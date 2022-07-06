@@ -83,4 +83,3 @@ def normalize_by_area(
     adata
 ):
     return adata
-    
