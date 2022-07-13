@@ -23,6 +23,7 @@ def calc_metric1 (
     #subtract matricies
     diff = cor_seq - cor_spt
     #find median
-    mean = np.mean(np.absolute(diff)) / 2
+    diff[np.tril_indices(len(common))] = np.nan
+    mean = np.nanmean(np.absolute(diff)) / 2
 
     return mean
