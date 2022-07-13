@@ -9,6 +9,16 @@ import matplotlib.pyplot as plt
 
 from cellpose import models
 
+def cellpose(img, min_size=15):
+    model = models.Cellpose(model_type='nuclei')
+    res, _, _, _ = model.eval(
+        img,
+        channels=[0, 0],
+        diameter=None,
+        min_size=min_size,
+    )
+    return res
+
 def segment_nuclei(img, 
     layer=None, 
     library_id=None, 
@@ -47,11 +57,17 @@ def segment_nuclei(img,
         Otherwise, modifies the img with the following key:
         ``squidpy.im.ImageContainer ['{layer_added}']``
     """
-    sq.im.process(
-        img=img,
-        layer=layer,
-        method = "smooth"
-    )
+    if(method == 'cellpose'):
+        return sq.im.segment(img=img, layer= layer, library_id=library_id, method=cellpose, 
+            channel=channel, chunks=chunks, lazy=lazy, layer_added=layer_added, copy=copy, **kwargs)
 
-    return sq.im.segment(img, layer="image_smooth", library_id=library_id, method=method, 
-        channel=channel, chunks=chunks, lazy=lazy, layer_added=layer_added, copy=copy)
+    else:
+        sq.im.process(
+            img=img,
+            layer=layer,
+            method = "smooth",
+            layer_added = "image_smooth"
+        )
+        
+        return sq.im.segment(img=img, layer= "image_smooth", library_id=library_id, method=method, 
+            channel=channel, chunks=chunks, lazy=lazy, layer_added=layer_added, copy=copy, **kwargs)

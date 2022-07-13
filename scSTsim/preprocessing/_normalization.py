@@ -80,6 +80,20 @@ def normalize_pearson_residuals(
 
 #TODO Fill in function
 def normalize_by_area(
-    adata
+    adata,
+    area='area',
+    inplace=True,
+    **kwargs
 ):
-    return adata
+    """
+    :param adata: unnormalized ``anndata`` object with counts
+    :param area: name of vector in ``adata.obsm`` with area values to use for normalization
+    :return: If ``inplace=True``, ``adata.X`` is updated with the normalized values. Otherwise, returns normalized 
+        numpy array
+    """
+    x = adata.X / adata.obsm[area][:,None]
+    
+    if(not inplace):
+        return x
+    adata.X = x
+    return 
