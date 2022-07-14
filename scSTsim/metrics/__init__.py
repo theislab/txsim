@@ -1,3 +1,3 @@
 #TODO replace with actual names
-from .metric1 import calc_metric1
+from .coexpression_similarity import coexpression_similarity
 from .metric2 import calc_metric2
