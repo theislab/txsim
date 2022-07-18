@@ -1,21 +1,20 @@
-import scanpy as sc
-import anndata as ad
+from anndata import AnnData
 import numpy as np
 
 #TODO replace with better name
 
 def coexpression_similarity(
-    spatial_data: ad._core.anndata.AnnData,
-    seq_data: ad._core.anndata.AnnData
+    spatial_data: AnnData,
+    seq_data: AnnData
 ) -> float:
-    """Calculates the mean difference of Pearson correlation matrix values
+    """Calculate the mean difference of Pearson correlation matrix values
     
     Parameters
     ----------
-    spatial_data : ad._core.anndata.AnnData
-        annotated ``anndata`` object with counts from spatial data
-    seq_data : ad._core.anndata.AnnData
-        annotated ``anndata`` object with counts scRNAseq data
+    spatial_data : AnnData
+        annotated ``AnnData`` object with counts from spatial data
+    seq_data : AnnData
+        annotated ``AnnData`` object with counts scRNAseq data
 
     Returns
     -------

@@ -5,7 +5,26 @@ from cellpose import models
 from typing import Union,  Optional, Any, Mapping, Callable, Sequence, TYPE_CHECKING, Tuple
 from squidpy._utils import NDArrayA
 
-def cellpose(img, min_size=15):
+#TODO seperate cellpose and watershed into two seperate functions
+def cellpose(
+    img: NDArrayA, 
+    min_size: Optional[int] = 15
+) -> NDArrayA:
+    """Run cellpose and get masks
+
+    Parameters
+    ----------
+    img : NDArrayA
+        Can be list of 2D/3D images, or array of 2D/3D images, or 4D image array
+    min_size : Optional[int], optional
+        Minimum number of pixels per mask, can turn off with -1, by default 15
+
+    Returns
+    -------
+    NDArray
+        labelled image, where 0=no masks; 1,2,...=mask labels
+    """
+    
     model = models.Cellpose(model_type='nuclei')
     res, _, _, _ = model.eval(
         img,
