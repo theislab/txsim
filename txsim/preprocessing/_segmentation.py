@@ -87,8 +87,8 @@ def segment_nuclei(
     """  
       
     if(method == 'cellpose'):
-        return sq.im.segment(img=img, layer= layer, library_id=library_id, method=cellpose, 
-            channel=channel, chunks=chunks, lazy=lazy, layer_added=layer_added, copy=copy, **kwargs)
+        return sq.im.segment(img=img, layer=layer, library_id=library_id, method=cellpose, 
+            channel=channel, chunks=chunks, lazy=lazy, layer_added="segmented_cellpose", copy=copy, **kwargs)
 
     else:
         sq.im.process(
