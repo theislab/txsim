@@ -140,7 +140,7 @@ def normalize_by_area(
         If ``inplace=True``, ``adata.X`` is updated with the normalized values. 
         Otherwise, returns normalized numpy array
     """
-    x = adata.X / adata.obs[area][:,None]
+    x = adata.X / adata.obs[area].to_numpy()[:,None]
     
     if(not inplace):
         return x
