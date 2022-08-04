@@ -7,7 +7,7 @@ from typing import Optional
 
 def generate_adata(
     molecules: str,
-    cell_types: Optional[str]
+    cell_types: Optional[str] = None
 ) -> AnnData:
     """Generate an AnnData object with counts from molecule data
 
@@ -16,7 +16,7 @@ def generate_adata(
     molecules : str
         File name of CSV containing genes and cell assignments
     cell_types : Optional[str]
-        File name containing cell type for each cell
+        File name containing cell type for each cell, by default None
 
     Returns
     -------
