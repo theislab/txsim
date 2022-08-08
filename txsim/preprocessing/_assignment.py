@@ -35,7 +35,7 @@ def basic_assign(
     spots['cell'] = seg[spots.y.to_numpy(dtype=np.int64), spots.x.to_numpy(dtype=np.int64)]
     return spots
 
-def run_pciseq(
+def run_pciSeq(
     molecules: str,
     image: str,
     sc_data: str,
