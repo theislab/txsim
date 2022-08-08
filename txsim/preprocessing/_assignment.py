@@ -72,7 +72,10 @@ def run_pciseq(
     
     #Read and format molecules, single cell data, and labels
     spots = pd.read_csv(molecules)
-    spots.columns = ['Gene', 'x', 'y']
+    spots.rename(columns = {spots.columns[0]:'Gene',
+                     spots.columns[1]:'x',
+                     spots.columns[2]:'y'
+                     } , inplace = True)
 
     adata = sc.read_h5ad(sc_data)
     scdata = adata.X
@@ -83,12 +86,20 @@ def run_pciseq(
     seg = skimage.io.imread(image)
     coo = coo_matrix(seg)
 
-    #TODO Add safety feature for genes that aren't included
-
-
+    #Safety feature for spatial genes that aren't included in scRNAseq
+    not_included = set(spots['Gene']) - set(adata.var_names)
+    if len(not_included) > 0:
+        if opts is None:
+            opts = {'exclude_genes':  list(not_included) }
+        elif opts.get('exclude_genes') is None:
+            opts['exclude_genes'] =  list(not_included)
+        else:
+            opts['exclude_genes'].extend(list(not_included))
+            opts['exclude_genes'] = list(set(opts['exclude_genes']))
+    
     #Run through pciSeq
     pciSeq.attach_to_log()
-    if(opts != None):
+    if(opts is not None):
         cellData, geneData = pciSeq.fit(spots, coo, scdata, opts)
     else:
         cellData, geneData = pciSeq.fit(spots, coo, scdata)   
