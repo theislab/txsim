@@ -40,7 +40,7 @@ def run_pciSeq(
     image: str,
     sc_data: str,
     cell_type_key: str,
-    opts: Optional[dict]
+    opts: Optional[dict] = None
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Use pciSeq to assign molecules to cells
 
@@ -120,3 +120,42 @@ def run_pciSeq(
     cell_types[cell_types == 'Zero'] = 'None'
     
     return assignments, cell_types
+
+def run_clustermap(
+    molecules: str,
+    image: str,
+    opts: Optional[dict] = None
+) -> pd.DataFrame:
+    from ClusterMap.clustermap import ClusterMap
+    import tifffile
+
+    dapi = tifffile.imread(image)
+
+    spots = pd.read_csv(molecules)
+    spots.rename(columns = {spots.columns[0]:'gene_name',
+                        spots.columns[1]:'spot_location_1',
+                        spots.columns[2]:'spot_location_2'
+                        } , inplace = True)
+    genes, ids = np.unique(spots['gene_name'], return_inverse=True)
+    spots['gene'] = ids+1
+    spots = spots.astype({'spot_location_1':int, 'spot_location_2':int})
+
+    gene_list=np.unique(ids)+1
+    genes = pd.DataFrame(genes)
+
+    model = ClusterMap(spots=spots,dapi=dapi, gene_list=gene_list, num_dims=2, xy_radius=25, z_radius=0, fast_preprocess=True)
+
+    model.preprocess()
+
+    model.min_spot_per_cell = 2
+    model.segmentation(cell_num_threshold=0.01,dapi_grid_interval=5,add_dapi=True,use_genedis=True)
+
+    assignments = spots[['gene_name', 'spot_location_1','spot_location_2', 'clustermap']].copy()
+    
+    assignments.rename(columns = {'gene_name':'Gene',
+                        'spot_location_1':'x',
+                        'spot_location_2':'y',
+                        'clustermap':'cell',
+                        } , inplace = True)
+    
+    return assignments

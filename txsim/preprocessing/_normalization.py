@@ -114,8 +114,6 @@ def normalize_pearson_residuals(
     return sc.experimental.pp.normalize_pearson_residuals(adata, theta=theta, clip=clip, check_values=check_values, 
         layer=layer, inplace=inplace, copy=copy)
 
-
-#TODO Fill in function
 def normalize_by_area(
     adata: AnnData,
     area: Optional[str] = 'area',

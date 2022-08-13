@@ -26,7 +26,7 @@ def generate_adata(
     
     #Read assignments
     spots = pd.read_csv(molecules)
-    spots = spots[spots['cell'] != 0]
+    spots = spots[spots['cell'] > 0]
 
     #Generate blank, labelled count matrix
     X = np.zeros([ len(pd.unique(spots['cell'])), len(pd.unique(spots['Gene'])) ])
@@ -80,6 +80,7 @@ def calculate_alpha_area(
     # If there are <3 molecules for a cell, use the mean area per molecule
     # times the number of molecules in the cell
     area_vec = np.zeros([adata.n_obs])
+    shape_vec = []
     for i in range(adata.n_obs):
         dots = pd.concat(
             [spots[spots['cell'] == adata.obs['cell_id'][i]].x,
@@ -87,9 +88,10 @@ def calculate_alpha_area(
             axis=1
         )
         pts = list(dots.itertuples(index=False, name=None))
+        alpha_shape = alphashape.alphashape(pts,alpha)
+        shape_vec.append(alpha_shape)
         #If possible, take area of alpha shape
         if(len(pts) > 2):
-            alpha_shape = alphashape.alphashape(pts,alpha)
             area_vec[i] = alpha_shape.area
         else:
             area_vec[i] = np.nan
@@ -98,4 +100,5 @@ def calculate_alpha_area(
     #Use this mean area to fill in NaN values
     area_vec[np.isnan(area_vec)] = mean_area * np.sum(adata.X, axis=1)[np.isnan(area_vec)]
     adata.obs['alpha_area'] = area_vec
+    adata.obs['alpha_shape'] = shape_vec
     return area_vec

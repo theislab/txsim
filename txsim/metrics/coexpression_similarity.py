@@ -1,8 +1,6 @@
 from anndata import AnnData
 import numpy as np
 
-#TODO replace with better name
-
 def coexpression_similarity(
     spatial_data: AnnData,
     seq_data: AnnData,
