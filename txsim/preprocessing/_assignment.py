@@ -47,7 +47,7 @@ def run_pciSeq(
     Parameters
     ----------
     molecules : str
-        File name of molecule data CSV with columns: 'gene name', 'x coord', 'y coord'
+        File name of molecule data CSV with the first 3 columns: 'gene', 'x', 'y'
     image : str
         File name of TIF with segmented cells where each cell is indicated by a different value
     sc_data : str
@@ -105,8 +105,7 @@ def run_pciSeq(
         cellData, geneData = pciSeq.fit(spots, coo, scdata)   
 
     #Save in correct format
-    assignments = geneData[ ["Gene", "x", "y", "neighbour"] ]
-    assignments.columns = ["Gene", "x", "y", "cell"]
+    assignments = geneData["neighbour"]
 
     #Save cell types
     type_vec = []
@@ -115,11 +114,12 @@ def run_pciSeq(
 
     #Change the cell names to match the segmentation
     cell_id = np.unique(seg)
-    assignments['cell'] = cell_id[assignments['cell']]
+    assignments = cell_id[assignments]
+    spots['cell'] = assignments
     cell_types = pd.DataFrame(data=type_vec, index = cell_id[cell_id != 0])
     cell_types[cell_types == 'Zero'] = 'None'
     
-    return assignments, cell_types
+    return spots, cell_types
 
 def run_clustermap(
     molecules: str,
@@ -150,7 +150,7 @@ def run_clustermap(
     model.min_spot_per_cell = 2
     model.segmentation(cell_num_threshold=0.01,dapi_grid_interval=5,add_dapi=True,use_genedis=True)
 
-    assignments = spots[['gene_name', 'spot_location_1','spot_location_2', 'clustermap']].copy()
+    assignments = spots.copy()
     
     assignments.rename(columns = {'gene_name':'Gene',
                         'spot_location_1':'x',

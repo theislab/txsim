@@ -24,8 +24,9 @@ def generate_adata(
         Populated count matrix
     """
     
-    #Read assignments
+    #Read assignments and calculate percentage of non-assigned spots
     spots = pd.read_csv(molecules)
+    pct_noise = sum(spots['cell'] <= 0)/len(spots['cell'])
     spots = spots[spots['cell'] > 0]
 
     #Generate blank, labelled count matrix
@@ -34,15 +35,28 @@ def generate_adata(
     adata.obs['cell_id'] = pd.unique(spots['cell'])
     adata.obs_names = [f"Cell_{i:d}" for i in range(adata.n_obs)]
     adata.var_names = pd.unique(spots['Gene'])
+    adata.obs['prior_celltype'] = 'None'
 
     #Populate matrix using assignments
-    for gene in adata.var_names:
-        cts = spots[spots['Gene'] == gene ]['cell'].value_counts()
-        adata[:, gene] = cts.reindex(adata.obs['cell_id'], fill_value = 0)
-
+    #Add in prior celltype if it exists
+    for cell_id in adata.obs['cell_id']:
+        cts = spots[spots['cell'] == cell_id ]['Gene'].value_counts()
+        adata[adata.obs['cell_id'] == cell_id, :] = cts.reindex(adata.var_names, fill_value = 0)
+        if 'celltype' in spots.columns:
+            mode = spots[spots['cell'] == cell_id ]['celltype'].mode()
+            if (spots[spots['cell'] == cell_id ]['celltype'].value_counts()[mode].values[0] / sum(cts)) > 0.75:
+                adata.obs.loc[adata.obs['cell_id'] == cell_id, 'prior_celltype'] = mode.values[0]
+    
     if cell_types is not None:
         temp = pd.read_csv(cell_types, header=None, index_col = 0)
         adata.obs['celltype'] = pd.Categorical(temp[1][adata.obs['cell_id']])
+    else:
+        adata.obs['celltype'] = adata.obs['prior_celltype']
+
+    #Save some additional information about data
+    #adata.uns['spots'] = spots
+    adata.uns['pct_noise'] = pct_noise
+    adata.layers['raw_counts'] = adata.X
 
     return adata
 
