@@ -85,6 +85,8 @@ def calculate_alpha_area(
 
     import alphashape
     from descartes import PolygonPatch
+    import shapely
+    import json
     
     #Read assignments
     spots = pd.read_csv(molecules)
@@ -103,7 +105,7 @@ def calculate_alpha_area(
         )
         pts = list(dots.itertuples(index=False, name=None))
         alpha_shape = alphashape.alphashape(pts,alpha)
-        shape_vec.append(alpha_shape)
+        shape_vec.append(json.dumps(shapely.geometry.mapping(alpha_shape)))
         #If possible, take area of alpha shape
         if(len(pts) > 2):
             area_vec[i] = alpha_shape.area
