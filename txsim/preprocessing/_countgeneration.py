@@ -7,7 +7,8 @@ from typing import Optional
 
 def generate_adata(
     molecules: str,
-    cell_types: Optional[str] = None
+    cell_types: Optional[str] = None,
+    prior_pct: float = 0.7
 ) -> AnnData:
     """Generate an AnnData object with counts from molecule data
 
@@ -17,6 +18,8 @@ def generate_adata(
         File name of CSV containing genes and cell assignments
     cell_types : Optional[str]
         File name containing cell type for each cell, by default None
+    prior_pct : float
+        Threshold percent for cell to be given prior segmented celltype, by default 0.7
 
     Returns
     -------
@@ -54,15 +57,14 @@ def generate_adata(
         adata.obs['celltype'] = adata.obs['prior_celltype']
 
     #Save some additional information about data
-    #adata.uns['spots'] = spots
+    adata.uns['spots'] = spots
     adata.uns['pct_noise'] = pct_noise
-    adata.layers['raw_counts'] = adata.X
+    adata.layers['raw_counts'] = adata.X.copy()
 
     return adata
 
 def calculate_alpha_area(
     adata: AnnData,
-    molecules: str,
     alpha: float = 0
 ) -> np.ndarray:
     """Calculate and store the alpha shape area of the cell given a set of points (genes). 
@@ -71,11 +73,10 @@ def calculate_alpha_area(
     Parameters
     ----------
     adata : AnnData
-        AnnData object with cells as `obs` and genes as `var`
-    molecules : str
-        File name of CSV containing genes and cell assignments
+        AnnData object with cells as `obs` and genes as `var`, and spots as `adata.uns['spots']`
     alpha : float, optional
-        The alpha parameter a, used to calculate the alpha shape, by default 0
+        The alpha parameter a, used to calculate the alpha shape, by default 0. If -1, optimal alpha 
+        parameter will be calculated.
 
     Returns
     -------
@@ -89,12 +90,10 @@ def calculate_alpha_area(
     import json
     
     #Read assignments
-    spots = pd.read_csv(molecules)
-    spots = spots[spots['cell'] != 0]
+    spots = adata.uns['spots']
 
     # Calculate alpha shape
-    # If there are <3 molecules for a cell, use the mean area per molecule
-    # times the number of molecules in the cell
+    # If there are <3 molecules for a cell, use the mean area
     area_vec = np.zeros([adata.n_obs])
     shape_vec = []
     for i in range(adata.n_obs):
@@ -104,17 +103,29 @@ def calculate_alpha_area(
             axis=1
         )
         pts = list(dots.itertuples(index=False, name=None))
-        alpha_shape = alphashape.alphashape(pts,alpha)
+        #If alpha is negative, find optimal alpha, else use parameter/convex hull
+        if alpha < 0 and len(pts) > 3:
+            opt_alpha = alphashape.optimizealpha(pts, max_iterations=100, lower = 0, upper = 10, silent=False)
+            alpha_shape = alphashape.alphashape(pts, opt_alpha)
+        elif alpha < 0:
+            alpha_shape = alphashape.alphashape(pts,0)
+        else:    
+            alpha_shape = alphashape.alphashape(pts,alpha)
+        
         shape_vec.append(json.dumps(shapely.geometry.mapping(alpha_shape)))
         #If possible, take area of alpha shape
-        if(len(pts) > 2):
+        if(len(pts) > 3):
             area_vec[i] = alpha_shape.area
         else:
             area_vec[i] = np.nan
-    #Normalize each cell by the number of molecules assigned to it
-    mean_area = np.nanmean(area_vec / np.sum(adata.X, axis=1) )
-    #Use this mean area to fill in NaN values
-    area_vec[np.isnan(area_vec)] = mean_area * np.sum(adata.X, axis=1)[np.isnan(area_vec)]
+    
+    #Find mean cell area and fill in NaN and very small values
+    #mean_area = np.nanmean(area_vec / np.sum(adata.X, axis=1) )
+    #area_vec[np.isnan(area_vec)] = mean_area * np.sum(adata.X, axis=1)[np.isnan(area_vec)]
+    mean_area = np.nanmean(area_vec)
+    area_vec[np.isnan(area_vec)] = mean_area
+    area_vec[np.where(area_vec < 1)] = mean_area
+
     adata.obs['alpha_area'] = area_vec
     adata.obs['alpha_shape'] = shape_vec
     return area_vec
