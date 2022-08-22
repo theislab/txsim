@@ -86,14 +86,15 @@ def run_pciSeq(
     seg = skimage.io.imread(image)
     coo = coo_matrix(seg)
 
+    if opts is None:
+        opts = {}
+
     #Safety feature for spatial genes that aren't included in scRNAseq
     not_included = set(spots['Gene']) - set(adata.var_names)
     if len(not_included) > 0:
         print("Warning: the following genes will be exluded since they were in the spatial data but not RNAseq")
         print(list(not_included))
-        if opts is None:
-            opts = {'exclude_genes':  list(not_included) }
-        elif opts.get('exclude_genes') is None:
+        if opts.get('exclude_genes') is None:
             opts['exclude_genes'] =  list(not_included)
         else:
             opts['exclude_genes'].extend(list(not_included))
@@ -115,9 +116,15 @@ def run_pciSeq(
         type_vec.append(cellData['ClassName'][i][np.argmax(cellData['Prob'][i])])
 
     #Change the cell names to match the segmentation
+
     cell_id = np.unique(seg)
     assignments = cell_id[assignments]
-    spots['cell'] = assignments
+    if opts.get('exclude_genes') is None:
+        spots['cell'] = assignments
+    else:
+        spots['cell'] = 0
+        spots.loc[~spots['Gene'].isin(opts['exclude_genes']), 'cell'] = assignments
+    
     cell_types = pd.DataFrame(data=type_vec, index = cell_id[cell_id != 0])
     cell_types[cell_types == 'Zero'] = 'None'
     
