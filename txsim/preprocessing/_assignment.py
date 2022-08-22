@@ -177,6 +177,8 @@ def run_clustermap(
     model = ClusterMap(spots=spots,dapi=dapi, gene_list=gene_list, num_dims=num_dims,z_radius=0,
         **(hyperparams['model']))
 
+    print('Radius: ' + str(model.xy_radius))
+
     #Preprocess
     model.preprocess(**(hyperparams['preprocess']))
 
@@ -193,5 +195,6 @@ def run_clustermap(
                         'spot_location_2':'y',
                         'clustermap':'cell',
                         } , inplace = True)
-    
+    assignments.cell = assignments.cell+1
+
     return assignments
