@@ -114,8 +114,6 @@ def normalize_pearson_residuals(
     return sc.experimental.pp.normalize_pearson_residuals(adata, theta=theta, clip=clip, check_values=check_values, 
         layer=layer, inplace=inplace, copy=copy)
 
-
-#TODO Fill in function
 def normalize_by_area(
     adata: AnnData,
     area: Optional[str] = 'area',
@@ -140,7 +138,7 @@ def normalize_by_area(
         If ``inplace=True``, ``adata.X`` is updated with the normalized values. 
         Otherwise, returns normalized numpy array
     """
-    x = adata.X / adata.obs[area][:,None]
+    x = adata.X / adata.obs[area].to_numpy()[:,None]
     
     if(not inplace):
         return x
