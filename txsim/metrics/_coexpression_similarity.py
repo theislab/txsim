@@ -1,11 +1,14 @@
 from anndata import AnnData
 import numpy as np
 import pandas as pd
+import scanpy as sc
 
 def coexpression_similarity(
     spatial_data: AnnData,
     seq_data: AnnData,
-    thresh: float = 0
+    thresh: float = 0,
+    raw: bool = False,
+    norm_sc: bool = True
 ) -> float:
     """Calculate the mean difference of Pearson correlation matrix values
     
@@ -25,10 +28,19 @@ def coexpression_similarity(
     mean : float
         mean of upper triangular difference matrix
     """
+
+    #Copy to prevent overwriting original
+    _seq_data = seq_data.copy()
+    _spatial_data = spatial_data.copy()
+
+    #Normalize single cell data and/or use raw spatial data
+    if norm_sc: sc.pp.normalize_total(_seq_data)
+    if raw: _spatial_data.X=_spatial_data.layers['raw_counts']
+
     #Create matrix only with intersected genes
-    common = seq_data.var_names.intersection(spatial_data.var_names)
-    seq = seq_data[:, common]
-    spt = spatial_data[:,common]
+    common = _seq_data.var_names.intersection(_spatial_data.var_names)
+    seq = _seq_data[:, common]
+    spt = _spatial_data[:,common]
 
     #Calculate corrcoef
     cor_seq = np.corrcoef(seq.X, rowvar=False)
@@ -88,6 +100,7 @@ def coexpression_similarity_celltype(
         cor_spt = np.corrcoef(spt[spt.obs[celltype]==c,:].X, rowvar=False)
 
         proportion = len(spt[spt.obs[celltype]==c])/len(spt.obs)
+        sc_proportion = len(seq[seq.obs[celltype]==c])/len(seq.obs)
 
         #If above threshold
         cor_seq[np.abs(cor_seq) < np.abs(thresh)] = np.nan
@@ -102,6 +115,7 @@ def coexpression_similarity_celltype(
 
         #Find mean of upper triangular
         mean = np.nanmean(np.absolute(diff)) / 2
-        mean_dict[c] = [mean, len(spt_above), len(cor_seq[~np.isnan(cor_seq)]), proportion]
+        mean_dict[c] = [mean, len(spt_above), len(cor_seq[~np.isnan(cor_seq)]), proportion, sc_proportion]
 
-    return pd.DataFrame.from_dict(mean_dict, orient='index', columns=['mean_diff', ' spt_above', 'seq_above', 'pct'])
+    return pd.DataFrame.from_dict(mean_dict, orient='index', 
+            columns=['mean_diff', ' spt_above', 'seq_above', 'pct', 'sc_pct'])
