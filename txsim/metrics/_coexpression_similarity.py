@@ -2,6 +2,7 @@ from anndata import AnnData
 import numpy as np
 import pandas as pd
 import scanpy as sc
+from pandas import DataFrame
 
 #TODO Change how normalization happens and consider using log1p
 def coexpression_similarity(
@@ -9,7 +10,7 @@ def coexpression_similarity(
     seq_data: AnnData,
     thresh: float = 0,
     raw: bool = False,
-    norm_sc: bool = True
+    log1p: bool = True
 ) -> float:
     """Calculate the mean difference of Pearson correlation matrix values
     
@@ -30,7 +31,7 @@ def coexpression_similarity(
 
     Returns
     -------
-    mean : float
+    float
         mean of upper triangular difference matrix
     """
 
@@ -39,8 +40,8 @@ def coexpression_similarity(
     _spatial_data = spatial_data.copy()
 
     #Normalize single cell data and/or use raw spatial data
-    if norm_sc: sc.pp.normalize_total(_seq_data)
     if raw: _spatial_data.X=_spatial_data.layers['raw_counts']
+    if log1p: sc.pp.log1p(_spatial_data)
 
     #Create matrix only with intersected genes
     common = _seq_data.var_names.intersection(_spatial_data.var_names)
@@ -68,7 +69,7 @@ def coexpression_similarity_celltype(
     seq_data: AnnData,
     thresh: float = 0,
     celltype: str = 'celltype'
-) -> float:
+) -> DataFrame:
     """Calculate the mean difference of Pearson correlation matrix values
     
     Parameters
@@ -86,8 +87,8 @@ def coexpression_similarity_celltype(
 
     Returns
     -------
-    mean : float
-        Mean of upper triangular difference matrix
+    DataFrame
+        Contains the mean coex diff for each cell type and additional information
     """
     #Create matrix only with intersected genes
     common = seq_data.var_names.intersection(spatial_data.var_names)
@@ -98,7 +99,7 @@ def coexpression_similarity_celltype(
     mean_dict = {}
     for c in common_types:
         #If there is only 1 cell:, skip cell type
-        if len(spt[spt.obs[celltype]==c]) == 1: continue
+        if len(spt[spt.obs[celltype]==c]) < 100: continue
 
         #Calculate corrcoef
         cor_seq = np.corrcoef(seq[seq.obs[celltype]==c,:].X, rowvar=False)
@@ -120,7 +121,7 @@ def coexpression_similarity_celltype(
 
         #Find mean of upper triangular
         mean = np.nanmean(np.absolute(diff)) / 2
-        mean_dict[c] = [mean, len(spt_above), len(cor_seq[~np.isnan(cor_seq)]), proportion, sc_proportion]
+        mean_dict[c] = [mean, len(spt_above)/2, len(cor_seq[~np.isnan(cor_seq)]), proportion, sc_proportion]
 
-    return pd.DataFrame.from_dict(mean_dict, orient='index', 
+    return DataFrame.from_dict(mean_dict, orient='index', 
             columns=['mean_diff', ' spt_above', 'seq_above', 'pct', 'sc_pct'])
