@@ -47,7 +47,7 @@ def generate_adata(
         adata[adata.obs['cell_id'] == cell_id, :] = cts.reindex(adata.var_names, fill_value = 0)
         if 'celltype' in spots.columns:
             mode = spots[spots['cell'] == cell_id ]['celltype'].mode()
-            if (spots[spots['cell'] == cell_id ]['celltype'].value_counts()[mode].values[0] / sum(cts)) > 0.75:
+            if (spots[spots['cell'] == cell_id ]['celltype'].value_counts()[mode].values[0] / sum(cts)) > prior_pct:
                 adata.obs.loc[adata.obs['cell_id'] == cell_id, 'prior_celltype'] = mode.values[0]
     
     if cell_types is not None:
