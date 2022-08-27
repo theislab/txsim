@@ -1,34 +1,36 @@
 import numpy as np
+from numpy import ndarray
 import anndata as ad
 from anndata import AnnData
 import pandas as pd
+from pandas import DataFrame
 import scanpy as sc
 from typing import Optional
 
 def generate_adata(
-    molecules: str,
-    cell_types: Optional[str] = None,
-    prior_pct: float = 0.7
+    molecules: DataFrame,
+    cell_types: Optional[DataFrame] = None,
+    prior_pct: float = 0.5
 ) -> AnnData:
     """Generate an AnnData object with counts from molecule data
 
     Parameters
     ----------
-    molecules : str
-        File name of CSV containing genes and cell assignments
-    cell_types : Optional[str]
-        File name containing cell type for each cell, by default None
-    prior_pct : float
-        Threshold percent for cell to be given prior segmented celltype, by default 0.7
+    molecules : DataFrame
+        DataFrame containing genes and cell assignments
+    cell_types : Optional[DataFrame], optional
+        DataFrame containing cell type for each cell, by default None
+    prior_pct : float, optional
+        Threshold percent for cell to be given prior segmented celltype, by default 0.5
 
     Returns
     -------
     AnnData
         Populated count matrix
-    """
+    """    
     
     #Read assignments and calculate percentage of non-assigned spots
-    spots = pd.read_csv(molecules)
+    spots = molecules.copy()
     pct_noise = sum(spots['cell'] <= 0)/len(spots['cell'])
     spots = spots[spots['cell'] > 0]
 
@@ -66,7 +68,7 @@ def generate_adata(
 def calculate_alpha_area(
     adata: AnnData,
     alpha: float = 0
-) -> np.ndarray:
+) -> ndarray:
     """Calculate and store the alpha shape area of the cell given a set of points (genes). 
     Uses the Alpha Shape Toolboox: https://alphashape.readthedocs.io/en/latest/readme.html 
 
@@ -80,7 +82,7 @@ def calculate_alpha_area(
 
     Returns
     -------
-    np.ndarray
+    ndarray
         Returns the area vector stored in `adata.obs['alpha_area']` as a numpy array
     """    
 

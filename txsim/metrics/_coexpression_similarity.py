@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 
+#TODO Change how normalization happens and consider using log1p
 def coexpression_similarity(
     spatial_data: AnnData,
     seq_data: AnnData,
@@ -22,6 +23,10 @@ def coexpression_similarity(
         threshold for significant pairs from scRNAseq data. Pairs with correlations
         below the threshold (by magnitude) will be ignored when calculating mean, by
         default 0
+    raw : bool, optional
+        Whether to use the raw counts for spatial data, by default False
+    norm_sc : bool, optional
+        whether to normalize single cell data first, by default True
 
     Returns
     -------

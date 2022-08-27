@@ -1,69 +1,70 @@
-import skimage.io
 import numpy as np
+from numpy import ndarray
 import pandas as pd
+from pandas import DataFrame
+import anndata as ad
+from anndata import AnnData
 from typing import Optional, Tuple
 
 def basic_assign(
-    molecules: str,
-    image: str
-) -> pd.DataFrame:
-    """Assign molecules to cells
+    molecules: DataFrame,
+    image: ndarray
+) -> DataFrame:
+    """Assign molecules to cells based on segments
 
     Parameters
     ----------
-    molecules : str
-        File name of molecule data CSV with columns: 'gene name', 'x coord', 'y coord'
-    image : str
-        File name of TIF with segmented cells where each cell is indicated by a different value
+    molecules : DataFrame
+        Molecule data DataFrame with first 3 columns: 'gene', 'x', 'y'
+    image : ndarray
+        DAPI image as matrix with segmented cells where each cell is indicated by a different value
 
     Returns
     -------
-    pd.DataFrame
+    DataFrame
         DataFrame containing the cell assignments as column 'cell'
     """
+
     #Read and format molecules
-    spots = pd.read_csv(molecules)
+    spots = molecules.copy()
     spots.rename(columns = {spots.columns[0]:'Gene',
                      spots.columns[1]:'x',
                      spots.columns[2]:'y'
                      } , inplace = True)
 
-    #Read image
-    seg = skimage.io.imread(image)
-
     #Assign molecules based value in segmentation array
-    spots['cell'] = seg[spots.y.to_numpy(dtype=np.int64), spots.x.to_numpy(dtype=np.int64)]
+    spots['cell'] = image[spots.y.to_numpy(dtype=np.int64), spots.x.to_numpy(dtype=np.int64)]
     return spots
 
 def run_pciSeq(
-    molecules: str,
-    image: str,
-    sc_data: str,
+    molecules: DataFrame,
+    image: ndarray,
+    sc_data: AnnData,
     cell_type_key: str,
     opts: Optional[dict] = None
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> Tuple[DataFrame, DataFrame]:
     """Use pciSeq to assign molecules to cells
 
     Parameters
     ----------
-    molecules : str
-        File name of molecule data CSV with the first 3 columns: 'gene', 'x', 'y'
-    image : str
-        File name of TIF with segmented cells where each cell is indicated by a different value
-    sc_data : str
-        File name of h5ad AnnData object 
+    molecules : DataFrame
+        Molecule data as pandas DataFrame with the first 3 columns: 'gene', 'x', 'y'
+    image : ndarray
+        DAPI image as matrix with segmented cells where each cell is indicated by a different value
+    sc_data : AnnData
+        AnnData object with scRNA-seq data
     cell_type_key : str
         Key for the cell type in `sc_data.obs` 
-    opts : Optional[dict]
-        Options for pciSeq
+    opts : Optional[dict], optional
+        Options for pciSeq, by default None
 
     Returns
     -------
-    Tuple[pd.DataFrame, pd.DataFrame]
-        Returns:
+    Tuple[DataFrame, DataFrame]
+        Returns two DataFrames:
             - Molecule to cell assignments
             - Cell types
-    """    
+    """
 
     import pciSeq
     from scipy.sparse import coo_matrix
@@ -71,20 +72,19 @@ def run_pciSeq(
 
     
     #Read and format molecules, single cell data, and labels
-    spots = pd.read_csv(molecules)
+    spots = molecules.copy()
     spots.rename(columns = {spots.columns[0]:'Gene',
                      spots.columns[1]:'x',
                      spots.columns[2]:'y'
                      } , inplace = True)
 
-    adata = sc.read_h5ad(sc_data)
+    adata = sc_data.copy()
     scdata = adata.X
     scdata  = pd.DataFrame(scdata.transpose())
     scdata.columns = adata.obs[cell_type_key]
     scdata.index = adata.var_names
 
-    seg = skimage.io.imread(image)
-    coo = coo_matrix(seg)
+    coo = coo_matrix(image)
 
     if opts is None:
         opts = {}
@@ -117,7 +117,7 @@ def run_pciSeq(
 
     #Change the cell names to match the segmentation
 
-    cell_id = np.unique(seg)
+    cell_id = np.unique(image)
     assignments = cell_id[assignments]
     if opts.get('exclude_genes') is None:
         spots['cell'] = assignments
@@ -152,7 +152,6 @@ def run_clustermap(
     pd.DataFrame
         DataFrame containing the cell assignments as column 'cell'
     """
-
 
     from ClusterMap.clustermap import ClusterMap
     import tifffile
