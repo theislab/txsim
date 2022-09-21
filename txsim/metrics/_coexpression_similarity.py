@@ -9,7 +9,7 @@ def coexpression_similarity(
     spatial_data: AnnData,
     seq_data: AnnData,
     thresh: float = 0,
-    return_matrices: bool = False
+    pipeline_output: bool = True,
 ):
     """Calculate the mean difference of normalised mutual information matrix values
     
@@ -23,9 +23,11 @@ def coexpression_similarity(
         threshold for significant pairs from scRNAseq data. Pairs with correlations
         below the threshold (by magnitude) will be ignored when calculating mean, by
         default 0
-    return_matrices: bool
-        return coexpression similarity matrix for each modality?
-        default False
+    pipeline_output: bool, optional (default: True)
+        flag whether the metric is run as part of the pipeline or not. If not, then
+        coexpression similarity matrices are returned for each modality. Otherwise,
+        only the mean absolute difference of the upper triangle of the coexpression
+        matrices is returned as a single score.
         
     Returns
     -------
@@ -52,7 +54,7 @@ def coexpression_similarity(
     sim_seq = drv.information_mutual_normalised(seq.X.T)
     
     
-    if return_matrices:
+    if not pipeline_output:
         return([sim_spt, sim_seq, common])
     else:
         # Evaluate NaN values for each gene in every modality

@@ -63,7 +63,7 @@ def gene_set_coexpression(
     mat_st, mat_sc, gene_ids = coexpression_similarity(
         spatial_data,
         seq_data,
-        return_matrices = True,
+        pipeline_output = False,
     )
     
     
