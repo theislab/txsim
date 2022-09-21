@@ -1,7 +1,5 @@
 import scanpy as sc
-import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import pandas as pd
 from anndata import AnnData
 
@@ -20,16 +18,17 @@ def similar_ge_across_clusters(adata_sp: AnnData, adata_sc: AnnData):
     scores : list
        similarity value for every gene across clusters
     """   
+    
     key='celltype'
     adata_sc.X = adata_sc.layers['lognorm']
     adata_sp.X = adata_sp.layers['lognorm']
     adata_sc=adata_sc[:,adata_sc.var['spatial']]
     unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
     genes=adata_sc.var.index[adata_sc.var.index.isin(adata_sp.var.index)]
-    exp_sc=pd.DataFrame(adata_sc.X,columns=adata_sc.var.index)
+    exp_sc=pd.DataFrame(adata_sc.layers["raw"],columns=adata_sc.var.index)
     gene_means_sc=pd.DataFrame(np.mean(exp_sc,axis=0))
     gene_means_sc=gene_means_sc.loc[gene_means_sc.index.sort_values(),:]
-    exp_sp=pd.DataFrame(adata_sp.X,columns=adata_sp.var.index)
+    exp_sp=pd.DataFrame(adata_sp.layers["raw"],columns=adata_sp.var.index)
     gene_means_sp=pd.DataFrame(np.mean(exp_sp,axis=0))
     gene_means_sp=gene_means_sp.loc[gene_means_sp.index.sort_values(),:]
     exp_sc['celltype']=list(adata_sc.obs['celltype'])
@@ -48,8 +47,8 @@ def similar_ge_across_clusters(adata_sp: AnnData, adata_sc: AnnData):
     values=np.mean(abs(mean_celltype_sp_norm-mean_celltype_sc_norm),axis=0)
     scores=pd.DataFrame(values,columns=['score']).sort_values(by='score')
     return scores
-    
-    
+
+
 def mean_similarity_gene_expression_across_clusters(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:bool=True)-> float:
     """Calculate mean similarity of the difference between mean normalized expression of genes across lusters in both modalities
     Parameters
@@ -72,8 +71,7 @@ def mean_similarity_gene_expression_across_clusters(adata_sp: AnnData, adata_sc:
         return output_value
     else:
         return float(output_value),scores
-
-
+    
 def median_similarity_gene_expression_across_clusters(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:bool=True)-> float:
     """Calculate meedian value of the similarity of the difference between mean normalized expression of genes across lusters in both modalities
     Parameters
@@ -96,9 +94,7 @@ def median_similarity_gene_expression_across_clusters(adata_sp: AnnData, adata_s
         return output_value
     else:
         return float(output_value),scores
-
-
-
+        
 def percentile95_similarity_gene_expression_across_clusters(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:bool=True)-> float:
     """Calculate percentile 95, considering the similarity of the difference between mean normalized expression of genes across lusters in both modalities
     Parameters
