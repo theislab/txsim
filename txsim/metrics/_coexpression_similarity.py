@@ -34,8 +34,10 @@ def coexpression_similarity(
     _spatial_data = spatial_data.copy()
 
     #Normalize single cell data and/or use raw spatial data
-    if norm_sc: sc.pp.normalize_total(_seq_data)
-    if raw: _spatial_data.X=_spatial_data.layers['raw_counts']
+    #if norm_sc: sc.pp.normalize_total(_seq_data)
+    #if raw: _spatial_data.X=_spatial_data.layers['raw_counts']
+    _spatial_data.X = _spatial_data.layers['lognorm']
+    _seq_data.X = _seq_data.layers['lognorm']
 
     #Create matrix only with intersected genes
     common = _seq_data.var_names.intersection(_spatial_data.var_names)
@@ -88,6 +90,8 @@ def coexpression_similarity_celltype(
     common = seq_data.var_names.intersection(spatial_data.var_names)
     seq = seq_data[:, common]
     spt = spatial_data[:,common]
+    seq.X = seq.layers['lognorm']
+    spt.X = spt.layers['lognorm']
     common_types = set(seq.obs[celltype]).intersection(set(spt.obs[celltype]))
 
     mean_dict = {}
