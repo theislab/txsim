@@ -119,7 +119,7 @@ def normalize_pearson_residuals(
     adata.layers['norm'] = sc.experimental.pp.normalize_pearson_residuals(adata, theta=theta, clip=clip, check_values=check_values, 
         layer=layer, inplace=False, copy=copy)['X']
     adata.layers['lognorm'] = adata.layers['norm'].copy()
-    adata.pp.log1p(adata, layer='lognorm')
+    sc.pp.log1p(adata, layer='lognorm')
     return adata
 
 def normalize_by_area(
@@ -153,6 +153,6 @@ def normalize_by_area(
     adata.layers['raw'] = adata.X.copy()
     adata.layers['norm'] = x
     adata.layers['lognorm'] = adata.layers['norm'].copy()
-    adata.pp.log1p(adata, layer='lognorm')
+    sc.pp.log1p(adata, layer='lognorm')
   
     return adata
