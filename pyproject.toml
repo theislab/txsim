@@ -7,6 +7,7 @@ requires = [
     "descartes",
     "cellpose",
     "shapely",
-    "scikit-image"
+    "scikit-image",
+    "pyitlib"
 ]
 build-backend = "setuptools.build_meta"
