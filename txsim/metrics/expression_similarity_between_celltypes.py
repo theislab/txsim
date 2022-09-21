@@ -1,13 +1,11 @@
 import scanpy as sc
-import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import pandas as pd
 from anndata import AnnData
 
-def similar_ge_across_clusters(adata_sp: AnnData, adata_sc: AnnData):
-    """Calculate the difference between mean normalized expression of genes across lusters in both modalities
-    Parameters
+
+def efficiency_deviation(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:bool=True,key='celltype'):
+    """Calculate the efficiency deviation present between the genes in the panel. 
     ----------
     adata_sp : AnnData
         annotated ``AnnData`` object with counts from spatial data
@@ -17,10 +15,13 @@ def similar_ge_across_clusters(adata_sp: AnnData, adata_sc: AnnData):
         Boolean for whether to use the 
     Returns
     -------
-    scores : list
-       similarity value for every gene across clusters
+    efficiency_std : float
+       Standard deviation of the calculated efficiencies for every gene. The higher it is, the more different the capture efficiencies are in comparison with the scRNAseq for every gene
+    efficiency_mean: float
+        Mean efficiency found when comparing scRNAseq and spatial for the overall panel tested
+    gene_ratios: pandas dataframe
+        Calculated efficiency for every gene in the panel when comparing scRNAseq to spatial
     """   
-    key='celltype'
     adata_sc=adata_sc[:,adata_sc.var['spatial']]
     unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
     genes=adata_sc.var.index[adata_sc.var.index.isin(adata_sp.var.index)]
@@ -39,83 +40,17 @@ def similar_ge_across_clusters(adata_sp: AnnData, adata_sc: AnnData):
     mean_celltype_sc=mean_celltype_sc.loc[:,mean_celltype_sc.columns.sort_values()]
     mean_celltype_sp=mean_celltype_sp.loc[:,mean_celltype_sp.columns.sort_values()]
     #If no read is prestent in a gene, we add 0.1 so that we can compute statistics
-    mean_celltype_sp.loc[:,list(mean_celltype_sp.sum(axis=0)==0)]=0.1
-    mean_celltype_sc.loc[:,list(mean_celltype_sc.sum(axis=0)==0)]=0.1
-    mean_celltype_sp_norm=mean_celltype_sp.div(mean_celltype_sp.mean(axis=0),axis=1)
-    mean_celltype_sc_norm=mean_celltype_sc.div(mean_celltype_sc.mean(axis=0),axis=1)
-    values=np.mean(abs(mean_celltype_sp_norm-mean_celltype_sc_norm),axis=0)
-    scores=pd.DataFrame(values,columns=['score']).sort_values(by='score')
-    return scores
-    
-    
-def mean_similarity_gene_expression_across_clusters(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:bool=True)-> float:
-    """Calculate mean similarity of the difference between mean normalized expression of genes across lusters in both modalities
-    Parameters
-    ----------
-    adata_sp : AnnData
-        annotated ``AnnData`` object with counts from spatial data
-    adata_sc : AnnData
-        annotated ``AnnData`` object with counts scRNAseq data
-    pipeline_output : float, optional
-        Boolean for whether to use the 
-    Returns
-    -------
-    output_value : float
-        mean of of the difference between mean normalized expression of genes across lusters in both modalities
-    """   
-    scores=similar_ge_across_clusters(adata_sp, adata_sc)
-    
-    output_value=np.mean(scores)
+    mean_celltype_sp.loc[:,list(mean_celltype_sp.sum(axis=0)==0)]=0.001
+    mean_celltype_sc.loc[:,list(mean_celltype_sc.sum(axis=0)==0)]=0.001
+    #mean_celltype_sp_norm=mean_celltype_sp.div(mean_celltype_sp.mean(axis=0),axis=1)
+    #mean_celltype_sc_norm=mean_celltype_sc.div(mean_celltype_sc.mean(axis=0),axis=1)
+    gene_ratios=pd.DataFrame(np.mean(mean_celltype_sp,axis=0)/np.mean(mean_celltype_sc,axis=0))
+    gr=pd.DataFrame(gene_ratios)
+    gr.columns=['efficiency_st_vs_sc']
+    efficiency_mean=np.mean(gene_ratios)
+    efficiency_std=np.std(gene_ratios)
     if pipeline_output==True:
-        return output_value
+        return efficiency_std
     else:
-        return float(output_value),scores
+        return efficiency_std,efficiency_mean,gr
 
-
-def median_similarity_gene_expression_across_clusters(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:bool=True)-> float:
-    """Calculate meedian value of the similarity of the difference between mean normalized expression of genes across lusters in both modalities
-    Parameters
-    ----------
-    adata_sp : AnnData
-        annotated ``AnnData`` object with counts from spatial data
-    adata_sc : AnnData
-        annotated ``AnnData`` object with counts scRNAseq data
-    pipeline_output : float, optional
-        Boolean for whether to use the 
-    Returns
-    -------
-    output_value : float
-        meedian of of the difference between mean normalized expression of genes across lusters in both modalities
-    """   
-    scores=similar_ge_across_clusters(adata_sp, adata_sc)
-    
-    output_value=np.median(scores)
-    if pipeline_output==True:
-        return output_value
-    else:
-        return float(output_value),scores
-
-
-
-def percentile95_similarity_gene_expression_across_clusters(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:bool=True)-> float:
-    """Calculate percentile 95, considering the similarity of the difference between mean normalized expression of genes across lusters in both modalities
-    Parameters
-    ----------
-    adata_sp : AnnData
-        annotated ``AnnData`` object with counts from spatial data
-    adata_sc : AnnData
-        annotated ``AnnData`` object with counts scRNAseq data
-    pipeline_output : float, optional
-        Boolean for whether to use the 
-    Returns
-    -------
-    output_value : float
-        meedian of of the difference between mean normalized expression of genes across lusters in both modalities
-    """   
-    scores=similar_ge_across_clusters(adata_sp, adata_sc)
-    
-    output_value=np.percentile(scores,95)
-    if pipeline_output==True:
-        return output_value
-    else:
-        return float(output_value),scores
