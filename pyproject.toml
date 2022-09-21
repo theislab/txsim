@@ -2,5 +2,11 @@
 requires = [
     "setuptools",
     "wheel",
+    "squidpy",
+    "alphashape",
+    "descartes",
+    "cellpose",
+    "shapely",
+    "scikit-image"
 ]
 build-backend = "setuptools.build_meta"
