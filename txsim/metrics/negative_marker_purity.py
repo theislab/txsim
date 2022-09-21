@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 from anndata import AnnData
 
-
 def negative_marker_purity(adata_sp: AnnData, adata_sc: AnnData,pipeline_output:bool=True):
     """ Negative marker purity aims to measure read leakeage between cells in spatial datasets. 
     For this, we calculate the increase in reads assigned in spatial datasets to pairs of genes-celltyes with no/very low expression in scRNAseq
@@ -52,5 +51,18 @@ def negative_marker_purity(adata_sp: AnnData, adata_sc: AnnData,pipeline_output:
     lowvals_sp_filt=[x for x in lowvals_sp if str(x) != 'nan']
     mean_sp_lowexp=np.mean(lowvals_sp_filt)
     negative_marker_purity=1-(mean_sp_lowexp-mean_sc_lowexp)
-    return negative_marker_purity
+    if pipeline_output==True:
+        return negative_marker_purity
+    else:
+        nmp_genes=[]
+        nmp_values=[]
+        for g in genes_with_noexp:
+            sels=mean_ct_sc_norm.loc[:,g]<minimum_exp
+            exi=mean_ct_sp_norm.loc[sels,g]-mean_ct_sc_norm.loc[sels,g]
+            exi=[x for x in exi if str(x) != 'nan']
+            if len(exi)>0:
+                nmp_genes.append(g)
+                nmp_values.append(np.mean(exi))
+        nmp_by_gene=pd.DataFrame([nmp_values],columns=[nmp_genes],index=['negative_marker_purity']).transpose()
+        return negative_marker_purity,nmp_by_gene
     
