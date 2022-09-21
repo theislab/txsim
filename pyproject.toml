@@ -2,5 +2,6 @@
 requires = [
     "setuptools",
     "wheel",
+    "omnipath",
 ]
 build-backend = "setuptools.build_meta"
