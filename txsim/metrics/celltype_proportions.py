@@ -23,7 +23,7 @@ def mean_proportion_deviation(adata_sp: AnnData, adata_sc: AnnData,pipeline_outp
     """   
 
     key='celltype'
-    adata_sc=adata_sc[:,adata_sc.var['spatial']]
+    adata_sc = adata_sc[:,adata_sc.var_names]
     unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
     celltype_info_sc=adata_sc.obs.loc[adata_sc.obs[key].isin(unique_celltypes),:]
     celltype_info_sp=adata_sp.obs.loc[adata_sp.obs[key].isin(unique_celltypes),:]
@@ -62,7 +62,7 @@ def proportion_cells_non_common_celltype_sc(adata_sp: AnnData, adata_sc: AnnData
     """   
 
     key='celltype'
-    adata_sc=adata_sc[:,adata_sc.var['spatial']]
+    adata_sc = adata_sc[:,adata_sc.var_names]
     unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
     celltype_info_sc=adata_sc.obs.loc[adata_sc.obs[key].isin(unique_celltypes),:]
     celltype_info_sp=adata_sp.obs.loc[adata_sp.obs[key].isin(unique_celltypes),:]
@@ -95,7 +95,7 @@ def proportion_cells_non_common_celltype_sp(adata_sp: AnnData, adata_sc: AnnData
     """   
 
     key='celltype'
-    adata_sc=adata_sc[:,adata_sc.var['spatial']]
+    adata_sc = adata_sc[:,adata_sc.var_names]
     unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
     celltype_info_sc=adata_sc.obs.loc[adata_sc.obs[key].isin(unique_celltypes),:]
     celltype_info_sp=adata_sp.obs.loc[adata_sp.obs[key].isin(unique_celltypes),:]
