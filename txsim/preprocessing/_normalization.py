@@ -54,9 +54,13 @@ def normalize_total(
         or updates `adata` with normalized version of the original
     `   adata.X` and `adata.layers`, depending on `inplace`
    """
-    
-    return sc.pp.normalize_total(adata=adata, target_sum=target_sum, exclude_highly_expressed=exclude_highly_expressed, 
-        max_fraction=max_fraction, key_added=key_added, layer=layer, inplace=inplace, copy=copy)
+    adata.layers['raw'] = adata.X
+    adata.layers['norm'] = sc.pp.normalize_total(adata=adata, target_sum=target_sum, exclude_highly_expressed=exclude_highly_expressed, 
+        inplace=False, max_fraction=max_fraction, key_added=key_added, layer=layer, copy=copy)['X']
+    adata.layers['lognorm'] = adata.layers['norm'].copy()
+    sc.pp.log1p(adata, layer='lognorm')
+
+    return adata
 
 def normalize_pearson_residuals(
     adata: AnnData,
@@ -111,8 +115,12 @@ def normalize_pearson_residuals(
         ``.uns['pearson_residuals_normalization']['computed_on']``:The name of the layer on which the residuals were computed.
     """
 
-    return sc.experimental.pp.normalize_pearson_residuals(adata, theta=theta, clip=clip, check_values=check_values, 
-        layer=layer, inplace=inplace, copy=copy)
+    adata.layers['raw'] = adata.X.copy()
+    adata.layers['norm'] = sc.experimental.pp.normalize_pearson_residuals(adata, theta=theta, clip=clip, check_values=check_values, 
+        layer=layer, inplace=False, copy=copy)['X']
+    adata.layers['lognorm'] = adata.layers['norm'].copy()
+    adata.pp.log1p(adata, layer='lognorm')
+    return adata
 
 def normalize_by_area(
     adata: AnnData,
@@ -142,5 +150,9 @@ def normalize_by_area(
     
     if(not inplace):
         return x
-    adata.X = x
-    return 
+    adata.layers['raw'] = adata.X.copy()
+    adata.layers['norm'] = x
+    adata.layers['lognorm'] = adata.layers['norm'].copy()
+    adata.pp.log1p(adata, layer='lognorm')
+  
+    return adata
