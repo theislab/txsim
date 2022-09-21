@@ -22,6 +22,8 @@ def efficiency_deviation(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:b
     gene_ratios: pandas dataframe
         Calculated efficiency for every gene in the panel when comparing scRNAseq to spatial
     """   
+    adata_sp.X = adata_sp.layers['lognorm']
+    adata_sc.X = adata_sp.layers['lognorm']
     adata_sc=adata_sc[:,adata_sc.var['spatial']]
     unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
     genes=adata_sc.var.index[adata_sc.var.index.isin(adata_sp.var.index)]
