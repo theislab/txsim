@@ -3,5 +3,12 @@ requires = [
     "setuptools",
     "wheel",
     "omnipath",
+    "squidpy",
+    "alphashape",
+    "descartes",
+    "cellpose",
+    "shapely",
+    "scikit-image",
+    "pyitlib"
 ]
 build-backend = "setuptools.build_meta"
