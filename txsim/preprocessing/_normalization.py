@@ -56,7 +56,7 @@ def normalize_total(
    """
     adata.layers['raw'] = adata.X
     adata.layers['norm'] = sc.pp.normalize_total(adata=adata, target_sum=target_sum, exclude_highly_expressed=exclude_highly_expressed, 
-        max_fraction=max_fraction, key_added=key_added, layer=layer, copy=copy)['X']
+        inplace=False, max_fraction=max_fraction, key_added=key_added, layer=layer, copy=copy)['X']
     adata.layers['lognorm'] = adata.layers['norm'].copy()
     sc.pp.log1p(adata, layer='lognorm')
 
