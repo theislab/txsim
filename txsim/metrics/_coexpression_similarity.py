@@ -13,8 +13,7 @@ def coexpression_similarity(
     layer: str = 'lognorm',
     key: str = 'celltype',
     by_celltype: bool = False,
-    pipeline_output = True
-    
+    pipeline_output: bool = True,
 ):
     """Calculate the mean difference of normalised mutual information matrix values
     
@@ -174,5 +173,3 @@ def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output
         output = mean
     
     return(output)
-        
-            
