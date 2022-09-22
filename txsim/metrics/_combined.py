@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 from ._coexpression_similarity import *
 from .metric2 import calc_metric2
-from ._combined import all_metrics
 from ._celltype_proportions import *
 from ._efficiency import *
 from ._expression_similarity_between_celltypes import *
@@ -40,7 +39,7 @@ def all_metrics(
     metrics['ratio_mean_genexcells']=ratio_mean_genesXcells(adata_sp,adata_sc)
     metrics['ratio_median_genexcells']=ratio_median_genesXcells(adata_sp,adata_sc)
     # KNN mixing
-    metrics['knn_mixing']=knn_mixing((adata_sp,adata_sc)
+    metrics['knn_mixing']=knn_mixing(adata_sp,adata_sc)
     
     
     
