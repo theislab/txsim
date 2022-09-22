@@ -71,6 +71,8 @@ def gene_set_coexpression(
     results = dict()
 
     for g in geneset_dict.keys():
+        print(f'Testing gene set: {g}')
+
         val = _mtx_subset_and_diff(
             mat_st,
             mat_sc,
@@ -110,10 +112,13 @@ def _mtx_subset_and_diff(
     mat_st_sub[np.tril_indices(len(ids_in_set))] = np.nan
     mat_sc_sub[np.tril_indices(len(ids_in_set))] = np.nan
 
+    mean_coexp_sc = np.nanmean(mat_sc_sub)
+    print(f'Average geneset coexpression in seq data: {mean_coexp_sc}')
+
     # Absolute mean diff
     diff = mat_st_sub - mat_sc_sub
     res = np.nanmean(np.absolute(diff)) / 2
-    
+
     return res
 
 
