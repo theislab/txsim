@@ -38,6 +38,8 @@ def gene_set_coexpression(
     """
     import omnipath as op
 
+    print('Computing gene set coexpression...')
+
     # Get gene sets to test
     anns = op.requests.Annotations.get(resources='MSigDB')
     geneset_dict = _get_msigdb_collection(anns)
