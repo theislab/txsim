@@ -24,7 +24,7 @@ def efficiency_deviation(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:b
     """   
 
     adata_sp.X = adata_sp.layers['lognorm']
-    adata_sc.X = adata_sp.layers['lognorm']
+    adata_sc.X = adata_sc.layers['lognorm']
     adata_sc=adata_sc[:,adata_sc.var['spatial']]
     unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
     genes=adata_sc.var.index[adata_sc.var.index.isin(adata_sp.var.index)]
@@ -53,9 +53,9 @@ def efficiency_deviation(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:b
     efficiency_mean=np.mean(gene_ratios)
     efficiency_std=np.std(gene_ratios)
     if pipeline_output==True:
-        return efficiency_std
+        return float(efficiency_std)
     else:
-        return efficiency_std,efficiency_mean,gr
+        return float(efficiency_std),efficiency_mean,gr
 
 
 def efficiency_mean(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:bool=True,key='celltype'):
@@ -104,7 +104,7 @@ def efficiency_mean(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:bool=T
     efficiency_mean=np.mean(gene_ratios)
     efficiency_mean=np.mean(gene_ratios)
     if pipeline_output==True:
-        return efficiency_mean
+        return float(efficiency_mean)
     else:
-        return efficiency_mean,efficiency_mean,gr
+        return float(efficiency_mean),efficiency_mean,gr
 
