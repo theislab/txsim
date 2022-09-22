@@ -11,7 +11,7 @@ def generate_adata(
     molecules: str,
     ct_method: str,
     ct_certainty_threshold: float = 0.7,
-    adata_sc_path: Optional[str] = None,
+    adata_sc: Optional[str] = None,
     ct_assign_output: Optional[str] = None,
     all_ct_methods: bool = False,
     #ct_manual_markers: Optional[str] = None, # ToDo: marker genes based annotation, input as csv with cell type and markers
@@ -65,7 +65,7 @@ def generate_adata(
     if (ct_method == 'majority' or all_ct_methods):
         adata = run_majority_voting(adata, spots)
     if (ct_method == 'ssam' or all_ct_methods):
-        adata = run_ssam(adata, spots, adata_sc_path = adata_sc_path)
+        adata = run_ssam(adata, spots, adata_sc = adata_sc)
     if (ct_method == 'pciSeq' or all_ct_methods):
         assert ct_assign_output is not None, 'Cell annotation file of assignment method not found.'
         temp = pd.read_csv(ct_assign_output, header=None, index_col = 0)
