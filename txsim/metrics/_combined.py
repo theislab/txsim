@@ -31,6 +31,11 @@ def all_metrics(
     metrics['mean_sim_across_clust'] = mean_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
     metrics['prc95_sim_across_clust'] = percentile95_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
     # Coexpression similarity
+    metrics['coexpression_similarity'] = coexpression_similarity(adata_sp, adata_sc)
+    metrics['coexpression_similarity_celltype'] = coexpression_similarity(
+        adata_sp,
+        adata_sc,
+        by_celltype = True)
     metrics['gene_set_coexpression'] = gene_set_coexpression(adata_sp, adata_sc)
     # Negative marker purity
     metrics['neg_marker_purity'] = negative_marker_purity(adata_sp,adata_sc)
