@@ -1,4 +1,5 @@
 import numpy as np
+import networkx as nx
 import anndata as ad
 from anndata import AnnData
 import scanpy as sc
@@ -73,7 +74,7 @@ def knn_mixing(
             sc.pp.neighbors(a,n_neighbors=k)
             G = nx.Graph(incoming_graph_data=a.obsp["connectivities"])
             nx.set_node_attributes(G, {i:a.obs["modality"].values[i] for i in range(G.number_of_nodes())}, "modality")
-            scores[ct] = -nx.attribute_assortativity_coefficient(G, "modality") + 1
+            scores[ct] = np.clip(-nx.attribute_assortativity_coefficient(G, "modality") + 1, 0, 1)
             
     mean_score = np.mean([v for _,v in scores.items() if v is not np.nan])
     
