@@ -130,7 +130,6 @@ def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output
     
     return(output)
         
-<<<<<<< HEAD
         #Find spatial correlations above threshold
         spt_above = cor_spt[np.abs(cor_spt) > np.abs(thresh)]
         spt_above = spt_above[spt_above < 0.9999]
@@ -144,6 +143,3 @@ def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output
 
     return pd.DataFrame.from_dict(mean_dict, orient='index', 
             columns=['mean_diff', ' spt_above', 'seq_above', 'pct', 'sc_pct'])
-=======
-            
->>>>>>> fff8f0be0ed94f91bfb2fa11ddc51d445f4b0bb8
