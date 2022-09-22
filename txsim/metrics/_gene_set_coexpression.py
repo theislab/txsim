@@ -50,7 +50,7 @@ def gene_set_coexpression(
     sets_to_remove = list()
 
     for g in geneset_dict:
-        overlap = len(set(test_dict[g]).intersection(common_features))
+        overlap = len(set(geneset_dict[g]).intersection(common_features))
     
         if overlap < overlap_threshold:
             sets_to_remove.append(g)
