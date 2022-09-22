@@ -46,7 +46,7 @@ def run_ssam(
     
     adata_st: AnnData,
     spots: pd.DataFrame,
-    adata_sc_path: str,
+    adata_sc: pd.DataFrame,
     um_p_px: float = 0.325,
     
 ) -> AnnData:
@@ -68,8 +68,6 @@ def run_ssam(
     AnnData
         Anndata object with cell type annotation in ``adata_st.obs['ct_ssam']`` and ``adata_st.obs['ct_ssam_cert']``, whereby the latter is the percentage of spots per cell with consistent cell type assignment.
     """
-    
-    adata_sc=sc.read_h5ad(adata_sc_path)
     
     x =  spots.x.values 
     y =  spots.y.values 
