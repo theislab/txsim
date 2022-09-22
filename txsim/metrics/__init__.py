@@ -1,4 +1,4 @@
-from ._coexpression_similarity import coexpression_similarity, coexpression_similarity_celltype
+from ._coexpression_similarity import coexpression_similarity
 from .metric2 import calc_metric2
 from ._combined import all_metrics
 from ._celltype_proportions import mean_proportion_deviation,proportion_cells_non_common_celltype_sc,proportion_cells_non_common_celltype_sp
