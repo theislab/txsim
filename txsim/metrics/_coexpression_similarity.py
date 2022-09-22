@@ -129,17 +129,3 @@ def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output
         output = mean
     
     return(output)
-        
-        #Find spatial correlations above threshold
-        spt_above = cor_spt[np.abs(cor_spt) > np.abs(thresh)]
-        spt_above = spt_above[spt_above < 0.9999]
-
-        #Subtract matricies
-        diff = cor_seq - cor_spt
-
-        #Find mean of upper triangular
-        mean = np.nanmean(np.absolute(diff)) / 2
-        mean_dict[c] = [mean, len(spt_above), len(cor_seq[~np.isnan(cor_seq)]), proportion, sc_proportion]
-
-    return pd.DataFrame.from_dict(mean_dict, orient='index', 
-            columns=['mean_diff', ' spt_above', 'seq_above', 'pct', 'sc_pct'])
