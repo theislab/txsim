@@ -13,7 +13,6 @@ def coexpression_similarity(
     key: str='celltype',
     by_celltype: bool=True,
     pipeline_output=True
-    
 ):
     """Calculate the mean difference of normalised mutual information matrix values
     
@@ -36,10 +35,12 @@ def coexpression_similarity(
     by_celltype: bool
         run analysis by cell type? If False, computation will be performed using the
         whole gene expression matrix
-    pipeline_output: bool
-        return coexpression similarity matrix for each modality?
-        default True
-        
+    pipeline_output: bool, optional (default: True)
+        flag whether the metric is run as part of the pipeline or not. If not, then
+        coexpression similarity matrices are returned for each modality. Otherwise,
+        only the mean absolute difference of the upper triangle of the coexpression
+        matrices is returned as a single score.
+
     Returns
     -------
     mean : float
@@ -130,4 +131,20 @@ def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output
     
     return(output)
         
+<<<<<<< HEAD
             
+=======
+        #Find spatial correlations above threshold
+        spt_above = cor_spt[np.abs(cor_spt) > np.abs(thresh)]
+        spt_above = spt_above[spt_above < 0.9999]
+
+        #Subtract matricies
+        diff = cor_seq - cor_spt
+
+        #Find mean of upper triangular
+        mean = np.nanmean(np.absolute(diff)) / 2
+        mean_dict[c] = [mean, len(spt_above), len(cor_seq[~np.isnan(cor_seq)]), proportion, sc_proportion]
+
+    return pd.DataFrame.from_dict(mean_dict, orient='index', 
+            columns=['mean_diff', ' spt_above', 'seq_above', 'pct', 'sc_pct'])
+>>>>>>> aa5c7557eb610c008e62a7819170bb02646cb0fe
