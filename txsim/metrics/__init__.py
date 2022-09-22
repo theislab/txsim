@@ -7,3 +7,4 @@ from ._expression_similarity_between_celltypes import similar_ge_across_clusters
 from ._negative_marker_purity import negative_marker_purity
 from ._cell_statistics import ratio_median_readsXcells,ratio_mean_readsXcells,ratio_number_of_cells,ratio_mean_genesXcells,ratio_median_genesXcells
 from ._coembedding import knn_mixing
+from ._gene_set_coexpression import gene_set_coexpression

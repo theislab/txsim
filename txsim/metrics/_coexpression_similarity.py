@@ -8,12 +8,11 @@ from pyitlib import discrete_random_variable as drv
 def coexpression_similarity(
     spatial_data: AnnData,
     seq_data: AnnData,
-    thresh: float=0,
-    layer: str='lognorm',
-    key: str='celltype',
-    by_celltype: bool=True,
-    pipeline_output=True
-    
+    thresh: float = 0,
+    layer: str = 'lognorm',
+    key: str = 'celltype',
+    by_celltype: bool = False,
+    pipeline_output: bool = True,
 ):
     """Calculate the mean difference of normalised mutual information matrix values
     
@@ -36,9 +35,11 @@ def coexpression_similarity(
     by_celltype: bool
         run analysis by cell type? If False, computation will be performed using the
         whole gene expression matrix
-    pipeline_output: bool
-        return coexpression similarity matrix for each modality?
-        default True
+    pipeline_output: bool, optional (default: True)
+        flag whether the metric is run as part of the pipeline or not. If not, then
+        coexpression similarity matrices are returned for each modality. Otherwise,
+        only the mean absolute difference of the upper triangle of the coexpression
+        matrices is returned as a single score.
         
     Returns
     -------
@@ -65,12 +66,11 @@ def coexpression_similarity(
           
     print("Calculating coexpression similarity")
     
-    
-    
     if not by_celltype:
         spt_mat = spt.layers[layer].T
         seq_mat = seq.layers[layer].T
         output = compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output)
+
     else:
         output = {}
         for c in common_types:
@@ -129,5 +129,3 @@ def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output
         output = mean
     
     return(output)
-        
-            
