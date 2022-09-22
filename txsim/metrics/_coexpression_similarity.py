@@ -11,6 +11,7 @@ def coexpression_similarity(
     thresh: float=0,
     layer: str='lognorm',
     key: str='celltype',
+    by_celltype: bool=True,
     pipeline_output=True
     
 ):
@@ -32,6 +33,9 @@ def coexpression_similarity(
         default lognorm
     key : str
         name of the column containing the cell type information
+    by_celltype: bool
+        run analysis by cell type? If False, computation will be performed using the
+        whole gene expression matrix
     pipeline_output: bool
         return coexpression similarity matrix for each modality?
         default True
@@ -61,54 +65,69 @@ def coexpression_similarity(
           
     print("Calculating coexpression similarity")
     
-    output = {}
-
-    for c in common_types:
-        #If there is only 1 cell:, skip cell type
-        #if len(spt[spt.obs['celltype']==c]) == 1: continue
-        print("[%s]" % c)
-        
-        # Extract expression data layer
-        spt_ct = spt[spt.obs[key]==c,:]
-        spt_mat = spt_ct.layers[layer].T
-        
-        seq_ct = seq[seq.obs[key]==c,:]
-        seq_mat = seq_ct.layers[layer].T
-        
-        # Apply distance metric
-        print("  - Spatial data...")        
-        sim_spt = drv.information_mutual_normalised(spt_mat)
-        print("  - Single-cell data...")
-        sim_seq = drv.information_mutual_normalised(seq_mat)
     
-        if not pipeline_output:
-            output[c] = [sim_spt, sim_seq, common]
-        else:
-        # Evaluate NaN values for each gene in every modality
-        ## Spatial
-            nan_res = np.sum(np.isnan(sim_spt), axis = 0)
-            if any(nan_res == len(common)):
-                genes_nan = common[nan_res == len(common)]
-                genes_nan = genes_nan.tolist()
-                print("The following genes in the spatial modality resulted in NaN values:")
-                for i in genes_nan: print(i)
+    
+    if not by_celltype:
+        spt_mat = spt.layers[layer].T
+        seq_mat = seq.layers[layer].T
+        output = compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output)
+    else:
+        output = {}
+        for c in common_types:
+            #If there is only 1 cell:, skip cell type
+            #if len(spt[spt.obs['celltype']==c]) == 1: continue
+            print("[%s]" % c)
+        
+            # Extract expression data layer
+            spt_ct = spt[spt.obs[key]==c,:]
+            spt_mat = spt_ct.layers[layer].T
+            
+            seq_ct = seq[seq.obs[key]==c,:]
+            seq_mat = seq_ct.layers[layer].T
+            output[c] = compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output)
+            
+       
+    return(output)
+
+
+
+def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output):
+    # Apply distance metric
+    print("  - Spatial data...")        
+    sim_spt = drv.information_mutual_normalised(spt_mat)
+    print("  - Single-cell data...")
+    sim_seq = drv.information_mutual_normalised(seq_mat)
+    
+    if not pipeline_output:
+        output = [sim_spt, sim_seq, common]
+    else:
+    # Evaluate NaN values for each gene in every modality
+    ## Spatial
+        nan_res = np.sum(np.isnan(sim_spt), axis = 0)
+        if any(nan_res == len(common)):
+            genes_nan = common[nan_res == len(common)]
+            genes_nan = genes_nan.tolist()
+            print("The following genes in the spatial modality resulted in NaN values:")
+            for i in genes_nan: print(i)
 
             ## Single cell
-            nan_res = np.sum(np.isnan(sim_seq), axis = 0)
-            if any(nan_res == len(common)):
-                genes_nan = common[nan_res == len(common)]
-                genes_nan = genes_nan.tolist()
-                print("The following genes in the single-cell modality resulted in NaN values")
-                for i in genes_nan: print(i)
+        nan_res = np.sum(np.isnan(sim_seq), axis = 0)
+        if any(nan_res == len(common)):
+            genes_nan = common[nan_res == len(common)]
+            genes_nan = genes_nan.tolist()
+            print("The following genes in the single-cell modality resulted in NaN values")
+            for i in genes_nan: print(i)
                 
-            #If threshold, mask values with NaNs
-            sim_seq[np.abs(sim_seq) < np.abs(thresh)] = np.nan
-            sim_seq[np.tril_indices(len(common))] = np.nan
+        #If threshold, mask values with NaNs
+        sim_seq[np.abs(sim_seq) < np.abs(thresh)] = np.nan
+        sim_seq[np.tril_indices(len(common))] = np.nan
 
 
-            # Calculate difference between modalities
-            diff = sim_seq - sim_spt
-            mean = np.nanmean(np.absolute(diff)) / 2
-            output[c] = mean
+        # Calculate difference between modalities
+        diff = sim_seq - sim_spt
+        mean = np.nanmean(np.absolute(diff)) / 2
+        output = mean
     
     return(output)
+        
+            
