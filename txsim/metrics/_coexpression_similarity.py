@@ -8,11 +8,12 @@ from pyitlib import discrete_random_variable as drv
 def coexpression_similarity(
     spatial_data: AnnData,
     seq_data: AnnData,
-    thresh: float=0,
-    layer: str='lognorm',
-    key: str='celltype',
-    by_celltype: bool=True,
-    pipeline_output=True
+    min_cells: int = 20,
+    thresh: float = 0,
+    layer: str = 'lognorm',
+    key: str = 'celltype',
+    by_celltype: bool = False,
+    pipeline_output = True
     
 ):
     """Calculate the mean difference of normalised mutual information matrix values
@@ -23,6 +24,9 @@ def coexpression_similarity(
         annotated ``AnnData`` object with counts from spatial data
     seq_data : AnnData
         annotated ``AnnData`` object with counts scRNAseq data
+    min_cells : int, optional
+        Minimum number of cells in which a gene should be detected to be considered
+        expressed. By default 20
     thresh : float, optional
         threshold for significant pairs from scRNAseq data. Pairs with correlations
         below the threshold (by magnitude) will be ignored when calculating mean, by
@@ -59,34 +63,73 @@ def coexpression_similarity(
     seq = _seq_data[:, common]
     spt = _spatial_data[:,common]
 
-    # Determine cell type populations across both modalities
-    ct_spt = list(np.unique(np.array(spt.obs[key])))
-    ct_seq = list(np.unique(np.array(seq.obs[key])))
-    
-    common_types = [x for x in ct_spt if x in ct_seq]
-          
-    print("Calculating coexpression similarity")
-    
-    
+    print(len(common), "genes are shared in both modalities")
     
     if not by_celltype:
-        spt_mat = spt.layers[layer].T
-        seq_mat = seq.layers[layer].T
-        output = compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output)
+        	
+        spatial_expressed = spt.var_names[sc.pp.filter_genes(spt, min_cells = min_cells, inplace=False)[0]]
+        seq_expressed = seq.var_names[sc.pp.filter_genes(seq, min_cells = min_cells, inplace=False)[0]]
+        
+        print(round(len(spatial_expressed)/len(common) * 100), "% of genes are expressed in the spatial modality", sep = '')
+        print(round(len(seq_expressed)/len(common) * 100), "% of genes are expressed in the single-cell modality", sep = '')
+        
+        common_exp = spatial_expressed.intersection(seq_expressed)
+        
+        if(not len(common_exp)):
+            print("No expressed genes are shared in both modalities")
+        else:
+            print(len(common_exp), "out of", len(common), 'genes will be used')
+            
+            spt_exp = spt[:, common_exp]
+            seq_exp = seq[:, common_exp]
+        
+            spt_mat = spt_exp.layers[layer].T
+            seq_mat = seq_exp.layers[layer].T
+            
+            print("Calculating coexpression similarity")
+            output = compute_mutual_information(spt_mat, seq_mat, common_exp, thresh, pipeline_output)
     else:
         output = {}
+        # Determine cell type populations across both modalities
+        ct_spt = list(np.unique(np.array(spt.obs[key])))
+        ct_seq = list(np.unique(np.array(seq.obs[key])))
+    
+        common_types = [x for x in ct_spt if x in ct_seq]
+        
+        #spt_ct_counts = spt.obs[key].value_counts()
+        #seq_ct_counts = seq.obs[key].value_counts()
+        #print(type(spt_ct_counts[spt_ct_counts > min_cells]))
+          
         for c in common_types:
-            #If there is only 1 cell:, skip cell type
-            #if len(spt[spt.obs['celltype']==c]) == 1: continue
             print("[%s]" % c)
         
             # Extract expression data layer
             spt_ct = spt[spt.obs[key]==c,:]
-            spt_mat = spt_ct.layers[layer].T
-            
             seq_ct = seq[seq.obs[key]==c,:]
-            seq_mat = seq_ct.layers[layer].T
-            output[c] = compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output)
+            
+            # Extract genes expressed in at least 20 cells
+            spatial_expressed = spt_ct.var_names[sc.pp.filter_genes(spt_ct, min_cells = min_cells, inplace=False)[0]]
+            seq_expressed = seq_ct.var_names[sc.pp.filter_genes(seq_ct, min_cells = min_cells, inplace=False)[0]]
+        
+            print(round(len(spatial_expressed)/len(common) * 100), "% of genes are expressed in the spatial modality", sep = '')
+            print(round(len(seq_expressed)/len(common) * 100), "% of genes are expressed in the single-cell modality", sep = '')
+            
+            common_exp = spatial_expressed.intersection(seq_expressed)
+
+            if(not len(common_exp)):
+                print("No expressed genes are shared in both modalities. Returning None value\n")
+                output[c] = None
+            else:
+                print(len(common_exp), "out of", len(common), 'genes will be used')
+            
+                spt_exp = spt_ct[:, common_exp]
+                seq_exp = seq_ct[:, common_exp]
+        
+                spt_mat = spt_exp.layers[layer].T
+                seq_mat = seq_exp.layers[layer].T
+ 
+                print("Calculating coexpression similarity")
+                output[c] = compute_mutual_information(spt_mat, seq_mat, common_exp, thresh, pipeline_output)
             
        
     return(output)
@@ -97,7 +140,7 @@ def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output
     # Apply distance metric
     print("  - Spatial data...")        
     sim_spt = drv.information_mutual_normalised(spt_mat)
-    print("  - Single-cell data...")
+    print("  - Single-cell data...\n")
     sim_seq = drv.information_mutual_normalised(seq_mat)
     
     if not pipeline_output:
@@ -117,7 +160,7 @@ def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output
         if any(nan_res == len(common)):
             genes_nan = common[nan_res == len(common)]
             genes_nan = genes_nan.tolist()
-            print("The following genes in the single-cell modality resulted in NaN values")
+            print("The following genes in the single-cell modality resulted in NaN values:")
             for i in genes_nan: print(i)
                 
         #If threshold, mask values with NaNs
