@@ -99,6 +99,7 @@ def _mtx_subset_and_diff(
     """
 
     # Find gene overlap
+    gene_ids = list(gene_ids)
     ids_in_set = [gene_ids.index(g) for g in geneset if g in gene_ids]
 
     # Subset matrices
