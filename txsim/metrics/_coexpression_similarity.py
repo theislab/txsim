@@ -8,10 +8,10 @@ from pyitlib import discrete_random_variable as drv
 def coexpression_similarity(
     spatial_data: AnnData,
     seq_data: AnnData,
-    thresh: float=0,
-    layer: str='lognorm',
-    key: str='celltype',
-    by_celltype: bool=True,
+    thresh: float = 0,
+    layer: str = 'lognorm',
+    key: str = 'celltype',
+    by_celltype: bool = False,
     pipeline_output: bool = True,
 ):
     """Calculate the mean difference of normalised mutual information matrix values
