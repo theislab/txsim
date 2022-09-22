@@ -27,7 +27,6 @@ def all_metrics(
     metrics['gene_eff_dev'] = efficiency_deviation(adata_sp,adata_sc)
     metrics['gene_eff_mean'] = efficiency_mean(adata_sp,adata_sc)
     # Expression similarity metrics
-    metrics['gene_exp_similarity'] = similar_ge_across_clusters(adata_sp,adata_sc)
     metrics['mean_sim_across_clust'] = mean_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
     metrics['prc95_sim_across_clust']=percentile95_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
     # Negative marker purity

@@ -4,7 +4,7 @@ import pandas as pd
 from ._quality_metrics import *
 
 def all_quality_metrics(
-    spatial_data: AnnData,
+    adata_sp: AnnData,
 ) -> pd.DataFrame:
 
     #Generate metrics

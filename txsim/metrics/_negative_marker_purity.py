@@ -23,7 +23,7 @@ def negative_marker_purity(adata_sp: AnnData, adata_sc: AnnData,pipeline_output:
     key='celltype'
     min_number_cells=10 #minimum number of cells belonging to a cluster to consider it in the analysis
     minimum_exp=0.005 #maximum relative expression allowed in a gene in a cluster to consider the gene-celltype pair the analysis 
-    adata_sc = adata_sc[:,adata_sc.var_names]
+    adata_sc = adata_sc[:,adata_sp.var_names]
     unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
     adata_sc.obs['index']=adata_sc.obs.index
     present_celltypes=list(adata_sc.obs.groupby('celltype').count().loc[adata_sc.obs.groupby('celltype').count().iloc[:,0]>min_number_cells,:].index)
