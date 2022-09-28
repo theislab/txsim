@@ -1,14 +1,16 @@
 import numpy as np
+from numpy import ndarray
 import anndata as ad
 from anndata import AnnData
 import pandas as pd
+from pandas import DataFrame
 import scanpy as sc
 from typing import Optional
 
 from ._ctannotation import run_majority_voting, run_ssam #, run_all_ct_methods
 
 def generate_adata(
-    molecules: str,
+    molecules: str, #TODO fix
     ct_method: str,
     ct_certainty_threshold: float = 0.7,
     adata_sc: Optional[str] = None,
@@ -37,10 +39,10 @@ def generate_adata(
     -------
     AnnData
         Populated count matrix
-    """
+    """    
     
     #Read assignments, calculate percentage of non-assigned spots (pct_noise) and save raw version of spots
-    spots = pd.read_csv(molecules)
+    spots = pd.read_csv(molecules) #TODO fix
     pct_noise = sum(spots['cell'] <= 0)/len(spots['cell'])
     spots_raw = spots.copy() # save raw spots to add to adata.uns and set 0 to None
     spots_raw.loc[spots_raw['cell']==0,'cell'] = None
@@ -93,12 +95,18 @@ def generate_adata(
     adata.uns['pct_noise'] = pct_noise
     adata.layers['raw_counts'] = adata.X.copy()
 
+    #Calculate some basic statistics
+    adata.obs['n_counts']= np.sum(adata.layers['raw_counts'], axis = 1)
+    adata.obs['n_unique_genes']= np.sum(adata.layers['raw_counts']>0, axis = 1)
+    adata.var['n_counts']= np.sum(adata.layers['raw_counts'], axis=0)
+    adata.var['n_unique_cells']= np.sum(adata.layers['raw_counts']>0, axis = 0)
+
     return adata
 
 def calculate_alpha_area(
     adata: AnnData,
     alpha: float = 0
-) -> np.ndarray:
+) -> ndarray:
     """Calculate and store the alpha shape area of the cell given a set of points (genes). 
     Uses the Alpha Shape Toolboox: https://alphashape.readthedocs.io/en/latest/readme.html 
 
@@ -112,7 +120,7 @@ def calculate_alpha_area(
 
     Returns
     -------
-    np.ndarray
+    ndarray
         Returns the area vector stored in `adata.obs['alpha_area']` as a numpy array
     """    
 

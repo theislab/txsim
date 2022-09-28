@@ -1,6 +1,7 @@
 from anndata import AnnData
 import numpy as np
 import pandas as pd
+import scanpy as sc
 from ._coexpression_similarity import *
 from .metric2 import calc_metric2
 from ._celltype_proportions import *
