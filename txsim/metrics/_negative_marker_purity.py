@@ -19,7 +19,7 @@ def negative_marker_purity(adata_sp: AnnData, adata_sc: AnnData,pipeline_output:
     negative marker purity : float
        Increase in proportion of reads assigned in spatial data to pairs of genes-celltyes with no/very low expression in scRNAseq
     """   
-    
+    #TODO fix bug: when gene is in spatial but not single cell
     key='celltype'
     min_number_cells=10 #minimum number of cells belonging to a cluster to consider it in the analysis
     minimum_exp=0.005 #maximum relative expression allowed in a gene in a cluster to consider the gene-celltype pair the analysis 

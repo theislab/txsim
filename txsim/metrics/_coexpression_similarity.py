@@ -2,12 +2,7 @@ from anndata import AnnData
 import numpy as np
 import pandas as pd
 import scanpy as sc
-<<<<<<< HEAD
 from pyitlib import discrete_random_variable as drv
-
-=======
-from pandas import DataFrame
->>>>>>> dev
 
 #TODO Change how normalization happens and consider using log1p
 def coexpression_similarity(

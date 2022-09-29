@@ -1,6 +1,7 @@
 import scanpy as scOA
 import pandas as pd
 import numpy as np
+import scanpy as sc
 from anndata import AnnData
 from . import coexpression_similarity
 

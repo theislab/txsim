@@ -16,6 +16,7 @@ def generate_adata(
     adata_sc: Optional[str] = None,
     ct_assign_output: Optional[str] = None,
     all_ct_methods: bool = False,
+    prior_pct: float = 0.5
     #ct_manual_markers: Optional[str] = None, # ToDo: marker genes based annotation, input as csv with cell type and markers
     #ct_scrna_referecne: Optional[str] = None, # ToDo: path to adata with single cell rna-seq data for automated marker gene detection
     
@@ -61,9 +62,10 @@ def generate_adata(
         adata[adata.obs['cell_id'] == cell_id, :] = cts.reindex(adata.var_names, fill_value = 0)
     
     #TEMP: save intermediate adata
-    adata.write_h5ad('data/adata_st_temp.h5ad')
+    #adata.write_h5ad('data/adata_st_temp.h5ad')
     
     #Add celltype according to ct_method and check if all methods should be implemented
+    if (ct_method == 'None'): ct_method = 'majority'
     if (ct_method == 'majority' or all_ct_methods):
         adata = run_majority_voting(adata, spots)
     if (ct_method == 'ssam' or all_ct_methods):
