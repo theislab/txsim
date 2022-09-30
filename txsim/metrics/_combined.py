@@ -9,6 +9,7 @@ from ._expression_similarity_between_celltypes import *
 from ._negative_marker_purity import *
 from ._cell_statistics import *
 from ._coembedding import knn_mixing
+from ._gene_set_coexpression import *
 
 
 

@@ -11,7 +11,7 @@ def generate_adata(
     molecules: str,
     ct_method: str,
     ct_certainty_threshold: float = 0.7,
-    adata_sc: Optional[str] = None,
+    adata_sc: Optional[AnnData] = None,
     ct_assign_output: Optional[str] = None,
     all_ct_methods: bool = False,
     #ct_manual_markers: Optional[str] = None, # ToDo: marker genes based annotation, input as csv with cell type and markers
@@ -58,8 +58,6 @@ def generate_adata(
         cts = spots[spots['cell'] == cell_id ]['Gene'].value_counts()
         adata[adata.obs['cell_id'] == cell_id, :] = cts.reindex(adata.var_names, fill_value = 0)
     
-    #TEMP: save intermediate adata
-    adata.write_h5ad('data/adata_st_temp.h5ad')
     
     #Add celltype according to ct_method and check if all methods should be implemented
     if (ct_method == 'majority' or all_ct_methods):

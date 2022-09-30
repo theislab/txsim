@@ -46,7 +46,7 @@ def run_ssam(
     
     adata_st: AnnData,
     spots: pd.DataFrame,
-    adata_sc: pd.DataFrame,
+    adata_sc: AnnData,
     um_p_px: float = 0.325,
     
 ) -> AnnData:
@@ -58,8 +58,8 @@ def run_ssam(
         DataFrame containing all spots with gene labels and coordinates
     adata_st : AnnData
         AnnData object of the spatial transcriptomics data
-    adata_sc : str
-        Path to the sc transcriptomics AnnData
+    adata_sc : AnnData
+        AnnData object of the single cell data
     um_p_px : float
         Conversion factor micrometer per pixel. Adjust to data set
         
@@ -75,7 +75,8 @@ def run_ssam(
     sdata = pl.SpatialData( spots.Gene,
                             spots.x*um_p_px,
                             spots.y*um_p_px )
-    adata_sc=adata_sc[:,adata_st.var_names]
+    intersect = list(set(adata_st.var_names).intersection(set(adata_sc.var_names)))
+    adata_sc=adata_sc[:,intersect]
     exp=pd.DataFrame(adata_sc.X,columns=adata_sc.var_names)
     exp['celltype']=list(adata_sc.obs['celltype'])
     signatures=exp.groupby('celltype').mean().transpose()
