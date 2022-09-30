@@ -2,7 +2,6 @@ from anndata import AnnData
 import numpy as np
 import pandas as pd
 import scanpy as sc
-from pyitlib import discrete_random_variable as drv
 
 #TODO Change how normalization happens and consider using log1p
 def coexpression_similarity(
@@ -136,6 +135,7 @@ def coexpression_similarity(
 
 
 def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output):
+    from pyitlib import discrete_random_variable as drv
     # Apply distance metric
     print("  - Spatial data...")        
     sim_spt = drv.information_mutual_normalised(spt_mat)
