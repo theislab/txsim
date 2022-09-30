@@ -99,9 +99,9 @@ def generate_adata(
 
     #Calculate some basic statistics
     adata.obs['n_counts']= np.sum(adata.layers['raw_counts'], axis = 1)
-    adata.obs['n_unique_genes']= np.sum(adata.layers['raw_counts']>0, axis = 1)
+    adata.obs['n_genes']= np.sum(adata.layers['raw_counts']>0, axis = 1)
     adata.var['n_counts']= np.sum(adata.layers['raw_counts'], axis=0)
-    adata.var['n_unique_cells']= np.sum(adata.layers['raw_counts']>0, axis = 0)
+    adata.var['n_cells']= np.sum(adata.layers['raw_counts']>0, axis = 0)
 
     return adata
 
