@@ -1,4 +1,5 @@
 import squidpy as sq
+import numpy as np
 from squidpy.im._container import ImageContainer
 from squidpy.im._segment import SegmentationModel
 from typing import Union,  Optional, Any, Mapping, Callable, Sequence, TYPE_CHECKING, Tuple
@@ -144,3 +145,15 @@ def segment_cellpose(
     return sq.im.segment(img=img, layer=layer, library_id=library_id, method=cellpose, 
             channel=channel, chunks=chunks, lazy=lazy, layer_added="segmented_cellpose", copy=copy, **kwargs)
 
+def segment_binning(
+    img: NDArrayA,
+    bin_size: int
+) -> NDArrayA:
+
+    n = np.shape(img)[0]
+    m = np.shape(img)[1]
+
+    x = np.floor(np.mgrid[0:n, 0:m][0] / bin_size)
+    y = np.floor(np.mgrid[0:n, 0:m][1] / bin_size)
+    bins = x*(np.ceil(m/bin_size)) + y + 1
+    return bins
