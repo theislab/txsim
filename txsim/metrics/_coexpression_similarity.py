@@ -63,6 +63,7 @@ def coexpression_similarity(
 
     print(len(common), "genes are shared in both modalities")
     
+    
     if not by_celltype:
         	
         spatial_expressed = spt.var_names[sc.pp.filter_genes(spt, min_cells = min_cells, inplace=False)[0]]
@@ -75,6 +76,7 @@ def coexpression_similarity(
         
         if(not len(common_exp)):
             print("No expressed genes are shared in both modalities")
+            output = None if pipeline_output else [None, None, None]
         else:
             print(len(common_exp), "out of", len(common), 'genes will be used')
             
