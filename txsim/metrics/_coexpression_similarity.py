@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 
-
+#TODO Change how normalization happens and consider using log1p
 def coexpression_similarity(
     spatial_data: AnnData,
     seq_data: AnnData,
@@ -46,7 +46,7 @@ def coexpression_similarity(
         
     Returns
     -------
-    mean : float
+    float
         mean of upper triangular difference matrix
     matrices: list
         list containing coexpression similarity matrix for each modality and gene names

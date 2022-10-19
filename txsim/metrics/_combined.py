@@ -1,6 +1,7 @@
 from anndata import AnnData
 import numpy as np
 import pandas as pd
+import scanpy as sc
 from ._coexpression_similarity import *
 from .metric2 import calc_metric2
 from ._celltype_proportions import *
@@ -9,7 +10,7 @@ from ._expression_similarity_between_celltypes import *
 from ._negative_marker_purity import *
 from ._cell_statistics import *
 from ._coembedding import knn_mixing
-
+from ._gene_set_coexpression import *
 
 
 def all_metrics(

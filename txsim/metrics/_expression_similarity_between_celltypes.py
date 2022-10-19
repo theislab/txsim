@@ -22,7 +22,8 @@ def similar_ge_across_clusters(adata_sp: AnnData, adata_sc: AnnData):
     key='celltype'
     adata_sc.X = adata_sc.layers['lognorm']
     adata_sp.X = adata_sp.layers['lognorm']
-    adata_sc=adata_sc[:,adata_sc.var['spatial']]
+    intersect = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
+    adata_sc=adata_sc[:,intersect]
     unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
     genes=adata_sc.var.index[adata_sc.var.index.isin(adata_sp.var.index)]
     exp_sc=pd.DataFrame(adata_sc.layers["raw"],columns=adata_sc.var.index)
