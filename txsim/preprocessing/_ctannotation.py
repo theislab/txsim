@@ -3,8 +3,6 @@ import anndata as ad
 from anndata import AnnData
 import pandas as pd
 import scanpy as sc
-import plankton.plankton as pl
-from plankton.utils import ssam
 
 
 def run_majority_voting(
@@ -68,6 +66,9 @@ def run_ssam(
     AnnData
         Anndata object with cell type annotation in ``adata_st.obs['ct_ssam']`` and ``adata_st.obs['ct_ssam_cert']``, whereby the latter is the percentage of spots per cell with consistent cell type assignment.
     """
+    
+    import plankton.plankton as pl
+    from plankton.utils import ssam
     
     x =  spots.x.values 
     y =  spots.y.values 
