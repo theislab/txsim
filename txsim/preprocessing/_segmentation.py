@@ -174,8 +174,19 @@ def segment_cellpose(
     """
     from cellpose import models
     
-    model = models.Cellpose(model_type='nuclei')
+    # Set model type
+    if (hyperparams is not None) and ("model_type" in hyperparams):
+        model_type = hyperparams["model_type"]
+    else:
+        model_type = 'nuclei'
+    
+    # Init model
+    model = models.Cellpose(model_type=model_type)
+    
+    # Predict
     if hyperparams is not None:
+        if "model_type" in hyperparams:
+            del hyperparams["model_type"]
         res, _, _, _ = model.eval(
             img,
             channels=[0, 0],
