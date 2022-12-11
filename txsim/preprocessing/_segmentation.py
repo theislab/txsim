@@ -58,14 +58,26 @@ def segment_nuclei(
     """  
       
 
-    sq.im.process(
-        img=img,
-        layer=layer,
-        method = "smooth",
-        layer_added = "image_smooth"
-    )
+    if (kwargs is not None) and ("blur_std" in kwargs):
+        if kwargs["blur_std"] > 0:
+            sq.im.process(
+                img, 
+                layer="image", 
+                method="smooth", #skimage.filters.gaussian, 
+                layer_added="image",
+                sigma=kwargs["blur_std"],
+                truncate=4.0,
+            )
+        del kwargs["blur_std"]
+        
+    #sq.im.process(
+    #    img=img,
+    #    layer=layer,
+    #    method = "smooth",
+    #    layer_added = "image_smooth"
+    #)
     
-    return sq.im.segment(img=img, layer= "image_smooth", library_id=library_id, method=method, 
+    return sq.im.segment(img=img, layer= "image", library_id=library_id, method=method, 
         channel=channel, chunks=chunks, lazy=lazy, layer_added=layer_added, copy=copy, **kwargs)
 
 # def segment_cellpose(
@@ -162,8 +174,19 @@ def segment_cellpose(
     """
     from cellpose import models
     
-    model = models.Cellpose(model_type='nuclei')
+    # Set model type
+    if (hyperparams is not None) and ("model_type" in hyperparams):
+        model_type = hyperparams["model_type"]
+    else:
+        model_type = 'nuclei'
+    
+    # Init model
+    model = models.Cellpose(model_type=model_type)
+    
+    # Predict
     if hyperparams is not None:
+        if "model_type" in hyperparams:
+            del hyperparams["model_type"]
         res, _, _, _ = model.eval(
             img,
             channels=[0, 0],
