@@ -55,11 +55,15 @@ def generate_adata(
     adata.obs['cell_id'] = pd.unique(spots['cell'])
     adata.obs_names = [f"Cell_{i:d}" for i in range(adata.n_obs)]
     adata.var_names = pd.unique(spots['Gene'])
+    adata.obs['centroid_x'] = 0
+    adata.obs['centroid_y'] = 0
     
     #Populate matrix using assignments
     for cell_id in adata.obs['cell_id']:
         cts = spots[spots['cell'] == cell_id ]['Gene'].value_counts()
         adata[adata.obs['cell_id'] == cell_id, :] = cts.reindex(adata.var_names, fill_value = 0)
+        adata.obs.loc[adata.obs['cell_id'] == cell_id,'centroid_x'] = spots[spots['cell'] == cell_id ]['x'].mean()
+        adata.obs.loc[adata.obs['cell_id'] == cell_id,'centroid_y'] = spots[spots['cell'] == cell_id ]['y'].mean()
     
     #TEMP: save intermediate adata
     #adata.write_h5ad('data/adata_st_temp.h5ad')
