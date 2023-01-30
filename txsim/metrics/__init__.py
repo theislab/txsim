@@ -1,5 +1,4 @@
 from ._coexpression_similarity import coexpression_similarity
-from .metric2 import calc_metric2
 from ._combined import all_metrics
 from ._celltype_proportions import mean_proportion_deviation,proportion_cells_non_common_celltype_sc,proportion_cells_non_common_celltype_sp
 from ._efficiency import efficiency_deviation,efficiency_mean
@@ -8,3 +7,4 @@ from ._negative_marker_purity import negative_marker_purity_cells, negative_mark
 from ._cell_statistics import ratio_median_readsXcells,ratio_mean_readsXcells,ratio_number_of_cells,ratio_mean_genesXcells,ratio_median_genesXcells
 from ._coembedding import knn_mixing
 from ._gene_set_coexpression import gene_set_coexpression
+from ._rand_index import calc_rand_index

@@ -1,5 +1,5 @@
 # txsim
-Python package to measure the similaritiy between matched single cell and targeted spatial transcriptomics data
+Python package to measure the similarity between matched single cell and targeted spatial transcriptomics data
 
 # Installation
 ## Cloning and adding
