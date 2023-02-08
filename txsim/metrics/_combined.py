@@ -11,7 +11,6 @@ from ._cell_statistics import *
 from ._coembedding import knn_mixing
 from ._gene_set_coexpression import *
 
-
 def all_metrics(
     adata_sp: AnnData,
     adata_sc: AnnData
@@ -53,3 +52,8 @@ def all_metrics(
     
     return pd.DataFrame.from_dict(metrics, orient='index')
 
+def aggregate_metrics(
+    metric_list: list
+):
+    mean_metric = pd.concat((metric_list), axis=1).mean(axis=1)
+    return mean_metric

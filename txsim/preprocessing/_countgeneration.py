@@ -175,3 +175,12 @@ def calculate_alpha_area(
     adata.obs['alpha_area'] = area_vec
     adata.obs['alpha_shape'] = shape_vec
     return area_vec
+
+
+
+def aggregate_count_matrices(
+    adata_list: list
+) -> AnnData:
+    for adata in adata_list: 
+        print(adata)
+    return ad.AnnData()
