@@ -18,3 +18,11 @@ def calc_rand_index(assignments: DataFrame):
     rand_matrix.index = assignments.columns
     
     return rand_matrix
+
+def aggregate_rand_index(matrices: list):
+    df_mean = matrices[0].copy()
+    df_std = matrices[0].copy()
+    df_mean.loc[:,:] = np.mean(np.array( matrices ), axis=0)  
+    df_std.loc[:,:] = np.std(np.array( matrices ), axis=0)
+    
+    return [df_mean, df_std]
