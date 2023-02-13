@@ -53,7 +53,11 @@ def all_metrics(
     return pd.DataFrame.from_dict(metrics, orient='index')
 
 def aggregate_metrics(
-    metric_list: list
+    metric_list: list,
+    name_list: list = None,
 ):
-    mean_metric = pd.concat((metric_list), axis=1).mean(axis=1)
+    mean_metric = pd.concat((metric_list), axis=1)
+    if name_list is not None: mean_metric.columns = name_list
+    mean_metric["mean"] = mean_metric.mean(axis=1)
+    mean_metric["std"] = mean_metric.std(axis=1)
     return mean_metric

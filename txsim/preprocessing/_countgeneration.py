@@ -10,7 +10,7 @@ from typing import Optional
 from ._ctannotation import run_majority_voting, run_ssam #, run_all_ct_methods
 
 def generate_adata(
-    molecules: str, #TODO fix
+    molecules: DataFrame,
     ct_method: str,
     ct_certainty_threshold: float = 0.7,
     adata_sc: Optional[str] = None,
@@ -25,8 +25,8 @@ def generate_adata(
 
     Parameters
     ----------
-    molecules : str
-        File name of CSV containing genes and cell assignments
+    molecules : DataFrame
+        DataFrame containing genes and cell assignments
     ct_method : str
         Method to use for cell type annotation. Output will be added to ``adata.obs['ct_<ct_method>']`` and duplicated in  ``adata.obs['celltype']``. Valid entries are ``['majority', 'ssam', 'pciSeq']``
     ct_certainty_threshold : Optional[float]
@@ -43,11 +43,11 @@ def generate_adata(
     """    
     
     #Read assignments, calculate percentage of non-assigned spots (pct_noise) and save raw version of spots
-    spots = pd.read_csv(molecules) #TODO fix
+    spots = molecules #TODO bad naming
     pct_noise = sum(spots['cell'] <= 0)/len(spots['cell'])
     spots_raw = spots.copy() # save raw spots to add to adata.uns and set 0 to None
     spots_raw.loc[spots_raw['cell']==0,'cell'] = None
-    spots = spots[spots['cell'] > 0]
+    # spots = spots[spots['cell'] > 0] #What is happening here
 
     #Generate blank, labelled count matrix
     X = np.zeros([ len(pd.unique(spots['cell'])), len(pd.unique(spots['Gene'])) ])
@@ -179,8 +179,40 @@ def calculate_alpha_area(
 
 
 def aggregate_count_matrices(
-    adata_list: list
+    adata_list: list,
+    rep_list: list = None
 ) -> AnnData:
-    for adata in adata_list: 
-        print(adata)
-    return ad.AnnData()
+    
+    # Jut in case the replicates aren't read in the right order
+    if rep_list is None: rep_list = range(1, len(adata_list)+1)
+    rep_idx = 1
+
+    # Copy in the first anndata, and set the replicate number
+    adata = adata_list[0].copy()
+    spots = adata.uns["spots"].copy()
+
+    adata.obs["replicate"] = rep_list[0]
+    spots['replicate'] = rep_list[0]
+
+    adata_list.pop(0)
+
+    for new_adata in adata_list: 
+        new_spots = new_adata.uns["spots"].copy()
+
+        # Ensures the cell id's will be unique, and that the spots['cell'] will match adata.obs['cell_id']
+        # Uses the max not 'nunique' of previous cell id since numbering is not perfectly sequential 
+        new_spots.loc[(new_spots['cell']  > 0), "cell"] = new_spots['cell'][new_spots['cell']  > 0] + spots['cell'].max()
+        new_adata.obs['cell_id'] = new_adata.obs['cell_id'] + spots['cell'].max()
+
+        # Set replicate number and increase index
+        new_spots['replicate'] = rep_list[rep_idx]
+        new_adata.obs['replicate'] = rep_list[rep_idx]
+        rep_idx+=1
+        
+        # Concatenate anndata and dataframe
+        spots = pd.concat((spots,new_spots), ignore_index = True)
+        adata = adata.concatenate(new_adata)
+
+    adata.uns['spots'] = spots
+    
+    return adata
