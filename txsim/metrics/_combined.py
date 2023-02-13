@@ -2,6 +2,7 @@ from anndata import AnnData
 import numpy as np
 import pandas as pd
 import scanpy as sc
+from pandas import DataFrame
 from ._coexpression_similarity import *
 from ._celltype_proportions import *
 from ._efficiency import *
@@ -14,7 +15,7 @@ from ._gene_set_coexpression import *
 def all_metrics(
     adata_sp: AnnData,
     adata_sc: AnnData
-) -> pd.DataFrame:
+) -> DataFrame:
 
     #Generate metrics
     metrics = {}
@@ -54,10 +55,13 @@ def all_metrics(
 
 def aggregate_metrics(
     metric_list: list,
-    name_list: list = None,
+    aggregated_metric: DataFrame,
+    name_list: list = None
 ):
     mean_metric = pd.concat((metric_list), axis=1)
     if name_list is not None: mean_metric.columns = name_list
     mean_metric["mean"] = mean_metric.mean(axis=1)
     mean_metric["std"] = mean_metric.std(axis=1)
+    aggregated_metric.columns = ["AGGREGATED_METRIC"]
+    mean_metric = pd.concat((mean_metric,aggregated_metric), axis=1)
     return mean_metric
