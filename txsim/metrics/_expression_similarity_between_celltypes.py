@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from anndata import AnnData
 from scipy.sparse import issparse
+import math
 
 def similar_ge_across_clusters(adata_sp: AnnData, adata_sc: AnnData, layer: str='lognorm'):
     """Calculate the difference between mean normalized expression of genes across lusters in both modalities
@@ -37,7 +38,7 @@ def similar_ge_across_clusters(adata_sp: AnnData, adata_sc: AnnData, layer: str=
         if issparse(a.X):
             a.X = a.X.toarray()
     
-
+    
     # Get cell types that occur in both sc and spatial
     unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
         
@@ -68,20 +69,59 @@ def similar_ge_across_clusters(adata_sp: AnnData, adata_sc: AnnData, layer: str=
     mean_celltype_sp=exp_sp.groupby('celltype').mean()
     mean_celltype_sp=mean_celltype_sp.loc[:,mean_celltype_sp.columns.sort_values()]
 
+# UPDATED PART WITH A OUR NEW SUGGESTION
+   
+    pairwise_differences_per_gene_sc = {}
+
+    # Calculate the pairwise difference between celltypes for each column(gene) for sc
+    pair_idx = 0
+    for i, col_i in enumerate(mean_celltype_sc.columns, start=0):
+        for j, col_j in enumerate(mean_celltype_sc.columns):
+            if i < j:
+                pairwise_differences_per_gene_sc[pair_idx] = mean_celltype_sc[col_i] - mean_celltype_sc[col_j]
+                pair_idx += 1
+
+    pairwise_differences_per_gene_sp = {}
+
+    # Calculate the pairwise difference between celltypes for each column(gene) for spatial
+    pair_idx = 0
+    for i, col_i in enumerate(mean_celltype_sp.columns, start=0):
+        for j, col_j in enumerate(mean_celltype_sp.columns):
+            if i < j:
+                pairwise_differences_per_gene_sp[pair_idx] = mean_celltype_sp[col_i] - mean_celltype_sp[col_j]
+                pair_idx += 1
+
+    sc_values =  pd.DataFrame(np.array(list(pairwise_differences_per_gene_sc.values())))
+    sp_values =  pd.DataFrame(np.array(list(pairwise_differences_per_gene_sp.values())))
+
+     #If no read is prestent in a gene, we add 0.1 so that we can compute statistics
+    sp_values.loc[:,list(sp_values.sum(axis=0)==0)]=0.1
+    sc_values.loc[:,list(sc_values.sum(axis=0)==0)]=0.1
+
+    sp_norm=sp_values.div(sp_values.sum(axis=0),axis=1)
+    sc_norm=sc_values.div(sc_values.sum(axis=0),axis=1)
+
+    final_difference_abs_values = np.mean(abs(sc_norm - sp_norm),axis=0)
+    scores_new =pd.DataFrame(final_difference_abs_values,columns=['score']).sort_values(by='score')
+
+   #----------------BELOW IS THE PART WITHOUT CHANGE
+
     #If no read is prestent in a gene, we add 0.1 so that we can compute statistics
-    mean_celltype_sp.loc[:,list(mean_celltype_sp.sum(axis=0)==0)]=0.1
-    mean_celltype_sc.loc[:,list(mean_celltype_sc.sum(axis=0)==0)]=0.1
+    mean_celltype_sp.loc[:,list(mean_celltype_sp.mean(axis=0)==0)]=0.1
+    mean_celltype_sc.loc[:,list(mean_celltype_sc.mean(axis=0)==0)]=0.1
 
     # Set Dataframes with mean-normalized expression values for each gene
-    mean_celltype_sp_norm=mean_celltype_sp.div(mean_celltype_sp.mean(axis=0),axis=1)
-    mean_celltype_sc_norm=mean_celltype_sc.div(mean_celltype_sc.mean(axis=0),axis=1)
+    # what it does: mean of each column of the mean_celltype_sp dataframe along the vertical axis (axis=0), and then divide each value in mean_celltype_sp by the corresponding mean value. 
+    # Problem is that mean_celltype_sp has mean values higher than the mean value of the whole gene
+    mean_celltype_sp_norm=mean_celltype_sp.div(mean_celltype_sp.sum(axis=0),axis=1) # output has not always absolute values! Reason for no absolute values in scores
+    mean_celltype_sc_norm=mean_celltype_sc.div(mean_celltype_sc.sum(axis=0),axis=1)
 
     # Create Array with mean absolute difference between the normalized gene expression values for each gene and each cell type
     values=np.mean(abs(mean_celltype_sp_norm-mean_celltype_sc_norm),axis=0)
 
     # Set Dataframe with one column and rows as 'values'
     scores=pd.DataFrame(values,columns=['score']).sort_values(by='score')
-    return scores
+    return scores, scores_new
 
 
 def mean_similarity_gene_expression_across_clusters(adata_sp: AnnData, adata_sc: AnnData, pipeline_output:bool=True)-> float:
@@ -152,3 +192,23 @@ def percentile95_similarity_gene_expression_across_clusters(adata_sp: AnnData, a
         return output_value
     else:
         return float(output_value),scores
+
+adata_sc = sc.read_h5ad("/Users/aslihankullelioglu/Desktop/MasterMathematik/WS23/CMSCB/adata_sc.h5ad")
+adata_sc.layers["raw"] = adata_sc.X.copy()
+sc.pp.normalize_total(adata_sc)
+adata_sc.layers["norm"] = adata_sc.X.copy()
+sc.pp.log1p(adata_sc)
+adata_sc.layers["lognorm"] = adata_sc.X.copy()
+adata_sp = sc.read_h5ad("/Users/aslihankullelioglu/Desktop/MasterMathematik/WS23/CMSCB/adata_sp.h5ad")
+adata_sp.layers["raw"] = adata_sp.X.copy()
+sc.pp.normalize_total(adata_sp)
+adata_sp.layers["norm"] = adata_sp.X.copy()
+sc.pp.log1p(adata_sp)
+adata_sp.layers["lognorm"] = adata_sp.X.copy()
+#adata_sc.var.index
+#adata_sc.layers["raw"].shape
+#adata_sc.X.shape
+similar_ge_across_clusters(adata_sp, adata_sc, layer='lognorm')
+#mean_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
+#median_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
+#percentile95_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
