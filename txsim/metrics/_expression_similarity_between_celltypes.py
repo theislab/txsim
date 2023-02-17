@@ -193,22 +193,3 @@ def percentile95_similarity_gene_expression_across_clusters(adata_sp: AnnData, a
     else:
         return float(output_value),scores
 
-adata_sc = sc.read_h5ad("/Users/aslihankullelioglu/Desktop/MasterMathematik/WS23/CMSCB/adata_sc.h5ad")
-adata_sc.layers["raw"] = adata_sc.X.copy()
-sc.pp.normalize_total(adata_sc)
-adata_sc.layers["norm"] = adata_sc.X.copy()
-sc.pp.log1p(adata_sc)
-adata_sc.layers["lognorm"] = adata_sc.X.copy()
-adata_sp = sc.read_h5ad("/Users/aslihankullelioglu/Desktop/MasterMathematik/WS23/CMSCB/adata_sp.h5ad")
-adata_sp.layers["raw"] = adata_sp.X.copy()
-sc.pp.normalize_total(adata_sp)
-adata_sp.layers["norm"] = adata_sp.X.copy()
-sc.pp.log1p(adata_sp)
-adata_sp.layers["lognorm"] = adata_sp.X.copy()
-#adata_sc.var.index
-#adata_sc.layers["raw"].shape
-#adata_sc.X.shape
-similar_ge_across_clusters(adata_sp, adata_sc, layer='lognorm')
-#mean_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
-#median_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
-#percentile95_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
