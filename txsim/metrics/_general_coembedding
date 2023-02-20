@@ -1,11 +1,4 @@
-import numpy as np
-import networkx as nx
-import anndata as ad
-from anndata import AnnData
-import scanpy as sc
-from typing import Union, Tuple
-
-def knn_mixing(
+def knn_mixing_per_ctype(
     adata_st: AnnData, 
     adata_sc: AnnData, 
     pipeline_output: bool = True,
@@ -52,9 +45,9 @@ def knn_mixing(
     adata = ad.concat([adata_st, adata_sc], join='inner')
     
     # Set counts to log norm data
-    adata.X = adata.layers["lognorm"]
+    adata.X = adata.layers["lognorm"]      
     
-# Calculate PCA (general or per cell type)
+    # Calculate PCA (general or per cell type)
     if not by_celltype:
         assert (adata.obsm is None) or ('X_pca' not in adata.obsm), "PCA already exists."
         sc.tl.pca(adata)    
