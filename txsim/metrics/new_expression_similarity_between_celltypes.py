@@ -83,19 +83,19 @@ def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key:str='
     
     #### NORMALIZE THESE PAIRWISE DISTANCES BETWEEN CELL TYPES
     #calculate sum of absolute distances
-    abs_diff_sc = np.absolute(pairwise_distances_sc)
+    abs_diff_sc = np.absolute(pairwise_distances_sc.T)
     abs_diff_sum_sc = np.sum(abs_diff_sc, axis=(0,1))
     
-    abs_diff_sp = np.absolute(pairwise_distances_sp)
+    abs_diff_sp = np.absolute(pairwise_distances_sp.T)
     abs_diff_sum_sp = np.sum(abs_diff_sp, axis=(0,1))
     
     # calculate normalization factor
-    norm_factor_sc = mean_celltype_sc.shape[1]**2 * abs_diff_sum_sc
-    norm_factor_sp = mean_celltype_sc.shape[1]**2 * abs_diff_sum_sp
+    norm_factor_sc = mean_celltype_sc.T.shape[1]**2 * abs_diff_sum_sc
+    norm_factor_sp = mean_celltype_sc.T.shape[1]**2 * abs_diff_sum_sp
     
     #perform normalization
-    norm_pairwise_distances_sc = np.divide(pairwise_distances_sc, norm_factor_sc)
-    norm_pairwise_distances_sp = np.divide(pairwise_distances_sp, norm_factor_sp)
+    norm_pairwise_distances_sc = np.divide(pairwise_distances_sc.T, norm_factor_sc)
+    norm_pairwise_distances_sp = np.divide(pairwise_distances_sp.T, norm_factor_sp)
     
     
     ##### CALCULATE OVERALL SCORE,PER-GENE SCORES, PER-CELLTYPE SCORES
