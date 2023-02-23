@@ -4,8 +4,8 @@ import pandas as pd
 from anndata import AnnData
 from scipy.sparse import issparse
 
-def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key:str='celltype', layer:str='lognorm'):
-    """Calculate the efficiency deviation present between the genes in the panel. 
+  def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key:str='celltype', layer:str='lognorm'):
+    """Calculate the efficiency deviation present between the cell types in the panel. 
     ----------
     adata_sp : AnnData
         annotated ``AnnData`` object with counts from spatial data
@@ -19,11 +19,11 @@ def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key:str='
     Returns
     -------
     overall_metric: float
-        similarity of relative gene expression across all genes and celltypes, b/t the scRNAseq and spatial data
+        similarity of relative cell type expression across all genes and celltypes, b/t the scRNAseq and spatial data
     per_gene_metric: float
-        similarity of relative gene expression per gene across all celltypes, b/t the scRNAseq and spatial data
+        similarity of relative cell type expression per gene across all celltypes, b/t the scRNAseq and spatial data
     per_celltype_metric: float
-        similarity of relative gene expression per celltype across all genes, b/t the scRNAseq and spatial data
+        similarity of relative cell type expression per celltype across all genes, b/t the scRNAseq and spatial data
   
     """   
     ### SET UP
@@ -75,40 +75,40 @@ def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key:str='
     #### CALCULATE PAIRWISE RELATIVE DISTANCES BETWEEN CELL TYPES
     mean_celltype_sc_np = mean_celltype_sc.T.to_numpy()
     pairwise_distances_sc = mean_celltype_sc_np[:,:,np.newaxis] - mean_celltype_sc_np[:,np.newaxis,:]
-    pairwise_distances_sc = pairwise_distances_sc.transpose((1,2,0)) #results in np.array of dimensions (num_genes, num_genes, num_celltypes) 
+    pairwise_distances_sc = pairwise_distances_sc.transpose((1,2,0)) #results in np.array of dimensions (num_celltypes, num_celltypes, num_genes) 
        
     mean_celltype_sp_np = mean_celltype_sp.T.to_numpy()
     pairwise_distances_sp = mean_celltype_sp_np[:,:,np.newaxis] - mean_celltype_sp_np[:,np.newaxis,:]
-    pairwise_distances_sp = pairwise_distances_sp.transpose((1,2,0)) #results in np.array of dimensions (num_genes, num_genes, num_celltypes) 
+    pairwise_distances_sp = pairwise_distances_sp.transpose((1,2,0)) #results in np.array of dimensions (num_celltypes, num_celltypes, num_genes) 
     
     #### NORMALIZE THESE PAIRWISE DISTANCES BETWEEN CELL TYPES
     #calculate sum of absolute distances
-    abs_diff_sc = np.absolute(pairwise_distances_sc.T)
+    abs_diff_sc = np.absolute(pairwise_distances_sc)
     abs_diff_sum_sc = np.sum(abs_diff_sc, axis=(0,1))
     
-    abs_diff_sp = np.absolute(pairwise_distances_sp.T)
+    abs_diff_sp = np.absolute(pairwise_distances_sp)
     abs_diff_sum_sp = np.sum(abs_diff_sp, axis=(0,1))
     
-    # calculate normalization factor
-    norm_factor_sc = mean_celltype_sc.T.shape[1]**2 * abs_diff_sum_sc
-    norm_factor_sp = mean_celltype_sc.T.shape[1]**2 * abs_diff_sum_sp
+    norm_factor_sc = (1/(mean_celltype_sc.T.shape[1]**2)) * abs_diff_sum_sc
+    norm_factor_sp = (1/(mean_celltype_sp.T.shape[1]**2)) * abs_diff_sum_sp
     
     #perform normalization
-    norm_pairwise_distances_sc = np.divide(pairwise_distances_sc.T, norm_factor_sc)
-    norm_pairwise_distances_sp = np.divide(pairwise_distances_sp.T, norm_factor_sp)
-    
+    norm_pairwise_distances_sc = np.divide(pairwise_distances_sc, norm_factor_sc)
+    norm_pairwise_distances_sp = np.divide(pairwise_distances_sp, norm_factor_sp)
     
     ##### CALCULATE OVERALL SCORE,PER-GENE SCORES, PER-CELLTYPE SCORES
-    overall_score = np.sum(np.absolute(norm_pairwise_distances_sp - norm_pairwise_distances_sc), axis=None)
+    overall_score = np.sum(np.absolute(np.nan_to_num(norm_pairwise_distances_sp, nan=0) - np.nan_to_num(norm_pairwise_distances_sc, nan=0)), axis=None)
     overall_metric = 1 - (overall_score/(2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=None)))
     
-    per_gene_score = np.sum(np.absolute(norm_pairwise_distances_sp - norm_pairwise_distances_sc), axis=(1,2))
-    per_gene_metric = 1 - (per_gene_score/(2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(1,2))))
-    per_gene_metric = pd.DataFrame(per_gene_metric, index=mean_celltype_sc.T.columns, columns=['score']) #add back the gene labels 
+    per_gene_score = np.sum(np.absolute(np.nan_to_num(norm_pairwise_distances_sp, nan=0) - np.nan_to_num(norm_pairwise_distances_sc, nan=0)), axis=(0,1))
+    per_gene_metric = 1 - (per_gene_score/(2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(0,1))))
+    per_gene_metric = pd.DataFrame(per_gene_metric, index=mean_celltype_sc.columns, columns=['score']) #add back the gene labels 
+
+
+    #per_gene_metric = pd.DataFrame(per_gene_metric, index=mean_celltype_sc.T.columns, columns=['score']) #add back the gene labels 
     
-    per_celltype_score = np.sum(np.absolute(norm_pairwise_distances_sp - norm_pairwise_distances_sc), axis=(0,1))
-    per_celltype_metric = 1 - (per_celltype_score/(2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(0,1))))
-    per_celltype_metric = pd.DataFrame(per_celltype_metric, index=mean_celltype_sc.T.index, columns=['score']) #add back the celltype labels 
+    per_celltype_score = np.sum(np.absolute(np.nan_to_num(norm_pairwise_distances_sp, nan=0) - np.nan_to_num(norm_pairwise_distances_sc, nan=0)), axis=(1,2))
+    per_celltype_metric = 1 - (per_celltype_score/(2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(1,2))))
+    per_celltype_metric = pd.DataFrame(per_celltype_metric, index=mean_celltype_sc.index, columns=['score']) #add back the celltype labels 
     
     return overall_metric, per_gene_metric, per_celltype_metric
-    
