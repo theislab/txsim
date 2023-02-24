@@ -4,7 +4,7 @@ import pandas as pd
 from anndata import AnnData
 from scipy.sparse import issparse
 
-  def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key:str='celltype', layer:str='lognorm'):
+def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype', layer: str='lognorm'):
     """Calculate the efficiency deviation present between the cell types in the panel. 
     ----------
     adata_sp : AnnData
@@ -112,3 +112,19 @@ from scipy.sparse import issparse
     per_celltype_metric = pd.DataFrame(per_celltype_metric, index=mean_celltype_sc.index, columns=['score']) #add back the celltype labels 
     
     return overall_metric, per_gene_metric, per_celltype_metric
+
+
+# adata_sc = sc.read_h5ad("/Users/aslihankullelioglu/Desktop/MasterMathematik/WS23/CMSCB/adata_sc.h5ad")
+# adata_sc.layers["raw"] = adata_sc.X.copy()
+# sc.pp.normalize_total(adata_sc)
+# adata_sc.layers["norm"] = adata_sc.X.copy()
+# sc.pp.log1p(adata_sc)
+# adata_sc.layers["lognorm"] = adata_sc.X.copy()
+# adata_sp = sc.read_h5ad("/Users/aslihankullelioglu/Desktop/MasterMathematik/WS23/CMSCB/adata_sp.h5ad")
+# adata_sp.layers["raw"] = adata_sp.X.copy()
+# sc.pp.normalize_total(adata_sp)
+# adata_sp.layers["norm"] = adata_sp.X.copy()
+# sc.pp.log1p(adata_sp)
+# adata_sp.layers["lognorm"] = adata_sp.X.copy()
+# #output = all_metrics(adata_sp,adata_sc)
+#out = relative_celltype_expression(adata_sp,adata_sc,'celltype','lognorm')
