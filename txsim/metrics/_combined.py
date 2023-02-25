@@ -107,11 +107,11 @@ for adata_sp_name in adata_sp_baysor_list[:5]: #first 5 to test
 
 
 
-whole_df = pd.concat(df_list,axis=1)
-whole_df.columns = spatial_files[:5]
-#whole_df.fillna(value=0, inplace=True)
-whole_df = whole_df.T
-print(whole_df.dtypes)
-#sns.heatmap(whole_df, annot=True)
+# whole_df = pd.concat(df_list,axis=1)
+# whole_df.columns = spatial_files[:5]
+# #whole_df.fillna(value=0, inplace=True)
+# whole_df = whole_df.T
+# print(whole_df.dtypes)
+# #sns.heatmap(whole_df, annot=True)
 
 
