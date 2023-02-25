@@ -2,6 +2,7 @@ import scanpy as sc
 import numpy as np
 import pandas as pd
 from anndata import AnnData
+from scipy.sparse import issparse
 
 def relative_gene_expression(adata_sp: AnnData, adata_sc: AnnData, key:str='celltype', layer:str='lognorm'):
     """Calculate the efficiency deviation present between the genes in the panel. 

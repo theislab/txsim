@@ -16,7 +16,7 @@ from new_expression_similarity_between_celltypes import *
 #from _expression_similarity_between_celltypes import *
 from _negative_marker_purity import *
 #from _cell_statistics import *
-from _coembedding import knn_mixing
+from _coembedding import knn_mixing_per_ctype
 #from _gene_set_coexpression import *
 
 
@@ -59,27 +59,27 @@ def all_metrics(
     #metrics['ratio_mean_genexcells'] = ratio_mean_genesXcells(adata_sp,adata_sc)
     #metrics['ratio_median_genexcells'] = ratio_median_genesXcells(adata_sp,adata_sc)
     ## KNN mixing
-    metrics['knn_mixing'] = knn_mixing(adata_sp,adata_sc)
+    metrics['knn_mixing'] = knn_mixing_per_ctype(adata_sp,adata_sc)
 
     return pd.DataFrame.from_dict(metrics, orient='index')
 
-panel_to_celltype =  {'Stromal broad': 'Stromal broad',
-   'Fibroblasts + PVL': 'Stromal broad',
-   'B-cells': 'Immune broad',
-   'T-cells':'Immune broad',
-   'Myeloid': 'Immune broad',
-   'Immune broad': 'Immune broad',               
-   'Epithelial broadl': 'Epithelial broad',
-   'None': 'None'}
+# panel_to_celltype =  {'Stromal broad': 'Stromal broad',
+#    'Fibroblasts + PVL': 'Stromal broad',
+#    'B-cells': 'Immune broad',
+#    'T-cells':'Immune broad',
+#    'Myeloid': 'Immune broad',
+#    'Immune broad': 'Immune broad',               
+#    'Epithelial broadl': 'Epithelial broad',
+#    'None': 'None'}
 
 
 adata_sc = sc.read_h5ad("/Users/aslihankullelioglu/Downloads/txsim/sc_normalized.h5ad")
 adata_sp_baysor_list = glob.glob('/Users/aslihankullelioglu/Downloads/txsim/spatial/*.h5ad')
 df_list = []
 for adata_sp_name in adata_sp_baysor_list[:5]: #first 5 to test
-    adata_sp.obs = adata_sp.obs.rename(columns={'celltype': 'celltype_panel'})
-    adata_sp.obs['celltype'] = [(panel_to_celltype)[k] for k in adata_sp.obs['celltype_panel']]
-    adata_sp.obs['celltype'] = adata_sp.obs['celltype'].astype('category')
+    # adata_sp.obs = adata_sp.obs.rename(columns={'celltype': 'celltype_panel'})
+    # adata_sp.obs['celltype'] = [(panel_to_celltype)[k] for k in adata_sp.obs['celltype_panel']]
+    # adata_sp.obs['celltype'] = adata_sp.obs['celltype'].astype('category')
 
     adata_sp = sc.read_h5ad(adata_sp_name)
     if re.match('baysor', adata_sp_name):
