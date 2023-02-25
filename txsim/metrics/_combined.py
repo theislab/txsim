@@ -65,7 +65,14 @@ def all_metrics(
     return pd.DataFrame.from_dict(metrics, orient='index')
 
 adata_sc = sc.read_h5ad("/Users/aslihankullelioglu/Downloads/txsim/sc_normalized.h5ad")
-
+panel_to_celltype =  {'Stromal broad': 'Stromal broad',
+  'Fibroblasts + PVL': 'Stromal broad',
+  'B-cells': 'Immune broad',
+  'T-cells':'Immune broad',
+  'Myeloid': 'Immune broad',
+  'Immune broad': 'Immune broad',               
+  'Epithelial broadl': 'Epithelial broad',
+  'None': 'None'}
 df_list = []
 spatial_data_path = "/Users/aslihankullelioglu/Downloads/txsim/spatial"
 spatial_files = [f for f in listdir(spatial_data_path) if isfile(join(spatial_data_path,f))]
@@ -74,8 +81,14 @@ for file in spatial_files[:5]:
         curr_whole_path = spatial_data_path + '/' + file
         curr_adata_sp = sc.read_h5ad(curr_whole_path)
         sc.pp.filter_cells(curr_adata_sp, min_genes=1, inplace=True)
+        curr_adata_sp.obs = curr_adata_sp.obs.rename(columns={'celltype': 'celltype_panel'})
+        curr_adata_sp.obs['celltype'] = [(panel_to_celltype)[k] for k in curr_adata_sp.obs['celltype_panel']]
+        curr_adata_sp.obs['celltype'] = curr_adata_sp.obs['celltype'].astype('category')
         output = all_metrics(curr_adata_sp,adata_sc)
         df_list.append(output)
+
+
+
 
 whole_df = pd.concat(df_list,axis=1)
 whole_df.columns = spatial_files[:5]
