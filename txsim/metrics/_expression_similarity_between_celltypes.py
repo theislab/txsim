@@ -189,4 +189,3 @@ def percentile95_similarity_gene_expression_across_clusters(adata_sp: AnnData, a
         return output_value
     else:
         return float(output_value),scores
-

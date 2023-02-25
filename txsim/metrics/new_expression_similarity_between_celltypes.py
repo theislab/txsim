@@ -4,7 +4,7 @@ import pandas as pd
 from anndata import AnnData
 from scipy.sparse import issparse
 
-def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype', layer: str='lognorm'):
+def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype', layer: str='lognorm', pipeline_output: bool=True):
     """Calculate the efficiency deviation present between the cell types in the panel. 
     ----------
     adata_sp : AnnData
@@ -97,20 +97,23 @@ def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key: str=
     norm_pairwise_distances_sp = np.divide(pairwise_distances_sp, norm_factor_sp)
     
     ##### CALCULATE OVERALL SCORE,PER-GENE SCORES, PER-CELLTYPE SCORES
-    overall_score = np.sum(np.absolute(np.nan_to_num(norm_pairwise_distances_sp, nan=0) - np.nan_to_num(norm_pairwise_distances_sc, nan=0)), axis=None)
+    overall_score = np.sum(np.absolute(norm_pairwise_distances_sp - norm_pairwise_distances_sc), axis=None)
     overall_metric = 1 - (overall_score/(2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=None)))
     
-    per_gene_score = np.sum(np.absolute(np.nan_to_num(norm_pairwise_distances_sp, nan=0) - np.nan_to_num(norm_pairwise_distances_sc, nan=0)), axis=(0,1))
+    per_gene_score = np.sum(np.absolute(norm_pairwise_distances_sp - norm_pairwise_distances_sc), axis=(0,1))
     per_gene_metric = 1 - (per_gene_score/(2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(0,1))))
     per_gene_metric = pd.DataFrame(per_gene_metric, index=mean_celltype_sc.columns, columns=['score']) #add back the gene labels 
 
 
     #per_gene_metric = pd.DataFrame(per_gene_metric, index=mean_celltype_sc.T.columns, columns=['score']) #add back the gene labels 
     
-    per_celltype_score = np.sum(np.absolute(np.nan_to_num(norm_pairwise_distances_sp, nan=0) - np.nan_to_num(norm_pairwise_distances_sc, nan=0)), axis=(1,2))
+    per_celltype_score = np.sum(np.absolute(norm_pairwise_distances_sp - norm_pairwise_distances_sc), axis=(1,2))
     per_celltype_metric = 1 - (per_celltype_score/(2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(1,2))))
     per_celltype_metric = pd.DataFrame(per_celltype_metric, index=mean_celltype_sc.index, columns=['score']) #add back the celltype labels 
     
+    if pipeline_output:
+        return overall_metric
+
     return overall_metric, per_gene_metric, per_celltype_metric
 
 

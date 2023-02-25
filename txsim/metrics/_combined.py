@@ -79,10 +79,9 @@ for file in spatial_files[:5]:
 
 whole_df = pd.concat(df_list,axis=1)
 whole_df.columns = spatial_files[:5]
-whole_df.fillna(value=0, inplace=True)
+#whole_df.fillna(value=0, inplace=True)
 whole_df = whole_df.T
 print(whole_df.dtypes)
 #sns.heatmap(whole_df, annot=True)
 
-#output = all_metrics(adata_sp,adata_sc)
-#print(output)
+
