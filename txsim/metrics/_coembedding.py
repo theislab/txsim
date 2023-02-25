@@ -5,13 +5,14 @@ from anndata import AnnData
 import scanpy as sc
 from typing import Union, Tuple
 
-def knn_mixing(
+def knn_mixing_per_ctype(
     adata_st: AnnData, 
     adata_sc: AnnData, 
     pipeline_output: bool = True,
     obs_key: str = "celltype",
     k: int = 45,
     ct_filter_factor: float = 5,
+    by_celltype: bool = False,
 ) -> Union[float, Tuple[str, dict]]: 
     """Compute score for knn mixing of modalities
     
@@ -51,11 +52,22 @@ def knn_mixing(
     adata = ad.concat([adata_st, adata_sc], join='inner')
     
     # Set counts to log norm data
-    adata.X = adata.layers["lognorm"]
+    adata.X = adata.layers["lognorm"]      
     
-    # Calculate PCA (Note: we could also think about pca per cell type...)
-    assert (adata.obsm is None) or ('X_pca' not in adata.obsm), "PCA already exists."
-    sc.tl.pca(adata)
+    # Calculate PCA (general or per cell type)
+    if not by_celltype:
+        assert (adata.obsm is None) or ('X_pca' not in adata.obsm), "PCA already exists."
+        sc.tl.pca(adata)    
+        
+    else:
+        c_type = adata.obs['celltype'].unique()
+        anndatas = []
+        for val in c_type:
+            dt = adata[adata.obs['celltype'] == val]
+            assert (dt.obsm is None) or ('X_pca' not in dt.obsm), "PCA already exists."
+            sc.tl.pca(dt)
+            anndatas.append(dt)
+        adata = ad.concat([anndata for anndata in anndatas], join='inner')
     
     # get cell type groups
     sc_cts = set(adata_sc.obs["celltype"].cat.categories)

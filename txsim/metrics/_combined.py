@@ -16,7 +16,7 @@ from new_expression_similarity_between_celltypes import *
 #from _expression_similarity_between_celltypes import *
 from _negative_marker_purity import *
 #from _cell_statistics import *
-#from _coembedding import knn_mixing
+from _coembedding import knn_mixing
 #from _gene_set_coexpression import *
 
 
@@ -32,18 +32,18 @@ def all_metrics(
     #metrics['prop_noncommon_labels_sc'] = proportion_cells_non_common_celltype_sc(adata_sp,adata_sc)
     #metrics['prop_noncommon_labels_sp'] = proportion_cells_non_common_celltype_sp(adata_sp,adata_sc)
     ## Gene efficiency metrics   
-    #metrics['relative_sim_across_genes'] = relative_gene_expression(adata_sp,adata_sc,'celltype','lognorm')
+    metrics['relative_sim_across_genes'] = relative_gene_expression(adata_sp,adata_sc,'celltype','lognorm')
     #metrics['gene_eff_dev'] = efficiency_deviation(adata_sp,adata_sc)
     #metrics['gene_eff_mean'] = efficiency_mean(adata_sp,adata_sc)
     ## Expression similarity metrics
-    #all_scores = relative_celltype_expression(adata_sp,adata_sc,'celltype','lognorm')
+    metrics['relative_sim_across_celltype_overall_metric'] = relative_celltype_expression(adata_sp,adata_sc,'celltype','lognorm')
     #metrics['relative_sim_across_celltype_overall_metric'] = all_scores[0]
     #metrics['relative_sim_across_celltype_per_gene_metric'] = all_scores[1]
     #metrics['relative_sim_across_celltype_per_celltype_metric'] = all_scores[2]
     #metrics['mean_sim_across_clust'] = mean_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
     #metrics['prc95_sim_across_clust'] = percentile95_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
     ## Coexpression similarity
-    #metrics['coexpression_similarity'] = coexpression_similarity(adata_sp, adata_sc)
+    metrics['coexpression_similarity'] = coexpression_similarity(adata_sp, adata_sc)
     #metrics['coexpression_similarity_celltype'] = coexpression_similarity(
     #    adata_sp,
     #    adata_sc,
@@ -59,7 +59,7 @@ def all_metrics(
     #metrics['ratio_mean_genexcells'] = ratio_mean_genesXcells(adata_sp,adata_sc)
     #metrics['ratio_median_genexcells'] = ratio_median_genesXcells(adata_sp,adata_sc)
     ## KNN mixing
-    #metrics['knn_mixing'] = knn_mixing(adata_sp,adata_sc)
+    metrics['knn_mixing'] = knn_mixing(adata_sp,adata_sc)
 
     
     
