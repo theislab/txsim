@@ -2,6 +2,7 @@ from anndata import AnnData
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import scipy
 from scipy import stats
 
 
@@ -185,10 +186,17 @@ def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output
     """
 
     print("  - Spatial data...")
-    sim_spt = drv.information_mutual_normalised(spt_mat)
+    if scipy.sparse.issparse(spt_mat):
+        sim_spt = drv.information_mutual_normalised(spt_mat.toarray())
+    else:    
+        sim_spt = drv.information_mutual_normalised(spt_mat)
+        
     print("  - Single-cell data...\n")
-    sim_seq = drv.information_mutual_normalised(seq_mat)
-
+    if scipy.sparse.issparse(seq_mat):
+        sim_seq = drv.information_mutual_normalised(seq_mat.toarray())
+    else:    
+        sim_seq = drv.information_mutual_normalised(seq_mat)
+    
     output = compute_correlation_difference(sim_spt, sim_seq, common, thresh) if pipeline_output \
         else [sim_spt, sim_seq, common]
 
@@ -199,9 +207,16 @@ def compute_pearson_correlation(spt_mat, seq_mat, common, thresh, pipeline_outpu
     # Calculate pearson correlation of the gene pairs in the matrix
 
     print("  - Spatial data...")
-    sim_spt = np.corrcoef(spt_mat, rowvar=False)
+    if scipy.sparse.issparse(spt_mat):
+        sim_spt = np.corrcoef(spt_mat.toarray(), rowvar=False)
+    else:    
+        sim_spt = np.corrcoef(spt_mat.astype(float), rowvar=False)
+        
     print("  - Single-cell data...\n")
-    sim_seq = np.corrcoef(seq_mat, rowvar=False)
+    if scipy.sparse.issparse(seq_mat):
+        sim_seq = np.corrcoef(seq_mat.toarray(), rowvar=False)
+    else:    
+        sim_seq = np.corrcoef(seq_mat.astype(float), rowvar=False)
 
     output = compute_correlation_difference(sim_spt, sim_seq, common, thresh) if pipeline_output \
         else [sim_spt, sim_seq, common]
@@ -213,9 +228,16 @@ def compute_spearman_correlation(spt_mat, seq_mat, common, thresh, pipeline_outp
     # Calculate spearman correlation of the gene pairs in the matrix
 
     print("  - Spatial data...")
-    sim_spt = stats.spearmanr(spt_mat).statistic
+    if scipy.sparse.issparse(spt_mat):
+        sim_spt = stats.spearmanr(spt_mat.toarray().astype(float)).statistic
+    else:
+        sim_spt = stats.spearmanr(spt_mat.astype(float)).statistic
+   
     print("  - Single-cell data...\n")
-    sim_seq = stats.spearmanr(seq_mat).statistic
+    if scipy.sparse.issparse(seq_mat):
+        sim_seq = stats.spearmanr(seq_mat.toarray().astype(float)).statistic
+    else:
+        sim_seq = stats.spearmanr(seq_mat.astype(float)).statistic
 
     output = compute_correlation_difference(sim_spt, sim_seq, common, thresh) if pipeline_output \
         else [sim_spt, sim_seq, common]
