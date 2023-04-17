@@ -11,14 +11,14 @@ from ._ctannotation import run_majority_voting, run_ssam #, run_all_ct_methods
 
 def generate_adata(
     molecules: DataFrame,
-    ct_method: str,
+    ct_method: str = 'majority',
     ct_certainty_threshold: float = 0.7,
     adata_sc: Optional[str] = None,
     ct_assign_output: Optional[str] = None,
     all_ct_methods: bool = False,
     prior_pct: float = 0.5
     #ct_manual_markers: Optional[str] = None, # ToDo: marker genes based annotation, input as csv with cell type and markers
-    #ct_scrna_referecne: Optional[str] = None, # ToDo: path to adata with single cell rna-seq data for automated marker gene detection
+    #ct_scrna_reference: Optional[str] = None, # ToDo: path to adata with single cell rna-seq data for automated marker gene detection
     
 ) -> AnnData:
     """Generate an AnnData object with counts from molecule data and assign cell types
@@ -27,7 +27,7 @@ def generate_adata(
     ----------
     molecules : DataFrame
         DataFrame containing genes and cell assignments
-    ct_method : str
+    ct_method : Optional[str]
         Method to use for cell type annotation. Output will be added to ``adata.obs['ct_<ct_method>']`` and duplicated in  ``adata.obs['celltype']``. Valid entries are ``['majority', 'ssam', 'pciSeq']``
     ct_certainty_threshold : Optional[float]
         To be set if ``ct_method`` provides a certainty measure of the cell type assignment. Threshold will be applied when annotations are set as ``adata.obs['celltype']`` to keep all annotations in ``adata.obs['ct_<ct_method>']``. For ``ct_method=='majority'`` the certainty refers to the percent of spots per cell assigned to a celltype proir to segmentatation, for ``ct_method=='ssam'`` it refers to **TODO!**
@@ -47,7 +47,7 @@ def generate_adata(
     pct_noise = sum(spots['cell'] <= 0)/len(spots['cell'])
     spots_raw = spots.copy() # save raw spots to add to adata.uns and set 0 to None
     spots_raw.loc[spots_raw['cell']==0,'cell'] = None
-    # spots = spots[spots['cell'] > 0] #What is happening here
+    spots = spots[spots['cell'] > 0] #What is happening here
 
     #Generate blank, labelled count matrix
     X = np.zeros([ len(pd.unique(spots['cell'])), len(pd.unique(spots['Gene'])) ])
@@ -69,23 +69,26 @@ def generate_adata(
     #adata.write_h5ad('data/adata_st_temp.h5ad')
     
     #Add celltype according to ct_method and check if all methods should be implemented
-    if (ct_method == 'None'): ct_method = 'majority'
+    ran_ct_method = False
+    if (ct_method is None): ct_method = 'majority'
     if (ct_method == 'majority' or all_ct_methods):
         adata = run_majority_voting(adata, spots)
+        ran_ct_method = True
     if (ct_method == 'ssam' or all_ct_methods):
         adata = run_ssam(adata, spots, adata_sc = adata_sc)
+        ran_ct_method = True
     if (ct_method == 'pciSeq' or all_ct_methods):
         assert ct_assign_output is not None, 'Cell annotation file of assignment method not found.'
         temp = pd.read_csv(ct_assign_output, header=None, index_col = 0)
         adata.obs['ct_pciSeq'] = pd.Categorical(temp[1][adata.obs['cell_id']])
+        ran_ct_method = True
 
     # ToDo (second prio)
     # elif ct_method == 'manual_markers':
     #     adata = run_manual_markers(adata, spots)
     # elif ct_method == 'scrna_markers':
     #     adata = run_scrna_markers(adata, spots, rna_adata)
-    else:
-        print('No valid cell type annotation method')
+    if not ran_ct_method: print('No valid cell type annotation method')
     
     # Take over primary ct annotation method to adata.obs['celltype'] and apply certainty threshold
     # Add methods, if they provide certainty measure
@@ -216,3 +219,71 @@ def aggregate_count_matrices(
     adata.uns['spots'] = spots
     
     return adata
+
+def filter_cells(
+    adata: AnnData,
+    min_counts: int = 10, 
+    min_cell_percentage: float = 0.8, 
+    min_area: Optional[float] = None, 
+    max_area: Optional[float] = None,
+    obs_key: str = "passed_QC",
+) -> None:
+    """Filter cells based on their counts and area.
+
+    Args:
+        min_counts: Minimum number of counts per cell.
+        min_cell_percentage: Minimum percentage of cells to keep.
+        min_area: Minimum area of a cell.
+        max_area: Maximum area of a cell.
+        obs_key: Key to store the QC results in the obs slot.
+
+    Returns:
+        Adds a boolean column to the obs slot of the AnnData object.
+        
+    """
+    #Filter counts
+    adata.obs[obs_key] = adata.obs["n_counts"] >= min_counts
+    #If filtered cells is below the min_cell_percentage
+    if sum(adata.obs[obs_key]) / len(adata.obs) < min_cell_percentage:
+        print(f"Only {round(100 * sum(adata.obs[obs_key]) / len(adata.obs))}% of cells passed min_counts QC (min: {round(100*min_cell_percentage)}%)")
+        #Find largest value that gives enough cells
+        counts = adata.obs["n_counts"].value_counts().sort_index(ascending=False)
+        new_min_counts = counts.index[np.argmax(np.cumsum(counts) > adata.n_obs*min_cell_percentage)]
+        #Refilter with new value
+        adata.obs[obs_key] = adata.obs["n_counts"] >= new_min_counts
+        print(f"New min_counts: {new_min_counts}, now {round(100 * sum(adata.obs[obs_key]) / len(adata.obs))}% of cells pass QC")
+        print("Stopping QC since min cell percentage reached")
+        return
+        
+    prev_obs = adata.obs[obs_key].copy()
+    if min_area is not None: adata.obs[obs_key] &= adata.obs["area"] >= min_area
+
+    if sum(adata.obs[obs_key]) / len(adata.obs) < min_cell_percentage:
+        print(f"Only {round(100 * sum(adata.obs[obs_key]) / len(adata.obs))}% of cells passed min_area QC (min: {round(100*min_cell_percentage)}%)")
+        #Find largest value that gives enough cells
+        counts = adata[prev_obs].obs["area"].value_counts().sort_index(ascending=False)
+        new_min_area = counts.index[np.argmax(np.cumsum(counts) > adata.n_obs*min_cell_percentage)]
+        #Refilter with new value
+        adata.obs[obs_key] = prev_obs
+        adata.obs[obs_key] &= adata.obs["area"] >= new_min_area
+        print(f"New min_area: {new_min_area}, now {round(100 * sum(adata.obs[obs_key]) / len(adata.obs))}% of cells pass QC")
+        print("Stopping QC since min cell percentage reached")
+        return
+
+    prev_obs = adata.obs[obs_key].copy()
+    if max_area is not None: adata.obs[obs_key] &= adata.obs["area"] <= max_area
+
+    if sum(adata.obs[obs_key]) / len(adata.obs) < min_cell_percentage:
+        print(f"Only {round(100 * sum(adata.obs[obs_key]) / len(adata.obs))}% of cells passed max_area QC (min: {round(100*min_cell_percentage)}%)")
+        #Find lowest value that gives enough cells
+        counts = adata[prev_obs].obs["area"].value_counts().sort_index()
+        print(np.cumsum(counts))
+        new_max_area = counts.index[np.argmax(np.cumsum(counts) > adata.n_obs*min_cell_percentage)]
+        #Refilter with new value
+        adata.obs[obs_key] = prev_obs
+        print(adata.obs)
+        adata.obs[obs_key] &= adata.obs["area"] <= new_max_area
+        print(f"New max_area: {new_max_area}, now {round(100 * sum(adata.obs[obs_key]) / len(adata.obs))}% of cells pass QC")
+        print("Stopping QC since min cell percentage reached")
+        return
+    
