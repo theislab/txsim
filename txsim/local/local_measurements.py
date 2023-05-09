@@ -254,7 +254,7 @@ def get_summed_cell_area(adata_sp: AnnData, x_min: int, x_max: int, y_min: int, 
     #filter spots
     df = df.loc[(df['x']>= x_min) & (df['x']<=x_max) & (df['y']>=y_min) & (df['y']<=y_max)]
 
-    bins_x = np.digitize(df['x'], np.linspace(x_min, x_max, bins[0] + 1)) -1
+    bins_x = np.digitize(df['x'], np.linspace(x_min, x_max, bins[0] + 1)) -1        #sicher bins[0] nicht bins[1]?
     bins_y = np.digitize(df['y'], np.linspace(y_min, y_max, bins[1] + 1)) -1
 
     groups = df.groupby([bins_x, bins_y])

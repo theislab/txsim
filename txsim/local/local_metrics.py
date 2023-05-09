@@ -109,7 +109,7 @@ def get_negative_marker_dict(adata_sp: AnnData, adata_sc: AnnData, key: str='cel
     
     # Filter cell types by minimum number of cells
     celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
-    celltype_count_sp = adata_sc.obs[key].value_counts().loc[shared_celltypes]   
+    celltype_count_sp = adata_sc.obs[key].value_counts().loc[shared_celltypes]      #!adata_sp?
     ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
     celltypes = celltype_count_sc.loc[ct_filter].index.tolist()             
     
@@ -185,7 +185,7 @@ def get_cells_location(adata_sp: AnnData, adata_sc: AnnData):
 
     get_spot_assignment_col(adata_sp,adata_sc)
     spots = adata_sp.uns["spots"]
-    df_cells = spots.loc[spots["spot_assignment"]!="unassigned"]      
+    df_cells = spots.loc[spots["spot_assignment"]!="unassigned"]      #ohne filter testen
     df_cells = df_cells.groupby(["cell"])[["x","y"]].mean()
     df_cells = df_cells.reset_index().rename(columns={'cell':'cell_id'})
     adata_sp.obs = pd.merge(df_cells,adata_sp.obs,left_on="cell_id",right_on="cell_id",how="inner")
@@ -196,7 +196,7 @@ def get_knn_mixing_score(adata_st: AnnData, adata_sc: AnnData, obs_key: str = "c
     """Get column in adata_sp.obs with knn mixing score.
 
     For this we concatenate the spatial and single cell datasets, compute the neighborsgraph for eligible celltypes, get the expected value for the
-    modality ratio, compute the actual ratio for each cell and assign a the knn mixing score.
+    modality ratio, compute the actual ratio for each cell and assign the knn mixing score.
 
     Parameters
     ----------
