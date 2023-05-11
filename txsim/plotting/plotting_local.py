@@ -3,17 +3,44 @@ from anndata import AnnData
 import matplotlib.pyplot as plt
 from typing import Tuple
 import seaborn as sns
-from ..local.local_metrics import check_crop_exists
-from ..local.local_metrics import matrix_colorbar_plot
-from ..local.local_measurements import get_wrong_spot_ratio
-from ..local.local_measurements import get_spot_density
-from ..local.local_measurements import get_cell_density
-from ..local.local_measurements import get_celltype_density
-from ..local.local_measurements import get_number_of_celltypes
-from ..local.local_measurements import get_major_celltype_perc
-from ..local.local_measurements import get_summed_cell_area
-from ..local.local_measurements import get_avg_knn_mixing
-from ..local.local_measurements import get_correlation_matrices
+from ..metrics.utility import check_crop_exists
+from ..metrics.local_measurements import get_wrong_spot_ratio
+from ..metrics.local_measurements import get_spot_density
+from ..metrics.local_measurements import get_cell_density
+from ..metrics.local_measurements import get_celltype_density
+from ..metrics.local_measurements import get_number_of_celltypes
+from ..metrics.local_measurements import get_major_celltype_perc
+from ..metrics.local_measurements import get_summed_cell_area
+from ..metrics.local_measurements import get_avg_knn_mixing
+from ..metrics.local_measurements import get_correlation_matrices
+
+#helper function
+def matrix_colorbar_plot(matrix: np.ndarray, title: str, x_min: int, x_max: int, y_min: int, y_max: int, vmin, vmax, 
+                         smooth: float = 0, show_ticks: bool = False):
+    """Display (smoothed and cropped) matrix as an image with a colorbar and title.
+    
+    Parameters
+    ----------
+    matrix: np.ndarray
+        data
+    title: str
+    x_min: int, x_max: int, y_min: int, y_max: int
+        crop coordinates
+    smooth : float = 0
+        sigma parameter of scipy.ndimage.gaussian_filter function
+    show_ticks : bool 
+        default False, show no ticks or labels
+    """
+    
+    matrix = gaussian_filter(matrix,sigma=smooth)
+    fig = plt.figure()
+    ax = fig.add_subplot(title = title)
+    plot = plt.imshow(matrix, vmin=vmin, vmax=vmax, interpolation='nearest', extent=[x_min, x_max, y_max, y_min])
+    fig.colorbar(plot)
+    
+    if not show_ticks:
+        ax.tick_params(which='both', bottom=False, left=False, labelbottom = False, labelleft = False)
+
 
 def plot_spots(adata_sp: AnnData, x_min: int, x_max: int, y_min: int, y_max: int, image: np.ndarray, show_ticks: bool = False):
     """Plot gene spots.

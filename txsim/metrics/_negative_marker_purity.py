@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 from anndata import AnnData
 from scipy.sparse import issparse
+from scipy.sparse import isspmatrix 
+import itertools
 
 # TODO: probably better to combine both metrics to one function with argument `flavor in ["reads", "cells"]`
 # TODO: Write test
@@ -34,6 +36,9 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
     min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
     max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair
     
+    #check that genes in spatial data is subset of genes in single cell data
+    adata_sp = adata_sp[:,adata_sp.var_names.isin(adata_sc.var_names)]
+
     # Subset adata_sc to genes of spatial data
     adata_sc = adata_sc[:,adata_sp.var_names]
     
@@ -47,7 +52,7 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
     
     # Filter cell types by minimum number of cells
     celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
-    celltype_count_sp = adata_sc.obs[key].value_counts().loc[shared_celltypes]
+    celltype_count_sp = adata_sp.obs[key].value_counts().loc[shared_celltypes]      #before:adata_sc...
     ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
     celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
     
@@ -88,7 +93,7 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
             return negative_marker_purity, None, None
     
     # Get pos cell ratios in negative marker-cell type pairs
-    lowvals_sc = np.full_like(neg_marker_mask, np.nan, dtype=np.float32)
+    lowvals_sc = np.full_like(neg_marker_mask, np.nan, dtype=np.float32)    #wofür nötig?
     lowvals_sc = ratio_celltype_sc.values[neg_marker_mask]
     lowvals_sp = ratio_celltype_sp.values[neg_marker_mask]
     
@@ -105,9 +110,9 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
         return negative_marker_purity
     else:
         # Calculate per gene and per cell type purities
-        purities = (ratio_celltype_sc - ratio_celltype_sp).cip(0,None)
+        purities = (ratio_celltype_sc - ratio_celltype_sp).clip(0,None)
         purities.values[~neg_marker_mask] = np.nan
-        purities = purities.loc[~(purities.isnull().all(axis=1)), ~(purities.isnull().all(axis=0))]
+        purities = purities.loc[~(purities.isnull().all(axis=1)), ~(purities.isnull().all(axis=0))]     #wieso?
         purity_per_gene = purities.mean(axis=0, skipna=True)
         purity_per_celltype = purities.mean(axis=1, skipna=True)
         
@@ -234,4 +239,102 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
         
         return negative_marker_purity, purity_per_gene, purity_per_celltype
 
+
+def get_negative_marker_dict(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype'):
+    """Add dictionary of negative marker genes for different celltypes.
     
+    Parameters
+    ----------
+    adata_sp : AnnData
+        Annotated ``AnnData`` object with counts from spatial data
+    adata_sc : AnnData
+        Annotated ``AnnData`` object with counts scRNAseq data
+    key : str
+        Celltype key in adata_sp.obs and adata_sc.obs
+
+    Returns
+    -------
+    neg_marker_dict : dict[string: list]
+        Dictionary with celltypes as keys and corresponding negative marker genes as values
+    """
+
+    # Set threshold parameters
+    min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
+    max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair
+
+    #check that genes in spatial data is subset of genes in single cell data
+    adata_sp = adata_sp[:,adata_sp.var_names.isin(adata_sc.var_names)]
+
+    # Subset adata_sc to genes of spatial data
+    adata_sc = adata_sc[:,adata_sp.var_names]           
+    
+    adata_sc.layers["raw"] = adata_sc.X
+
+    # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
+    if isspmatrix(adata_sc.layers["raw"]):                                  
+        adata_sc.layers["raw"] = adata_sc.layers["raw"].toarray()
+
+    # Get cell types that we find in both modalities
+    shared_celltypes = adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
+    
+    # Filter cell types by minimum number of cells
+    celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
+    celltype_count_sp = adata_sc.obs[key].value_counts().loc[shared_celltypes]      #!adata_sp?
+    ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
+    celltypes = celltype_count_sc.loc[ct_filter].index.tolist()             
+    
+    
+    # Filter cells to eligible cell types
+    adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
+    genes = adata_sc.var_names
+    
+    # Get ratio of positive cells per cell type
+    pos_exp_sc = pd.DataFrame(adata_sc.layers["raw"] > 0,columns=adata_sp.var_names)     
+    pos_exp_sc['celltype'] = list(adata_sc.obs[key])
+    ratio_celltype_sc = pos_exp_sc.groupby('celltype').mean()
+    
+    # Get gene-cell type pairs with negative marker expression
+    neg_marker_mask = np.array(ratio_celltype_sc < max_ratio_cells)
+    
+
+    neg_marker_mask = pd.DataFrame(neg_marker_mask, columns = genes, index = ratio_celltype_sc.index)   
+    neg_marker_dict = {celltype: list(row.index[row]) for celltype, row in neg_marker_mask.iterrows()}
+
+    return neg_marker_dict
+
+
+def get_spot_assignment_col(adata_sp: AnnData, adata_sc: AnnData):
+
+    """Add column spot_assignment to adata_sp.uns["spots"].
+
+       spot_assignment is "spot in wrong celltype", if celltype of cell is in the keys of the neg_marker_dict and gene is a negative marker for the celltype. 
+       spot_assignment is "unassigned" if the corresponding cell entry is NaN.
+       spot_assignment is "no negative marker" if gene is  not a negative marker for any celltype in neg_marker_dict.
+       spot_assignment is "spot in correct celltype" otherwise.
+      
+       Parameters
+       ----------
+       adata_sp : AnnData
+        Annotated ``AnnData`` object with counts from spatial data
+       adata_sc : AnnData
+        Annotated ``AnnData`` object with counts scRNAseq data
+    """ 
+    #check that genes in spatial data is subset of genes in single cell data
+    adata_sp = adata_sp[:,adata_sp.var_names.isin(adata_sc.var_names)]
+
+    df = adata_sp.uns["spots"]  
+   
+    neg_marker_dict = get_negative_marker_dict(adata_sp, adata_sc)
+
+    celltypes = list(neg_marker_dict.keys())   
+
+    df["spot_assignment"] = "spot in correct celltype"
+
+    all_neg_markers = set(itertools.chain(*neg_marker_dict.values()))
+    #gene is not a negative marker for any celltype in neg_marker_dict and celltype is not in celltypes 
+    df.loc[(~df["Gene"].isin(all_neg_markers))& (~df["celltype"].isin(celltypes)), "spot_assignment"] = "no negative marker"  
+
+    for ct in celltypes:
+      df.loc[(df["Gene"].isin(neg_marker_dict[ct])) & (df["celltype"] == ct), 'spot_assignment'] = "spot in wrong celltype" 
+
+    df.loc[df["cell"]!=df["cell"],"spot_assignment"] = "unassigned"   #check for NaNs
