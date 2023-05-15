@@ -20,9 +20,9 @@ def all_metrics(
     #Generate metrics
     metrics = {}
     ##Celltype proportion
-    #metrics['mean_ct_prop_dev'] = mean_proportion_deviation(adata_sp,adata_sc)
-    #metrics['prop_noncommon_labels_sc'] = proportion_cells_non_common_celltype_sc(adata_sp,adata_sc)
-    #metrics['prop_noncommon_labels_sp'] = proportion_cells_non_common_celltype_sp(adata_sp,adata_sc)
+    metrics['mean_ct_prop_dev'] = mean_proportion_deviation(adata_sp,adata_sc)
+    metrics['prop_noncommon_labels_sc'] = proportion_cells_non_common_celltype_sc(adata_sp,adata_sc)
+    metrics['prop_noncommon_labels_sp'] = proportion_cells_non_common_celltype_sp(adata_sp,adata_sc)
     ## Gene efficiency metrics   
     #metrics['gene_eff_dev'] = efficiency_deviation(adata_sp,adata_sc)
     #metrics['gene_eff_mean'] = efficiency_mean(adata_sp,adata_sc)

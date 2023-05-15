@@ -117,3 +117,47 @@ def run_ssam(
         (spots[spots['cell'] == cell_id ]['celltype'].value_counts()[mode].values[0] / sum(cts))
     
     return adata_st
+
+def annotate_celltypes(
+    adata: AnnData,
+    adata_sc: AnnData,
+    ct_method: str = 'majority',
+    ct_threshold: float = 0.7,
+    prior_celltypes : pd.DataFrame = None
+) -> AnnData:
+    #TODO fix this
+    all_ct_methods = False
+
+    #Add celltype according to ct_method and check if all methods should be implemented
+    ran_ct_method = False
+    if (ct_method is None): ct_method = 'majority'
+    if (ct_method == 'majority' or all_ct_methods):
+        adata = run_majority_voting(adata, adata.uns['spots'])
+        ran_ct_method = True
+    if (ct_method == 'ssam' or all_ct_methods):
+        adata = run_ssam(adata, spots.uns['spots'], adata_sc = adata_sc)
+        ran_ct_method = True
+    if (ct_method == 'pciSeq' or all_ct_methods):
+        #TODO check if this actually works
+        if prior_celltypes is not None:
+            #TODO read certainty
+            adata.obs['ct_pciSeq'] = pd.Categorical(prior_celltypes[1][adata.obs['cell_id']])
+        ran_ct_method = True
+
+    # ToDo (second prio)
+    # elif ct_method == 'manual_markers':
+    #     adata = run_manual_markers(adata, spots)
+    # elif ct_method == 'scrna_markers':
+    #     adata = run_scrna_markers(adata, spots, rna_adata)
+    if not ran_ct_method: print('No valid cell type annotation method')
+    
+    # Take over primary ct annotation method to adata.obs['celltype'] and apply certainty threshold
+    # Add methods, if they provide certainty measure
+    if ct_method in ['majority', 'ssam']: 
+        ct_list = adata.obs['ct_'+str(ct_method)].copy()
+        ct_list[adata.obs['ct_'+str(ct_method)+'_cert'] < ct_threshold] = "Unknown" #TODO different hyperparams probably
+        adata.obs['celltype'] = ct_list
+    else:
+        adata.obs['celltype'] = adata.obs['ct_'+str(ct_method)]
+
+    return adata
