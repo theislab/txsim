@@ -1,4 +1,3 @@
-import scanpy as sc
 import numpy as np
 import pandas as pd
 from anndata import AnnData
@@ -9,6 +8,34 @@ import itertools
 # TODO: probably better to combine both metrics to one function with argument `flavor in ["reads", "cells"]`
 # TODO: Write test
 # TODO: Investigate the importance of setting max_ratio_cells, minimum_exp, and min_number_cells
+
+#helper function 
+def get_eligible_celltypes(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype'):
+    # Set threshold parameters
+    min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
+    
+    #check that genes in spatial data is subset of genes in single cell data
+    adata_sp = adata_sp[:,adata_sp.var_names.isin(adata_sc.var_names)]
+
+    # Subset adata_sc to genes of spatial data
+    adata_sc = adata_sc[:,adata_sp.var_names]
+    
+    # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
+    for a in [adata_sc, adata_sp]:
+        if issparse(a.layers["raw"]):
+            a.layers["raw"] = a.layers["raw"].toarray()
+    
+    # Get cell types that we find in both modalities
+    shared_celltypes = adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
+    
+    # Filter cell types by minimum number of cells
+    celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
+    celltype_count_sp = adata_sp.obs[key].value_counts().loc[shared_celltypes]      #before:adata_sc...
+    ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
+    celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
+
+    return celltypes, adata_sp, adata_sc
+
 
 def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype', pipeline_output: bool=True):
     """ Negative marker purity aims to measure read leakeage between cells in spatial datasets. 
@@ -30,31 +57,10 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
     -------
     negative marker purity : float
        Increase in proportion of positive cells assigned in spatial data to pairs of genes-celltyes with no/very low expression in scRNAseq
-    """   
+    """ 
+    max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair  
     
-    # Set threshold parameters
-    min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
-    max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair
-    
-    #check that genes in spatial data is subset of genes in single cell data
-    adata_sp = adata_sp[:,adata_sp.var_names.isin(adata_sc.var_names)]
-
-    # Subset adata_sc to genes of spatial data
-    adata_sc = adata_sc[:,adata_sp.var_names]
-    
-    # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
-    for a in [adata_sc, adata_sp]:
-        if issparse(a.layers["raw"]):
-            a.layers["raw"] = a.layers["raw"].toarray()
-    
-    # Get cell types that we find in both modalities
-    shared_celltypes = adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
-    
-    # Filter cell types by minimum number of cells
-    celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
-    celltype_count_sp = adata_sp.obs[key].value_counts().loc[shared_celltypes]      #before:adata_sc...
-    ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
-    celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
+    celltypes, adata_sp, adata_sc  = get_eligible_celltypes(adata_sp, adata_sc, key)
     
     # Return nan if too few cell types were found
     if len(celltypes) < 2:
@@ -144,23 +150,8 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
     min_number_cells=10 #minimum number of cells belonging to a cluster to consider it in the analysis
     minimum_exp=0.005 #maximum relative expression allowed in a gene in a cluster to consider the gene-celltype pair the analysis 
     
-    # Subset adata_sc to genes of spatial data
-    adata_sc = adata_sc[:,adata_sp.var_names]
-    
-    # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
-    for a in [adata_sc, adata_sp]:
-        if issparse(a.layers["raw"]):
-            a.layers["raw"] = a.layers["raw"].toarray()
-    
-    # Get cell types that we find in both modalities
-    shared_celltypes = adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
-    
-    # Filter cell types by minimum number of cells
-    celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
-    celltype_count_sp = adata_sc.obs[key].value_counts().loc[shared_celltypes]
-    ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
-    celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
-    
+    celltypes, adata_sp, adata_sc  = get_eligible_celltypes(adata_sp, adata_sc, key)
+
     # Return nan if too few cell types were found
     if len(celltypes) < 2:
         print("Not enough cell types (>1) eligible to calculate negative marker purity")
@@ -231,13 +222,14 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
         return negative_marker_purity
     else:
         # Calculate per gene and per cell type purities
-        purities = (mean_ct_sp_norm - mean_ct_sc_norm).cip(0,None)
+        purities = (mean_ct_sp_norm - mean_ct_sc_norm).clip(0,None)
         purities.values[~neg_marker_mask] = np.nan
         purities = purities.loc[~(purities.isnull().all(axis=1)), ~(purities.isnull().all(axis=0))]
         purity_per_gene = purities.mean(axis=0, skipna=True)
         purity_per_celltype = purities.mean(axis=1, skipna=True)
         
         return negative_marker_purity, purity_per_gene, purity_per_celltype
+
 
 
 def get_negative_marker_dict(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype'):
@@ -257,32 +249,9 @@ def get_negative_marker_dict(adata_sp: AnnData, adata_sc: AnnData, key: str='cel
     neg_marker_dict : dict[string: list]
         Dictionary with celltypes as keys and corresponding negative marker genes as values
     """
-
-    # Set threshold parameters
-    min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
     max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair
-
-    #check that genes in spatial data is subset of genes in single cell data
-    adata_sp = adata_sp[:,adata_sp.var_names.isin(adata_sc.var_names)]
-
-    # Subset adata_sc to genes of spatial data
-    adata_sc = adata_sc[:,adata_sp.var_names]           
-    
-    adata_sc.layers["raw"] = adata_sc.X
-
-    # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
-    if isspmatrix(adata_sc.layers["raw"]):                                  
-        adata_sc.layers["raw"] = adata_sc.layers["raw"].toarray()
-
-    # Get cell types that we find in both modalities
-    shared_celltypes = adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
-    
-    # Filter cell types by minimum number of cells
-    celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
-    celltype_count_sp = adata_sc.obs[key].value_counts().loc[shared_celltypes]      #!adata_sp?
-    ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
-    celltypes = celltype_count_sc.loc[ct_filter].index.tolist()             
-    
+           
+    celltypes, adata_sp, adata_sc  = get_eligible_celltypes(adata_sp, adata_sc, key)  #unnecessary potential adata_sp sparse matrix fix here, is not used
     
     # Filter cells to eligible cell types
     adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]

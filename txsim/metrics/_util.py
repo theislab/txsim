@@ -1,4 +1,5 @@
 from anndata import AnnData
+import numpy as np
 from _negative_marker_purity import get_spot_assignment_col
 import pandas as pd
 

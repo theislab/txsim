@@ -2,17 +2,18 @@ import numpy as np
 from anndata import AnnData
 import matplotlib.pyplot as plt
 from typing import Tuple
+from scipy.ndimage import gaussian_filter
 import seaborn as sns
-from ..metrics.utility import check_crop_exists
-from ..metrics.local_measurements import get_wrong_spot_ratio
-from ..metrics.local_measurements import get_spot_density
-from ..metrics.local_measurements import get_cell_density
-from ..metrics.local_measurements import get_celltype_density
-from ..metrics.local_measurements import get_number_of_celltypes
-from ..metrics.local_measurements import get_major_celltype_perc
-from ..metrics.local_measurements import get_summed_cell_area
-from ..metrics.local_measurements import get_avg_knn_mixing
-from ..metrics.local_measurements import get_correlation_matrices
+from ..metrics._util import check_crop_exists
+from ..metrics._local_measurements import get_wrong_spot_ratio
+from ..metrics._local_measurements import get_spot_density
+from ..metrics._local_measurements import get_cell_density
+from ..metrics._local_measurements import get_celltype_density
+from ..metrics._local_measurements import get_number_of_celltypes
+from ..metrics._local_measurements import get_major_celltype_perc
+from ..metrics._local_measurements import get_summed_cell_area
+from ..metrics._local_measurements import get_avg_knn_mixing
+from ..metrics._local_measurements import get_correlation_matrices
 
 #helper function
 def matrix_colorbar_plot(matrix: np.ndarray, title: str, x_min: int, x_max: int, y_min: int, y_max: int, vmin, vmax, 

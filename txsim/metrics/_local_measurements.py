@@ -4,7 +4,7 @@ from anndata import AnnData
 from scipy import stats
 from typing import Tuple
 from typing import List
-from utility import check_crop_exists
+from _util import check_crop_exists
 
 
 def get_wrong_spot_ratio(adata_sp : AnnData, x_min: int, x_max: int, y_min: int, y_max: int, image: np.ndarray, bins):
