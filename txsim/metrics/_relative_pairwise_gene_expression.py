@@ -15,6 +15,8 @@ def relative_pairwise_gene_expression(adata_sp: AnnData, adata_sc: AnnData, key:
         .obs column of ``AnnData`` that contains celltype information
     layer: str (default: 'lognorm')
         layer of ```AnnData`` to use to compute the metric
+    pipeline_output: bool (default: True)
+        whether to return only the overall metric (if False, will return the overall metric, per-gene metric and per-celltype metric)
     Returns
     -------
     overall_metric: float
