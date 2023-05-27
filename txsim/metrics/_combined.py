@@ -51,35 +51,9 @@ def all_metrics(
     #metrics['knn_mixing'] = knn_mixing(adata_sp,adata_sc)
 
     
-    
-    
     return pd.DataFrame.from_dict(metrics, orient='index')
 
-panel_to_celltype =  {'Stromal broad': 'Stromal broad',
-    'Fibroblasts + PVL': 'Stromal broad',
-    'B-cells': 'Immune broad',
-    'T-cells':'Immune broad',
-    'Myeloid': 'Immune broad',
-    'Immune broad': 'Immune broad',               
-   'Epithelial broad': 'Epithelial broad',
-   'None': 'None'}
 
-adata_sc = sc.read_h5ad("/Users/aslihankullelioglu/Downloads/txsim/sc_normalized.h5ad")
-adata_sp_baysor_list = glob.glob('/Users/aslihankullelioglu/Downloads/txsim/spatial/*.h5ad')
-df_list = []
-
-for adata_sp_name in adata_sp_baysor_list[:5]: #first 5 to test
-    adata_sp = sc.read_h5ad(adata_sp_name)
-    if re.match('baysor', adata_sp_name):
-        adata_sp = adata_sp[~np.isnan(adata_sp.layers['lognorm']).any(axis=1)]
-    
-    adata_sp.obs = adata_sp.obs.rename(columns={'celltype': 'celltype_panel'})
-    adata_sp.obs['celltype'] = [(panel_to_celltype)[k] for k in adata_sp.obs['celltype_panel']]
-    adata_sp.obs['celltype'] = adata_sp.obs['celltype'].astype('category')
-    adata_sp.write_h5ad("new_"+os.path.basename(adata_sp_name))
-    
-    output = all_metrics(adata_sp,adata_sc)
-    df_list.append(output)
 
 
 
