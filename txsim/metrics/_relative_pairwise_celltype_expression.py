@@ -4,7 +4,7 @@ import pandas as pd
 from anndata import AnnData
 from scipy.sparse import issparse
 
-def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key:str='celltype', layer:str='lognorm',  pipeline_output: bool=True):
+def relative_pairwise_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key:str='celltype', layer:str='lognorm',  pipeline_output: bool=True):
     """Calculate the efficiency deviation present between the genes in the panel. 
     ----------
     adata_sp : AnnData
@@ -15,6 +15,8 @@ def relative_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, key:str='
         .obs column of ``AnnData`` that contains celltype information
     layer: str (default: 'lognorm')
         layer of ```AnnData`` to use to compute the metric
+    pipeline_output: bool (default: True)
+        whether to return only the overall metric (if False, will return the overall metric, per-gene metric and per-celltype metric) 
 
     Returns
     -------
