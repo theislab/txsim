@@ -136,7 +136,7 @@ def annotate_celltypes(
         adata = run_majority_voting(adata, adata.uns['spots'])
         ran_ct_method = True
     elif (ct_method == 'ssam'):
-        adata = run_ssam(adata, spots.uns['spots'], adata_sc = adata_sc)
+        adata = run_ssam(adata, adata.uns['spots'], adata_sc = adata_sc)
         ran_ct_method = True
     elif (ct_method == 'pciSeqCT'):
         #TODO check if this actually works
