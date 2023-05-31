@@ -112,8 +112,10 @@ def run_pciSeq(
 
     #Save cell types
     type_vec = []
+    prob_vec = []
     for i in cellData['Cell_Num']:
         type_vec.append(cellData['ClassName'][i][np.argmax(cellData['Prob'][i])])
+        prob_vec.append(np.max(cellData['Prob'][i]))
 
     #Change the cell names to match the segmentation
 
@@ -125,7 +127,7 @@ def run_pciSeq(
         spots['cell'] = 0
         spots.loc[~spots['Gene'].isin(opts['exclude_genes']), 'cell'] = assignments
     
-    cell_types = pd.DataFrame(data=type_vec, index = cell_id[cell_id != 0])
-    cell_types[cell_types == 'Zero'] = 'None'
+    cell_types = pd.DataFrame(data={'type':type_vec, 'prob':prob_vec}, index = cell_id[cell_id != 0])
+    cell_types = cell_types.replace({'Zero':'None'})
     
     return spots, cell_types

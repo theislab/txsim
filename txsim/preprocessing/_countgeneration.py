@@ -10,7 +10,7 @@ from typing import Optional
 from ._ctannotation import run_majority_voting, run_ssam #, run_all_ct_methods
 
 def generate_adata(
-    molecules: DataFrame,
+    input_spots: DataFrame,
     ct_method: str = 'majority',
     ct_certainty_threshold: float = 0.7,
     adata_sc: Optional[str] = None,
@@ -25,7 +25,7 @@ def generate_adata(
 
     Parameters
     ----------
-    molecules : DataFrame
+    input_spots : DataFrame
         DataFrame containing genes and cell assignments
     ct_method : Optional[str]
         Method to use for cell type annotation. Output will be added to ``adata.obs['ct_<ct_method>']`` and duplicated in  ``adata.obs['celltype']``. Valid entries are ``['majority', 'ssam', 'pciSeq']``
@@ -43,7 +43,7 @@ def generate_adata(
     """    
     
     #Read assignments, calculate percentage of non-assigned spots (pct_noise) and save raw version of spots
-    spots = molecules #TODO bad naming
+    spots = input_spots.copy()
     pct_noise = sum(spots['cell'] <= 0)/len(spots['cell'])
     spots_raw = spots.copy() # save raw spots to add to adata.uns and set 0 to None
     spots_raw.loc[spots_raw['cell']==0,'cell'] = None

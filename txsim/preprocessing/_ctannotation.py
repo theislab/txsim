@@ -123,27 +123,29 @@ def annotate_celltypes(
     adata_sc: AnnData,
     ct_method: str = 'majority',
     ct_threshold: float = 0.7,
-    prior_celltypes : pd.DataFrame = None
+    prior_celltypes : pd.DataFrame = None,
+    hyperparams: dict = {}
 ) -> AnnData:
-    #TODO fix this
-    all_ct_methods = False
-
+    #all_ct_methods = False
+    #TODO potentially fix how threshold is measured
     #Add celltype according to ct_method and check if all methods should be implemented
+    if hyperparams.get('threshold') is not None: ct_threshold = hyperparams.get('threshold')
     ran_ct_method = False
     if (ct_method is None): ct_method = 'majority'
-    if (ct_method == 'majority' or all_ct_methods):
+    if (ct_method == 'majority'):
         adata = run_majority_voting(adata, adata.uns['spots'])
         ran_ct_method = True
-    if (ct_method == 'ssam' or all_ct_methods):
+    elif (ct_method == 'ssam'):
         adata = run_ssam(adata, spots.uns['spots'], adata_sc = adata_sc)
         ran_ct_method = True
-    if (ct_method == 'pciSeq' or all_ct_methods):
+    elif (ct_method == 'pciSeqCT'):
         #TODO check if this actually works
-        if prior_celltypes is not None:
-            #TODO read certainty
-            adata.obs['ct_pciSeq'] = pd.Categorical(prior_celltypes[1][adata.obs['cell_id']])
+        ct_method = 'pciSeq'
+        adata.obs['ct_pciSeq'] = pd.Categorical(prior_celltypes['type'][adata.obs['cell_id']])
+        adata.obs['ct_pciSeq_cert'] = prior_celltypes['prob'][adata.obs['cell_id']]
         ran_ct_method = True
-
+    else:
+        raise Exception(f'{ct_method} is not a valid cell type method')
     # ToDo (second prio)
     # elif ct_method == 'manual_markers':
     #     adata = run_manual_markers(adata, spots)
