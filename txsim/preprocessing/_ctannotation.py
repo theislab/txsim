@@ -225,10 +225,11 @@ def run_tangram(
         device=device,
         num_epochs=num_epochs)
     
+    #TODO: normalize the scores so they represent a probability to be a cell type 
     # Spatial prediction dataframe is saved in `obsm` `tangram_ct_pred` of the spatial AnnData
     tg.project_cell_annotations(
         adata_map = adata_map,
-        adata_sp = adata_st, annotation=cluster_labels)
+        adata_sp = adata_st, annotation=sc_ct_labels)
     
     # Assign cell type predictions
     df = adata_st.obsm['tangram_ct_pred'].copy()
