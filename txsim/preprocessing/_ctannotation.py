@@ -204,6 +204,8 @@ def run_tangram(
     # use log1p noramlized values  
     #adata_sc.X = adata_sc.layers['lognorm']
     
+    adata_st_orig = adata_st.copy()
+
     # use all the genes from adata_st as markers for tangram
     markers = adata_st.var_names.tolist()
     
@@ -232,6 +234,10 @@ def run_tangram(
         adata_map = adata_map,
         adata_sp = adata_st, annotation=sc_ct_labels)
     
+    # use original without extra layers generated from tangram
+    adata_st_orig.obsm['tangram_ct_pred'] = adata_st.obsm['tangram_ct_pred']
+    adata_st = adata_st_orig.copy()
+
     # Assign cell type predictions
     df = adata_st.obsm['tangram_ct_pred'].copy()
     df['MaxValue_Column'] = df.idxmax(axis=1)
