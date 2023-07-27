@@ -6,7 +6,7 @@ import scanpy as sc
 
 
 def run_majority_voting(
-    adata_st: AnnData,
+    adata_st: AnnData, 
     spots: pd.DataFrame
 ) -> AnnData:
 
@@ -163,3 +163,78 @@ def annotate_celltypes(
         adata.obs['celltype'] = adata.obs['ct_'+str(ct_method)]
 
     return adata
+
+def run_tangram(
+        
+    adata_st: AnnData,
+    #TODO figure out adata_sc is the path or the adata file
+    adata_sc: AnnData,
+    sc_ct_labels: str = 'celltype',
+    device: str = 'cpu',
+    mode: str = 'cells',
+    num_epochs: int = 1000,
+    
+) -> AnnData:
+    """Run the Tangram algorithm.
+
+    Parameters
+    ----------
+    adata_st : AnnData
+        AnnData object of the spatial transcriptomics data
+    adata_sc : str
+        Path to the sc transcriptomics AnnDat
+    sc_ct_labels : str
+        Labels of the cell_type layer in the adata_sc
+    device : str or torch.device 
+        Optional. Default is 'cpu'.
+    mode : str
+        Optional. Tangram mapping mode. 'cells', 'clusters', 'constrained'. Default is 'cells'
+    num_epochs : int 
+        Optional. Number of epochs. Default is 1000
+        
+    Returns
+    -------
+    AnnData
+        Anndata object with cell type annotation in ``adata_st.obs['ct_tangram']`` and ``adata_st.obs['ct_tangram_scores']``, whereby the latter is the noramlized scores, i.e. probability of each spatial cell to belong to a specific cell type assignment.
+    """
+    #import os, sys
+    #import numpy as np
+    #import pandas as pd
+    import scanpy as sc
+    #import torch
+    import tangram as tg
+
+    #TODO: check the layers in adata_sc
+    # use log1p noramlized values  
+    #adata_sc.X = adata_sc.layers['lognorm']
+    
+    # use all the genes from adata_st as markers for tangram
+    markers = adata_st.var_names.tolist()
+    
+    # Removes genes that all entries are zero. Finds the intersection between adata_sc, adata_st and given marker gene list, save the intersected markers in two adatas
+    # Calculates density priors and save it with adata_st
+    tg.pp_adatas(
+        adata_sc=adata_sc, 
+        adata_sp=adata_st, 
+        genes=markers)
+    
+    # Map single cell data (`adata_sc`) on spatial data (`adata_st`).
+    adata_map = tg.map_cells_to_space(
+        adata_sc=adata_sc,
+        adata_sp=adata_st,
+        device=device,
+        num_epochs=num_epochs)
+    
+    # Spatial prediction dataframe is saved in `obsm` `tangram_ct_pred` of the spatial AnnData
+    tg.project_cell_annotations(
+        adata_map = adata_map,
+        adata_sp = adata_st, annotation=cluster_labels)
+    
+    # Assign cell type predictions
+    df = adata_st.obsm['tangram_ct_pred'].copy()
+    df['MaxValue_Column'] = df.idxmax(axis=1)
+    df = df['MaxValue_Column']
+    adata_st.obs['celltype_tangram'] = df
+
+    return adata_st
+
