@@ -197,11 +197,7 @@ def run_tangram(
     AnnData
         Anndata object with cell type annotation in ``adata_st.obs['ct_tangram']`` and ``adata_st.obs['ct_tangram_scores']``, whereby the latter is the noramlized scores, i.e. probability of each spatial cell to belong to a specific cell type assignment.
     """
-    #import os, sys
-    #import numpy as np
-    #import pandas as pd
     import scanpy as sc
-    #import torch
     import tangram as tg
 
     #TODO: check the layers in adata_sc
@@ -216,14 +212,19 @@ def run_tangram(
     tg.pp_adatas(
         adata_sc=adata_sc, 
         adata_sp=adata_st, 
-        genes=markers)
+        genes=markers,
+        )
     
     # Map single cell data (`adata_sc`) on spatial data (`adata_st`).
+    # density_prior (str, ndarray or None): Spatial density of spots, when is a string, value can be 'rna_count_based' or 'uniform', when is a ndarray, shape = (number_spots,). 
+    # use 'uniform' if the spatial voxels are at single cell resolution (e.g. MERFISH). 'rna_count_based', assumes that cell density is proportional to the number of RNA molecules.
+
     adata_map = tg.map_cells_to_space(
         adata_sc=adata_sc,
         adata_sp=adata_st,
         device=device,
-        num_epochs=num_epochs)
+        num_epochs=num_epochs,
+        density_prior='uniform')
     
     #TODO: normalize the scores so they represent a probability to be a cell type 
     # Spatial prediction dataframe is saved in `obsm` `tangram_ct_pred` of the spatial AnnData
