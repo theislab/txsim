@@ -197,7 +197,7 @@ def run_tangram(
     AnnData
         Anndata object with cell type annotation in ``adata_st.obs['ct_tangram']`` and ``adata_st.obs['ct_tangram_scores']``, whereby the latter is the noramlized scores, i.e. probability of each spatial cell to belong to a specific cell type assignment.
     """
-    import scanpy as sc
+    #import scanpy as sc
     import tangram as tg
 
     #TODO: check the layers in adata_sc
@@ -225,6 +225,7 @@ def run_tangram(
         adata_sc=adata_sc,
         adata_sp=adata_st,
         device=device,
+        mode=mode,
         num_epochs=num_epochs,
         density_prior='uniform')
     
@@ -235,14 +236,14 @@ def run_tangram(
         adata_sp = adata_st, annotation=sc_ct_labels)
     
     # use original without extra layers generated from tangram
-    adata_st_orig.obsm['tangram_ct_pred'] = adata_st.obsm['tangram_ct_pred']
+    adata_st_orig.obsm['ct_tangram_scores'] = adata_st.obsm['tangram_ct_pred']
     adata_st = adata_st_orig.copy()
 
     # Assign cell type predictions
     df = adata_st.obsm['tangram_ct_pred'].copy()
     df['MaxValue_Column'] = df.idxmax(axis=1)
     df = df['MaxValue_Column']
-    adata_st.obs['celltype_tangram'] = df
+    adata_st.obs['ct_tangram'] = df
 
     return adata_st
 
