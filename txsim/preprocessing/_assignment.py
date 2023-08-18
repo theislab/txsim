@@ -67,7 +67,7 @@ def run_pciSeq(
     """
 
     import pciSeq
-    from scipy.sparse import coo_matrix
+    from scipy.sparse import coo_matrix, issparse
     import scanpy as sc
 
     
@@ -79,8 +79,13 @@ def run_pciSeq(
                      } , inplace = True)
 
     adata = sc_data.copy()
-    scdata = adata.X
+    scdata = adata.X if not issparse(adata.X) else adata.X.toarray()
     scdata  = pd.DataFrame(scdata.transpose())
+    print(scdata.columns)
+    print(adata.obs[cell_type_key])
+    print(type(adata.X))
+    print(type(scdata))
+    print(scdata)
     scdata.columns = adata.obs[cell_type_key]
     scdata.index = adata.var_names
 
