@@ -45,9 +45,7 @@ def knn_mixing(
         - score per cell type
     
     """
-    
-    #adata_sc = adata_sc[:,adata_st.var_names] -> not even needed, concat does this
-    
+
     # Concate sc and spatial
     adata_st.obs["modality"] = "spatial"
     adata_sc.obs["modality"] = "sc"
@@ -133,7 +131,7 @@ def get_knn_mixing_score(adata_st: AnnData, adata_sc: AnnData, obs_key: str = "c
             f = np.vectorize(lambda x: x/exp_val if x>=0 and x<=exp_val else x/(exp_val-1)+1/(1-exp_val))
             i = 0
             for cell in G.nodes():
-                ct_df[i] = sum(1 for neighbor in G.neighbors(cell) if G.nodes[cell]["modality"]=="sc")  #number_modality_sc
+                ct_df[i] = sum(1 for neighbor in G.neighbors(cell) if G.nodes[neighbor]["modality"]=="sc")  #number_modality_sc
                 ct_df[i] = ct_df[i]/G.degree(cell)      #ratio: number modality sc / total cells
                 i += 1 
 
