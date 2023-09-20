@@ -6,8 +6,6 @@ from anndata import AnnData
 import scanpy as sc
 from typing import Union, Tuple
 
-#TODO: fix Warnings in get_knn_mixing_score
-
 def knn_mixing(
     adata_st: AnnData, 
     adata_sc: AnnData, 
@@ -84,11 +82,13 @@ def knn_mixing(
     else:
         return mean_score, scores
     
+#TODO: fix NumbaDeprecationWarning
+
 def get_knn_mixing_score(adata_st: AnnData, adata_sc: AnnData, obs_key: str = "celltype", k: int = 45,ct_filter_factor: float = 2):
     """Get column in adata_sp.obs with knn mixing score.
 
     For this we concatenate the spatial and single cell datasets, compute the neighborsgraph for eligible celltypes, get the expected value for the
-    modality ratio, compute the actual ratio for each cell and assign the knn mixing score.
+    modality ratio, compute the actual ratio for each cell and assign a the knn mixing score.
 
     Parameters
     ----------
@@ -97,12 +97,12 @@ def get_knn_mixing_score(adata_st: AnnData, adata_sc: AnnData, obs_key: str = "c
     adata_sc : AnnData
         Annotated ``AnnData`` object with counts scRNAseq data
     """
+
     adata_st.obs["modality"] = "spatial"
     adata_sc.obs["modality"] = "sc"
-    adata = ad.concat([adata_st, adata_sc], join='inner')  
-    adata.X = adata.X.astype(np.float32)
-    adata.obs_names = adata.obs_names.astype(str) + "_" + adata.obs["modality"].astype(str)
-    adata.obs = adata.obs.reset_index()
+    adata = ad.concat([adata_st, adata_sc])
+ 
+    adata_st.obs["score"] = np.zeros(adata_st.n_obs)  
 
     # Set counts to log norm data
     adata.X = adata.layers["lognorm"]
@@ -117,12 +117,11 @@ def get_knn_mixing_score(adata_st: AnnData, adata_sc: AnnData, obs_key: str = "c
     shared_cts = list(sc_cts.intersection(st_cts))         
 
     # Get ratio per shared cell type
-    df = pd.DataFrame(columns=["index","knn mixing score"])
     for ct in shared_cts:
-        enough_cells = (adata.obs.loc[adata.obs[obs_key]==ct,"modality"].value_counts() > (ct_filter_factor * k)).all()     
+        enough_cells = (adata.obs.loc[adata.obs[obs_key]==ct,"modality"].value_counts() > (ct_filter_factor * k)).all()     #nochmal: wieso ct_fil?
         if enough_cells:
             a = adata[adata.obs[obs_key]==ct]
-            exp_val = (a.obs.loc[a.obs["modality"]=="sc"].shape[0])/a.obs.shape[0]  
+            exp_val = (a.obs.loc[a.obs["modality"]=="sc"].shape[0])/a.obs.shape[0]  #sinnvoller EW?
             sc.pp.neighbors(a,n_neighbors=k)
             G = nx.Graph(incoming_graph_data=a.obsp["connectivities"])
             nx.set_node_attributes(G, {i:a.obs["modality"].values[i] for i in range(G.number_of_nodes())}, "modality")   
@@ -134,12 +133,6 @@ def get_knn_mixing_score(adata_st: AnnData, adata_sc: AnnData, obs_key: str = "c
                 ct_df[i] = sum(1 for neighbor in G.neighbors(cell) if G.nodes[neighbor]["modality"]=="sc")  #number_modality_sc
                 ct_df[i] = ct_df[i]/G.degree(cell)      #ratio: number modality sc / total cells
                 i += 1 
-
-            df_t = a.obs[a.obs['index'].str.endswith('spatial')]    	    #TODO: früher subsetten
-            df_t["index"] = df_t["index"].apply(lambda s: s.rsplit('_',1)[0])
-            ct_df = ct_df[a.obs['index'].str.endswith('spatial')]
             
-            daf = pd.DataFrame({"index": df_t["index"], "knn mixing score":f(ct_df)})
-            df = pd.concat([df,daf])
-
-    adata_st.obs = pd.merge(adata_st.obs.reset_index(),df,left_on="index",right_on="index",how="left")
+            a.obs["score"] = f(ct_df)
+            adata_st.obs.loc[adata_st.obs["celltype"] == ct, "score"] = a.obs.loc[a.obs["modality"]=="spatial","score"]
