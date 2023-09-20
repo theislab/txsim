@@ -317,7 +317,7 @@ def plot_summed_cell_area(adata_sp: AnnData, x_min: int, x_max: int, y_min: int,
 
 
 def plot_avg_knn_mixing(adata_sp: AnnData, x_min: int, x_max: int, y_min: int, y_max: int, image: np.ndarray, bins: Tuple[int,int], smooth: float = 0, show_ticks: bool = False):
-    """Plot summed cell area.
+    """Plot average knn mixing.
 
     Parameters
     ----------
@@ -343,24 +343,47 @@ def plot_avg_knn_mixing(adata_sp: AnnData, x_min: int, x_max: int, y_min: int, y
     matrix_colorbar_plot(matrix, title, x_min, x_max, y_min, y_max, vmin, vmax, smooth, show_ticks)
 
 
-def plot_correlation_matrices_and_pairplot(adata_sp,x_min,x_max,y_min,y_max,image,bins,celltype):
-    pearson_corr_matrix, spearman_corr_matrix, measurements_df = get_correlation_matrices(adata_sp,x_min,x_max,y_min,y_max,image,bins,celltype)
+
+
+def plot_correlation_matrices_and_pairplot(adata_sp,adata_sc,x_min,x_max,y_min,y_max,image,bins,celltype):
+    """Plot pearson and spearman correlation matrices and a pairplot of all measurements.
+
+    Parameters
+    ----------
+    adata_sp: AnnData
+        Annotated ``AnnData`` object with counts from spatial data
+    adata_sc: AnnData
+        Annotated ``AnnData`` object with counts scRNAseq data
+    x_min : int, x_max : int, y_min : int, y_max : int 
+        crop coordinates
+    image : NDArray
+        read from image of dapi stained cell-nuclei
+    bins : [int,int]
+        the number of bins in each dimension
+
+    """
+    
+    pearson_corr_matrix, spearman_corr_matrix, measurements_df = get_correlation_matrices(adata_sp,adata_sc,x_min,x_max,y_min,y_max,image,bins,celltype)
     fig, (ax1, ax2) = plt.subplots(1,2)
-    ax1.set_title("measurements pearson-corrlations", fontsize = 10)
-    ax2.set_title("measurements spearman-corrlations", fontsize = 10)
+    ax1.set_title("measurements pearson-correlations", fontsize = 10)
+    ax2.set_title("measurements spearman-correlations", fontsize = 10)
     plot1 = ax1.imshow(pearson_corr_matrix)
     plot2 = ax2.imshow(spearman_corr_matrix)
 
     labels = ["wrong spot ratio","spot density","cell density", "celltype density",
-            "number of celltypes","major celltype perc","summed cell area", "avg knn mixing"]
+            "number of celltypes","major celltype perc","summed cell area", "avg knn mixing", "relative expression similarity across genes local",
+            "relative expression similarity across cell type clusters"]
     for ax in [ax1,ax2]:
-        ax.set_xticks([0,1,2,3,4,5,6,7],labels)
-        ax.set_yticks([0,1,2,3,4,5,6,7],labels)
+        ax.set_xticks(np.arange(len(labels)),labels)
+        ax.set_yticks(np.arange(len(labels)),labels)
         ax.set_xticklabels(labels, rotation=90)
+        ax.tick_params(axis="x",labelsize=8)
+        ax.tick_params(axis="y",labelsize=8)
         
     fig.colorbar(plot1,fraction=0.046, pad=0.04)    
     fig.colorbar(plot2,fraction=0.046, pad=0.04)    
 
-    plt.subplots_adjust(wspace=1.5)        
+    plt.subplots_adjust(wspace=4)        #controls gap between two plots, to avoid overlaps of labels
 
+    sns.set(font_scale=0.8)               
     sns.pairplot(measurements_df)
