@@ -11,6 +11,20 @@ import itertools
 
 #helper function 
 def get_eligible_celltypes(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype'):
+    """ Get shared celltypes of adata_sp and adata_sc, that have at least min_number_cells members.
+
+    Parameters
+    ----------
+    adata_sp : AnnData
+        Annotated ``AnnData`` object with counts from spatial data
+    adata_sc : AnnData
+        Annotated ``AnnData`` object with counts scRNAseq data
+
+    Returns
+    -------
+    celltypes, adata_sp, adata_sc
+
+    """
     # Set threshold parameters
     min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
     
