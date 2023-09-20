@@ -5,6 +5,9 @@ from scipy import stats
 from typing import Tuple
 from typing import List
 from _util import check_crop_exists
+from _relative_expression_similarity  import relative_expression_similarity_across_genes_local
+from _relative_expression_similarity  import relative_expression_similarity_across_cell_type_clusters
+
 
 
 def get_wrong_spot_ratio(adata_sp : AnnData, x_min: int, x_max: int, y_min: int, y_max: int, image: np.ndarray, bins):
@@ -310,7 +313,12 @@ def get_avg_knn_mixing(adata_sp: AnnData, x_min: int, x_max: int, y_min: int, y_
 
 
 
-def get_correlation_matrices(adata_sp: AnnData, x_min: int, x_max: int, y_min: int, y_max: int, image: np.ndarray, bins: Tuple[int,int], celltype: str):
+
+
+#Warnings: 
+#ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+
+def get_correlation_matrices(adata_sp: AnnData, adata_sc: AnnData, x_min: int, x_max: int, y_min: int, y_max: int, image: np.ndarray, bins: Tuple[int,int], celltype: str):
     """Get pearson and spearman correlation matrices.
 
     Parameters
@@ -337,17 +345,34 @@ def get_correlation_matrices(adata_sp: AnnData, x_min: int, x_max: int, y_min: i
     M_major_celltype_perc = get_major_celltype_perc(adata_sp,x_min, x_max, y_min, y_max,image,bins)[0]
     M_summed_cell_area = get_summed_cell_area(adata_sp,x_min, x_max, y_min, y_max,image,bins)[0]
     M_avg_knn_mixing = get_avg_knn_mixing(adata_sp,x_min, x_max, y_min, y_max,image,bins)[0]
-
+    M_relative_expression_similarity_across_genes_local = relative_expression_similarity_across_genes_local(adata_sp, adata_sc, x_min, x_max, y_min, y_max, image, bins)
+    M_relative_expression_similarity_across_cell_type_clusters = relative_expression_similarity_across_cell_type_clusters(adata_sp, adata_sc, x_min, x_max, y_min, y_max, image, bins)
     measurements_df = pd.DataFrame({'wrong spot ratio':M_wrong_spot_ratio.flatten(), 'spot density': M_spot_density.flatten(), 
                                 'cell density': M_cell_density.flatten(), 'celltype density': M_celltype_density.flatten(), 'number of celltypes': M_number_of_celltypes.flatten(),
                                 'major celltype perc': M_major_celltype_perc.flatten(), 'summed cell area': M_summed_cell_area.flatten(),
-                                'avg knn mixing': M_avg_knn_mixing.flatten()})
+                                'avg knn mixing': M_avg_knn_mixing.flatten(), 'relative expression similarity across genes local': M_relative_expression_similarity_across_genes_local.flatten(),
+                                'relative expression similarity across cell type clusters': M_relative_expression_similarity_across_cell_type_clusters.flatten()
+    })     
+    
     n = measurements_df.shape[1]
     spearman_corr_matrix = np.zeros((n,n))
     pearson_corr_matrix = np.zeros((n,n))
     for i in range(n):
         for j in range(n):
-            spearman_corr_matrix[i,j] = stats.spearmanr(measurements_df.iloc[:,i],measurements_df.iloc[:,j]).statistic
-            pearson_corr_matrix[i,j] = stats.pearsonr(measurements_df.iloc[:,i],measurements_df.iloc[:,j]).statistic
-    
+            x, y = measurements_df.iloc[:,i], measurements_df.iloc[:,j]
+            # Create a mask to filter out NaN values
+            mask = ~np.isnan(x) & ~np.isnan(y)
+            # Apply the mask to the data
+            x_filtered = x[mask]
+            y_filtered = y[mask]
+
+            #pearsonr only defined if len(x_filtered) = len(y_filtered) >= 2
+            if len(x_filtered)>=2:
+                spearman_corr_matrix[i,j] = stats.spearmanr(x_filtered,y_filtered).statistic
+                pearson_corr_matrix[i,j] = stats.pearsonr(x_filtered,y_filtered).statistic      
+            else:
+                spearman_corr_matrix[i,j] = np.nan
+                pearson_corr_matrix[i,j] = np.nan     
+        
     return pearson_corr_matrix, spearman_corr_matrix, measurements_df
+
