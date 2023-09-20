@@ -50,3 +50,48 @@ def get_cells_location(adata_sp: AnnData, adata_sc: AnnData):
     df_cells = df_cells.reset_index().rename(columns={'cell':'cell_id'})
     adata_sp.obs = pd.merge(df_cells,adata_sp.obs,left_on="cell_id",right_on="cell_id",how="inner")
 
+
+#helper function
+def get_bin_edges(A: list[list[int]], bins):
+    """ Get bins_x and bins_y (the bin edges) from the range matrix A ([[xmin, xmax], [ymin, ymax]]) and bins as in the np.histogram2d function.
+
+    Parameters
+    ----------
+    A : np.ndarray
+    bins : int or array_like or [int, int] or [array, array]
+        The bin specification:
+        If int, the number of bins for the two dimensions (nx=ny=bins).
+        If array_like, the bin edges for the two dimensions (x_edges=y_edges=bins).
+        If [int, int], the number of bins in each dimension (nx, ny = bins).
+        If [array, array], the bin edges in each dimension (x_edges, y_edges = bins).
+        A combination [int, array] or [array, int], where int is the number of bins and array is the bin edges.
+
+    Returns
+    -------
+    bins_x : array
+    bins_y : array
+    """
+    A = np.array(A)
+
+    if isinstance(bins, int):
+        bins_x = np.linspace(A[0, 0], A[0, 1], bins+1)
+        bins_y = np.linspace(A[1, 0], A[1, 1], bins+1)
+    elif isinstance(bins, (list,np.ndarray)) and len(bins) != 2:
+        bins_x = bins
+        bins_y = bins
+    elif isinstance(bins, (list, tuple)) and len(bins) == 2 and all(isinstance(b, int) for b in bins):
+        bins_x = np.linspace(A[0, 0], A[0, 1], bins[0]+1)
+        bins_y = np.linspace(A[1, 0], A[1, 1], bins[1]+1)
+    elif isinstance(bins, (list, tuple)) and len(bins) == 2 and all(isinstance(b, (list, np.ndarray)) for b in bins):
+        bins_x = np.array(bins[0])
+        bins_y = np.array(bins[1])
+    elif isinstance(bins, (list, tuple)) and len(bins) == 2 and isinstance(bins[0], int) and isinstance(bins[1], (list, np.ndarray)):
+        bins_x = np.linspace(A[0, 0], A[0, 1], bins[0]+1)
+        bins_y = np.array(bins[1])
+    elif isinstance(bins, (list, tuple)) and len(bins) == 2 and isinstance(bins[1], int) and isinstance(bins[0], (list, np.ndarray)):
+        bins_x = np.array(bins[0])
+        bins_y = np.linspace(A[1, 0], A[1, 1], bins[1]+1)
+    else:
+        raise ValueError("Invalid 'bins' parameter format")
+
+    return bins_x, bins_y
