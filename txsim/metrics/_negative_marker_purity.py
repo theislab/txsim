@@ -44,7 +44,7 @@ def get_eligible_celltypes(adata_sp: AnnData, adata_sc: AnnData, key: str='cellt
     
     # Filter cell types by minimum number of cells
     celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
-    celltype_count_sp = adata_sp.obs[key].value_counts().loc[shared_celltypes]      #before:adata_sc...
+    celltype_count_sp = adata_sp.obs[key].value_counts().loc[shared_celltypes]      
     ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
     celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
 
@@ -113,7 +113,7 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
             return negative_marker_purity, None, None
     
     # Get pos cell ratios in negative marker-cell type pairs
-    lowvals_sc = np.full_like(neg_marker_mask, np.nan, dtype=np.float32)    #wofür nötig?
+    lowvals_sc = np.full_like(neg_marker_mask, np.nan, dtype=np.float32)    
     lowvals_sc = ratio_celltype_sc.values[neg_marker_mask]
     lowvals_sp = ratio_celltype_sp.values[neg_marker_mask]
     
@@ -132,7 +132,7 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
         # Calculate per gene and per cell type purities
         purities = (ratio_celltype_sc - ratio_celltype_sp).clip(0,None)
         purities.values[~neg_marker_mask] = np.nan
-        purities = purities.loc[~(purities.isnull().all(axis=1)), ~(purities.isnull().all(axis=0))]     #wieso?
+        purities = purities.loc[~(purities.isnull().all(axis=1)), ~(purities.isnull().all(axis=0))]    
         purity_per_gene = purities.mean(axis=0, skipna=True)
         purity_per_celltype = purities.mean(axis=1, skipna=True)
         
@@ -265,7 +265,7 @@ def get_negative_marker_dict(adata_sp: AnnData, adata_sc: AnnData, key: str='cel
     """
     max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair
            
-    celltypes, adata_sp, adata_sc  = get_eligible_celltypes(adata_sp, adata_sc, key)  #unnecessary potential adata_sp sparse matrix fix here, is not used
+    celltypes, adata_sp, adata_sc  = get_eligible_celltypes(adata_sp, adata_sc, key)  
     
     # Filter cells to eligible cell types
     adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]

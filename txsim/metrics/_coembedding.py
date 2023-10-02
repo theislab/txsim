@@ -118,10 +118,10 @@ def get_knn_mixing_score(adata_st: AnnData, adata_sc: AnnData, obs_key: str = "c
 
     # Get ratio per shared cell type
     for ct in shared_cts:
-        enough_cells = (adata.obs.loc[adata.obs[obs_key]==ct,"modality"].value_counts() > (ct_filter_factor * k)).all()     #nochmal: wieso ct_fil?
+        enough_cells = (adata.obs.loc[adata.obs[obs_key]==ct,"modality"].value_counts() > (ct_filter_factor * k)).all()    
         if enough_cells:
             a = adata[adata.obs[obs_key]==ct]
-            exp_val = (a.obs.loc[a.obs["modality"]=="sc"].shape[0])/a.obs.shape[0]  #sinnvoller EW?
+            exp_val = (a.obs.loc[a.obs["modality"]=="sc"].shape[0])/a.obs.shape[0]  
             sc.pp.neighbors(a,n_neighbors=k)
             G = nx.Graph(incoming_graph_data=a.obsp["connectivities"])
             nx.set_node_attributes(G, {i:a.obs["modality"].values[i] for i in range(G.number_of_nodes())}, "modality")   
@@ -130,8 +130,8 @@ def get_knn_mixing_score(adata_st: AnnData, adata_sc: AnnData, obs_key: str = "c
             f = np.vectorize(lambda x: x/exp_val if x>=0 and x<=exp_val else x/(exp_val-1)+1/(1-exp_val))
             i = 0
             for cell in G.nodes():
-                ct_df[i] = sum(1 for neighbor in G.neighbors(cell) if G.nodes[neighbor]["modality"]=="sc")  #number_modality_sc
-                ct_df[i] = ct_df[i]/G.degree(cell)      #ratio: number modality sc / total cells
+                ct_df[i] = sum(1 for neighbor in G.neighbors(cell) if G.nodes[neighbor]["modality"]=="sc")
+                ct_df[i] = ct_df[i]/G.degree(cell)     
                 i += 1 
             
             a.obs["score"] = f(ct_df)

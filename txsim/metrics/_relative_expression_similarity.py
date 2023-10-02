@@ -97,7 +97,6 @@ def relative_expression_similarity_across_genes_local(
     for x_start, x_end in zip(bins_x[:-1], bins_x[1:]):
         i = 0
         for y_start, y_end in zip(bins_y[:-1], bins_y[1:]):    
-            #hat adata_sp.obs immer x, y Koord? Sonst mit get_cells_location Funktion
             df = adata_sp.obs[["x", "y"]]
             df = df[
             (df["x"] >= x_start)
@@ -112,7 +111,7 @@ def relative_expression_similarity_across_genes_local(
                 continue  
 
             sp_local = exp_sp.loc[df.index,:] 
-            sp_local[key] = adata_sp.obs.loc[df.index,:][key]           #wieso nicht vor der for-Schleife?
+            sp_local[key] = adata_sp.obs.loc[df.index,:][key]           
 
             n_cells_per_ct = sp_local[key].value_counts()
             eligible_ct = n_cells_per_ct.loc[n_cells_per_ct >= min_n_cells_per_ct].index.tolist()
@@ -128,7 +127,7 @@ def relative_expression_similarity_across_genes_local(
             sum_sc_local = np.sum(np.sum(sc_local.iloc[:,:-1]))
 
             if sum_sp_local != 0:
-                mean_celltype_sp_normalized=(sp_local.groupby(key).mean().dropna())*(n_intersect_genes)**2     #why still e.g. Meis2 in df? (dropna)
+                mean_celltype_sp_normalized=(sp_local.groupby(key).mean().dropna())*(n_intersect_genes)**2     
             else: 
                 mean_celltype_sp_normalized=0
 
@@ -245,7 +244,6 @@ def relative_expression_similarity_across_cell_type_clusters(
     for x_start, x_end in zip(bins_x[:-1], bins_x[1:]):
         i = 0
         for y_start, y_end in zip(bins_y[:-1], bins_y[1:]):    
-            #hat adata_sp.obs immer x, y Koord? Sonst mit get_cells_location Funktion
             df = adata_sp.obs[["x", "y"]]
             df = df[
             (df["x"] >= x_start)
@@ -260,7 +258,7 @@ def relative_expression_similarity_across_cell_type_clusters(
                 continue  
 
             sp_local = exp_sp.loc[df.index,:] 
-            sp_local[key] = adata_sp.obs.loc[df.index,:][key]           #wieso nicht vor der for-Schleife?
+            sp_local[key] = adata_sp.obs.loc[df.index,:][key]           
 
             n_cells_per_ct = sp_local[key].value_counts()
             eligible_ct = n_cells_per_ct.loc[n_cells_per_ct >= min_n_cells_per_ct].index.tolist()
@@ -276,7 +274,7 @@ def relative_expression_similarity_across_cell_type_clusters(
             sum_sc_local = np.sum(np.sum(sc_local.iloc[:,:-1]))
 
             if sum_sp_local != 0:
-                mean_celltype_sp_normalized=(sp_local.groupby(key).mean().dropna())*(n_intersect_celltypes)**2     #why still e.g. Meis2 in df? (dropna)
+                mean_celltype_sp_normalized=(sp_local.groupby(key).mean().dropna())*(n_intersect_celltypes)**2     
             else: 
                 mean_celltype_sp_normalized=0
 

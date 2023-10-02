@@ -25,7 +25,7 @@ def _uniform_cell(adata_sp: AnnData):
         spots["x"], spots["y"] = spots["x"]-x_min, spots["y"]-y_min
 
         seg_mask = np.zeros((x_max-x_min+1,y_max-y_min+1))
-        seg_mask[spots["x"].values.tolist(), spots["y"].values.tolist()] = 1     #?spot mir Koord. (x,y) wird geplottet bei (y,x)
+        seg_mask[spots["x"].values.tolist(), spots["y"].values.tolist()] = 1    
         cell = convex_hull_image(seg_mask)
 
         # Count the number of spots in each quadrat
@@ -43,7 +43,7 @@ def _uniform_cell(adata_sp: AnnData):
         chi2_statistic = np.sum((observed_counts - expected_counts)**2 / expected_counts)
 
         #delta peak: all spots in one pixel
-        chi2_delta = (n_pixs-1)*mean_pix + (total_spots-mean_pix)**2/mean_pix       #richtig so?
+        chi2_delta = (n_pixs-1)*mean_pix + (total_spots-mean_pix)**2/mean_pix     
 
         # Calculate a uniformness measure based on the Chi-squared statistic
         adata_sp.obs.loc[adata_sp.obs["cell_id"]==i,"uniform_cell"] = 1 - chi2_statistic / chi2_delta  

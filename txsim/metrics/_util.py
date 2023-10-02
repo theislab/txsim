@@ -45,7 +45,7 @@ def get_cells_location(adata_sp: AnnData, adata_sc: AnnData):
 
     get_spot_assignment_col(adata_sp,adata_sc)
     spots = adata_sp.uns["spots"]
-    df_cells = spots.loc[spots["spot_assignment"]!="unassigned"]      #ohne filter testen
+    df_cells = spots.loc[spots["spot_assignment"]!="unassigned"]      
     df_cells = df_cells.groupby(["cell"])[["x","y"]].mean()
     df_cells = df_cells.reset_index().rename(columns={'cell':'cell_id'})
     adata_sp.obs = pd.merge(df_cells,adata_sp.obs,left_on="cell_id",right_on="cell_id",how="inner")
