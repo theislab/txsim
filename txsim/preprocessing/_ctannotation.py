@@ -44,7 +44,7 @@ def run_ssam(
     
     adata_st: AnnData,
     spots: pd.DataFrame,
-    adata_sc: pd.DataFrame,
+    adata_sc: AnnData,
     um_p_px: float = 0.325,
     
 ) -> AnnData:
