@@ -77,7 +77,7 @@ def run_ssam(
                             spots.x*um_p_px,
                             spots.y*um_p_px )
     adata_sc=adata_sc[:,adata_st.var_names]
-    exp=pd.DataFrame(adata_sc.X,columns=adata_sc.var_names)
+    exp=pd.DataFrame(adata_sc.X,columns=adata_sc.var_names) #TO DO: this line raises: raise ValueError(f"Shape of passed values is {passed}, indices imply {implied}") ValueError: Shape of passed values is (100064, 1), indices imply (100064, 62)
     exp['celltype']=list(adata_sc.obs['celltype'])
     signatures=exp.groupby('celltype').mean().transpose()
     # 'cheat-create' an anndata set:
