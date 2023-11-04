@@ -2,8 +2,8 @@ from anndata import AnnData
 import numpy as np
 import pandas as pd
 import scanpy as sc
+from pandas import DataFrame
 from ._coexpression_similarity import *
-from .metric2 import calc_metric2
 from ._celltype_proportions import *
 from ._efficiency import *
 from ._relative_pairwise_celltype_expression import *
@@ -13,19 +13,17 @@ from ._cell_statistics import *
 from ._coembedding import knn_mixing
 from ._gene_set_coexpression import *
 
-
 def all_metrics(
     adata_sp: AnnData,
     adata_sc: AnnData
-) -> pd.DataFrame:
+) -> DataFrame:
 
     #Generate metrics
     metrics = {}
     ##Celltype proportion
-    #metrics['mean_ct_prop_dev'] = mean_proportion_deviation(adata_sp,adata_sc)
-    #metrics['prop_noncommon_labels_sc'] = proportion_cells_non_common_celltype_sc(adata_sp,adata_sc)
-    #metrics['prop_noncommon_labels_sp'] = proportion_cells_non_common_celltype_sp(adata_sp,adata_sc)
-    
+    metrics['mean_ct_prop_dev'] = mean_proportion_deviation(adata_sp,adata_sc)
+    metrics['prop_noncommon_labels_sc'] = proportion_cells_non_common_celltype_sc(adata_sp,adata_sc)
+    metrics['prop_noncommon_labels_sp'] = proportion_cells_non_common_celltype_sp(adata_sp,adata_sc)
     ## Gene efficiency metrics   
     #metrics['gene_eff_dev'] = efficiency_deviation(adata_sp,adata_sc)
     #metrics['gene_eff_mean'] = efficiency_mean(adata_sp,adata_sc)
@@ -58,7 +56,15 @@ def all_metrics(
     
     return pd.DataFrame.from_dict(metrics, orient='index')
 
-
-
-
-
+def aggregate_metrics(
+    metric_list: list,
+    aggregated_metric: DataFrame,
+    name_list: list = None
+):
+    mean_metric = pd.concat((metric_list), axis=1)
+    if name_list is not None: mean_metric.columns = name_list
+    mean_metric["mean"] = mean_metric.mean(axis=1)
+    mean_metric["std"] = mean_metric.std(axis=1)
+    aggregated_metric.columns = ["AGGREGATED_METRIC"]
+    mean_metric = pd.concat((mean_metric,aggregated_metric), axis=1)
+    return mean_metric
