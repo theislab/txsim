@@ -15,10 +15,12 @@ def jensen_shannon_divergence(adata_sp: AnnData, adata_sc: AnnData,
     adata_sc: AnnData
         annotated ``AnnData`` object containing the dissociated single-cell data
     key: str (default: 'celltype')
-         .obs column of ``AnnData`` that contains celltype information
+        .obs column of ``AnnData`` that contains celltype information
     layer: str (default: 'lognorm')
-         layer of ```AnnData`` to use to compute the metric
+        layer of ```AnnData`` to use to compute the metric
     pipeline_output: bool (default: True)
+        whether to return only the overall metric (pipeline style)
+        (if False, will return the overall metric, per-gene metric and per-celltype metric)
 
     Returns
     -------
