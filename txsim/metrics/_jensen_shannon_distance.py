@@ -147,6 +147,7 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
         P_extended = P
         Q_extended = Q
     # 2. normalize the vectors
+    # TODO # delete # actually this step is not necessary because the scipy function does it for you
     P_normalized = P_extended / np.sum(P_extended)
     Q_normalized = Q_extended / np.sum(Q_extended)
     # 3. calculate the Jensen-Shannon distance
