@@ -6,7 +6,7 @@ from anndata import AnnData
 from scipy.sparse import issparse
 from scipy.spatial import distance
 
-def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData, 
+def jensen_shannon_divergence_metrics(adata_sp: AnnData, adata_sc: AnnData, 
                               key:str='celltype', layer:str='lognorm', 
                               pipeline_output: bool=True):
     """Calculate the Jensen-Shannon divergence between the two distributions:
@@ -81,13 +81,16 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     ################
     # PER-GENE METRIC
     ################
-    per_gene_metric = pd.DataFrame(columns=['gene', 'JSD'])
+    per_gene_metric = pd.DataFrame(columns=['Gene', 'JSD'])
     for gene in adata_sc.var_names:
         sum = 0
         for celltype in set(adata_sp.obs['celltype']):
             sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype)
         jsd = sum / n_celltypes
-        per_gene_metric = pd.concat([per_gene_metric, pd.DataFrame({'gene': gene, 'JSD': jsd})], ignore_index=True)
+        new_entry = pd.DataFrame([[gene, jsd]],
+                   columns=['Gene', 'JSD'])
+        per_gene_metric = pd.concat([per_gene_metric, new_entry])
+    per_gene_metric.set_index('Gene', inplace=True)    
     ################
     # PER-CELLTYPE METRIC
     ################
@@ -97,9 +100,11 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
         for gene in adata_sc.var_names:
             sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype)
         jsd = sum / n_genes
-        per_celltype_metric = pd.concat([per_celltype_metric, pd.DataFrame({'celltype': celltype, 'JSD': jsd})], ignore_index=True)
+        new_entry = pd.DataFrame([[celltype, jsd]],
+                     columns=['celltype', 'JSD'])
+        per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
+    per_celltype_metric.set_index('celltype', inplace=True)
     ################
-
     return overall_metric, per_gene_metric, per_celltype_metric
 
 def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:AnnData, gene:str, celltype:str):
@@ -127,8 +132,6 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     # 1. append the shorter vector with average values
     P = np.squeeze(P) # make sure the vector is 1D
     Q = np.squeeze(Q) # make sure the vector is 1D
-    print(np.shape(P))
-    print(np.shape(Q))
     length_difference = abs(len(P) - len(Q))
     if len(P) > len(Q):
         average_values_to_add = np.empty(length_difference)
@@ -148,6 +151,16 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     Q_normalized = Q_extended / np.sum(Q_extended)
     # 3. calculate the Jensen-Shannon distance
     return distance.jensenshannon(P_normalized, Q_normalized)
+
+# TODO: deal with empty expression vectors
+# TODO: if the expression vector is empty, then I get: "FutureWarning: 
+# The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. 
+# In a future version, this will no longer exclude empty or all-NA columns when 
+# determining the result dtypes. To retain the old behavior, exclude the relevant 
+# entries before the concat operation.
+# per_celltype_metric = pd.concat([per_celltype_metric, new_entry])" - I NEED TO
+# build a check for empty vectors, then this concatination won't cause an issue in 
+# the future versions
 
 
 ####
