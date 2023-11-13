@@ -35,7 +35,7 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
     max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair
     
     # Subset adata_sc to genes of spatial data
-    adata_sc = adata_sc[:,adata_sp.var_names]
+    adata_sc = adata_sc[:,adata_sp.var_names] #TODO: probably here we create a view! --> Then the sparse adata.X doesn't convert to dense --> CHECK and then also adjust in the other metrics!!!
     
     # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
     for a in [adata_sc, adata_sp]:
