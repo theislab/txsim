@@ -29,18 +29,22 @@ def aggregate_rand_index(matrices: list):
     return [df_mean, df_std]
 
 def calc_annotation_similarity(adata1: AnnData, adata2: AnnData):
-    #Lots of indexing- get all the spots assigned to a cell (in at least one of the adata objects)
-    #notnull = assigned to cell
-    #For these indices, get the cell_id
-    indices = adata2.uns['spots']['cell'][adata1.uns['spots']['cell'].notnull() | adata2.uns['spots']['cell'].notnull()]
+    # Get all the spots assigned to a cell in at least one of the adata objects
+    # notnull = assigned to cell
+    indices1 = adata1.uns['spots']['cell'][adata1.uns['spots']['cell'].notnull() | adata2.uns['spots']['cell'].notnull()]
+    indices2 = adata2.uns['spots']['cell'][adata1.uns['spots']['cell'].notnull() | adata2.uns['spots']['cell'].notnull()]
 
-    #Given the cell_id, get the celltypes of the cell for each spot
-    cellann1 = adata1.obs[['cell_id','celltype']].set_index('cell_id').loc[indices.values,'celltype'].values
-    #Also for second adata
-    cellann2 = adata2.obs[['cell_id','celltype']].set_index('cell_id').loc[indices.values,'celltype'].values
+    #Create temporary copy of cell_id -> celltype dictionary, and add "nan" value
+    # for when a transcript (spot) is assigned to a cell in 1 adata, but not the other (cell_id = nan)
+    temp_cell_dict2 = adata2.obs[['cell_id','celltype']].set_index('cell_id').loc[:,'celltype'].copy()
+    temp_cell_dict2[np.nan] = 'None_1'
 
-    #calc how many are the same
-    similarity = sum(cellann1.astype(str) == cellann2.astype(str)) / len(cellann2)
+    temp_cell_dict1 = adata1.obs[['cell_id','celltype']].set_index('cell_id').loc[:,'celltype'].copy()
+    temp_cell_dict1[np.nan] = 'None_2'
+
+    # Use the cell dictionary to get celltypes for each index
+    # length of indices1 and 2 are same
+    similarity = sum(temp_cell_dict1[indices1].values == temp_cell_dict2[indices2].values) / len(indices1)
 
     return similarity
 
@@ -48,7 +52,11 @@ def calc_annotation_matrix(adata_list: list, name_list: list):
     ann_matrix = np.zeros([len(adata_list), len(adata_list)])
     ann_matrix = pd.DataFrame(ann_matrix)
     for i in range(len(adata_list)):
-        for j in range(len(adata_list)):
+        for j in range(len(adata_list)): #TODO Mirror matrix instead of running it twice?
+            # print(name_list[i])
+            # print("-")
+            # print(name_list[j])
+            # print("-")
             adata1 = adata_list[i]
             adata2 = adata_list[j]
             ann_matrix.iloc[i, j] = calc_annotation_similarity(adata1, adata2)
