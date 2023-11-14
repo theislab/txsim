@@ -39,7 +39,6 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     ### SET UP 
     # Set threshold parameters
     min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
-    max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair
 
     # set the .X layer of each of the adatas to be log-normalized counts
     adata_sp.X = adata_sp.layers[layer]
