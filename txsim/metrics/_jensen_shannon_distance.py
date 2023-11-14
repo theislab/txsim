@@ -6,7 +6,7 @@ from anndata import AnnData
 from scipy.sparse import issparse
 from scipy.spatial import distance
 
-def jensen_shannon_divergence_metrics(adata_sp: AnnData, adata_sc: AnnData, 
+def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData, 
                               key:str='celltype', layer:str='lognorm', 
                               pipeline_output: bool=True):
     """Calculate the Jensen-Shannon divergence between the two distributions:
