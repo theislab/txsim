@@ -47,7 +47,7 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
     
     # Filter cell types by minimum number of cells
     celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
-    celltype_count_sp = adata_sc.obs[key].value_counts().loc[shared_celltypes]
+    celltype_count_sp = adata_sp.obs[key].value_counts().loc[shared_celltypes]
     ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
     celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
     
