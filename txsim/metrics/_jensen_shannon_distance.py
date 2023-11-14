@@ -129,8 +129,12 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     # 0. get all expression values for the gene of interest for the celltype of interest
     P = np.array(adata_sp[adata_sp.obs['celltype']==celltype][:,gene].X)
     Q = np.array(adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X)
-    if len(P) == 0 or len(Q) == 0 or np.sum(P) == 0 or np.sum(Q) == 0:
-        return 1 # if the expression vector is empty or is a null vectory, then the distance is 1 (most different)
+    # 0.1. if both vectors are empty, return 0
+    if (sum(P) == 0 and sum(Q) == 0):
+        return 0
+    # 0.2. if one of the vectors is empty, return 1 (maximum distance)
+    elif (sum(P) == 0 and sum(Q) != 0) or (sum(P) != 0 and sum(Q) == 0):
+        return 1
     
     # 1. append the shorter vector with average values
     P = np.squeeze(P) # make sure the vector is 1D
