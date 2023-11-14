@@ -106,7 +106,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     per_celltype_metric = pd.DataFrame(columns=['celltype', 'JSD'])
     for celltype in set(adata_sp.obs['celltype']):
         sum = 0
-        for gene in adata_sc.var_names:
+        for gene in intersect_genes:
             sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype)
         jsd = sum / n_genes
         new_entry = pd.DataFrame([[celltype, jsd]],
