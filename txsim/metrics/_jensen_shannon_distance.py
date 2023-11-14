@@ -38,7 +38,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
 
     ### SET UP 
     # Set threshold parameters
-    min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
+    min_number_cells=30 # minimum number of cells belonging to a cluster to consider it in the analysis
 
     # set the .X layer of each of the adatas to be log-normalized counts
     adata_sp.X = adata_sp.layers[layer]
@@ -65,7 +65,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
 
     # Filter cell types by minimum number of cells
     celltype_count_sc = adata_sc.obs[key].value_counts().loc[intersect_celltypes]
-    celltype_count_sp = adata_sc.obs[key].value_counts().loc[intersect_celltypes]
+    celltype_count_sp = adata_sp.obs[key].value_counts().loc[intersect_celltypes]
     ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
     celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
 
@@ -99,6 +99,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
         new_entry = pd.DataFrame([[gene, jsd]],
                    columns=['Gene', 'JSD'])
         per_gene_metric = pd.concat([per_gene_metric, new_entry])
+    # set gene as index
     per_gene_metric.set_index('Gene', inplace=True)    
     ################
     # PER-CELLTYPE METRIC
@@ -112,6 +113,13 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
         new_entry = pd.DataFrame([[celltype, jsd]],
                      columns=['celltype', 'JSD'])
         per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
+    # add the rows with celltypes which were filtered out because of the min_number_cells threshold
+    celltypes_with_nan = list(set(adata_sp.obs['celltype']) - set(celltypes))
+    for celltype in celltypes_with_nan:
+        new_entry = pd.DataFrame([[celltype, np.nan]],
+                     columns=['celltype', 'JSD'])
+        per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
+    # set celltype as index
     per_celltype_metric.set_index('celltype', inplace=True)
     ################
     return overall_metric, per_gene_metric, per_celltype_metric
@@ -179,6 +187,7 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
 # build a check for empty vectors, then this concatination won't cause an issue in 
 # the future versions
 # TODO: check if my solution for vectors of different lengths is correct
+# TODO: filtering out celltypes with less than x cells somehow does not work yet
 
 
 ####
