@@ -37,6 +37,10 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     """
 
     ### SET UP 
+    # Set threshold parameters
+    min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
+    max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair
+
     # set the .X layer of each of the adatas to be log-normalized counts
     adata_sp.X = adata_sp.layers[layer]
     adata_sc.X = adata_sc.layers[layer]
@@ -55,14 +59,20 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     adata_sc=adata_sc[:,intersect_genes]
     adata_sp=adata_sp[:,intersect_genes]
 
-    # subset adata_sc and adata_sp to only include celltypes in the intersection of adata_sp and adata_sc
-    adata_sc=adata_sc[adata_sc.obs[key].isin(intersect_celltypes)]
-    adata_sp=adata_sp[adata_sp.obs[key].isin(intersect_celltypes)]
-
     # sparse matrix support
     for a in [adata_sc, adata_sp]:
         if issparse(a.X):
             a.layers[layer]= a.layers[layer].toarray()
+
+    # Filter cell types by minimum number of cells
+    celltype_count_sc = adata_sc.obs[key].value_counts().loc[intersect_celltypes]
+    celltype_count_sp = adata_sc.obs[key].value_counts().loc[intersect_celltypes]
+    ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
+    celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
+
+    # subset adata_sc and adata_sp to only include eligible celltypes
+    adata_sc=adata_sc[adata_sc.obs[key].isin(celltypes)]
+    adata_sp=adata_sp[adata_sp.obs[key].isin(celltypes)]
 
     ################
     # OVERALL METRIC
@@ -84,7 +94,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     per_gene_metric = pd.DataFrame(columns=['Gene', 'JSD'])
     for gene in adata_sc.var_names:
         sum = 0
-        for celltype in set(adata_sp.obs['celltype']):
+        for celltype in celltypes:
             sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype)
         jsd = sum / n_celltypes
         new_entry = pd.DataFrame([[gene, jsd]],
