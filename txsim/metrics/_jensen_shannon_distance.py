@@ -144,38 +144,51 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
         Jensen-Shannon distance between the two distributions, single value
     """
     # 0. get all expression values for the gene of interest for the celltype of interest
-    P = np.array(adata_sp[adata_sp.obs['celltype']==celltype][:,gene].X)
-    Q = np.array(adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X)
-    # 0.1. if both vectors are empty, return 0
+    sp = np.array(adata_sp[adata_sp.obs['celltype']==celltype][:,gene].X)
+    sc = np.array(adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X)
+    # 1. calculate the distribution vectors for the two datasets
+    P, Q = get_probability_distributions_for_sp_and_sc(sp, sc)
+    # 2. if both vectors are empty, return 0
     if (sum(P) == 0 and sum(Q) == 0):
         return 0
-    # 0.2. if one of the vectors is empty, return 1 (maximum distance)
+    # 3. if one of the vectors is empty, return 1 (maximum distance)
     elif (sum(P) == 0 and sum(Q) != 0) or (sum(P) != 0 and sum(Q) == 0):
         return 1
-    
-    # 1. append the shorter vector with average values
-    P = np.squeeze(P) # make sure the vector is 1D
-    Q = np.squeeze(Q) # make sure the vector is 1D
-    length_difference = abs(len(P) - len(Q))
-    if len(P) > len(Q):
-        average_values_to_add = np.empty(length_difference)
-        average_values_to_add.fill(np.average(Q))
-        Q_extended = np.append(Q, average_values_to_add)
-        P_extended = P
-    elif len(Q) > len(P):
-        average_values_to_add = np.empty(length_difference)
-        average_values_to_add.fill(np.average(P))
-        P_extended = np.append(P, average_values_to_add)
-        Q_extended = Q
-    else:
-        P_extended = P
-        Q_extended = Q
-    # 2. normalize the vectors
-    # TODO # delete # actually this step is not necessary because the scipy function does it for you
-    P_normalized = P_extended / np.sum(P_extended)
-    Q_normalized = Q_extended / np.sum(Q_extended)
-    # 3. calculate the Jensen-Shannon distance
-    return distance.jensenshannon(P_normalized, Q_normalized)
+    # 4. calculate the Jensen-Shannon distance
+    return distance.jensenshannon(P, Q)
+
+
+def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
+    """Calculate the probability distribution vectors from one celltype and one gene
+    from spatial and single-cell data
+    ---------- 
+    v_sp: np.array
+        spatial data from one celltype and one gene, 1-dim vector
+    v_sc: np.array
+        single-cell data from one celltype and one gene, 1-dim vector
+
+    Returns
+    -------
+    probability_distribution_sp: np.array
+        probability distribution from spatial data for one celltype and one gene, 1-dim vector
+    probability_distribution_sc: np.array
+        probability distribution from dissociated sc data for one celltype and one gene, 1-dim vector
+    """
+    # find the maximum value in the two given vectors
+    max_value = max(max(v_sp), max(v_sc))
+    # find the minimum value in the two given vectors
+    min_value = min(min(v_sp), min(v_sc))
+
+    # Calculate the histogram
+    hist_sp, bin_edges = np.histogram(v_sp, bins=max_value - min_value + 1, density=True)
+    hist_sc, bin_edges = np.histogram(v_sc, bins=max_value - min_value + 1, density=True)
+    # hist_sp, bin_edges = np.histogram(v_sp, bins=100, density=True)
+    # hist_sc, bin_edges = np.histogram(v_sc, bins=100, density=True)
+
+    # Normalize the histogram to obtain the probability distribution
+    d_sp = hist_sp / np.sum(hist_sp)
+    d_sc = hist_sc / np.sum(hist_sc)
+    return d_sp, d_sc
 
 # TODO: deal with empty expression vectors
 # TODO: if the expression vector is empty, then I get: "FutureWarning: 
