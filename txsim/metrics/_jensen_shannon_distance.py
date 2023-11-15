@@ -38,7 +38,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
 
     ### SET UP 
     # Set threshold parameters
-    min_number_cells=30 # minimum number of cells belonging to a cluster to consider it in the analysis
+    min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
 
     # set the .X layer of each of the adatas to be log-normalized counts
     adata_sp.X = adata_sp.layers[layer]
@@ -101,6 +101,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
         per_gene_metric = pd.concat([per_gene_metric, new_entry])
     # set gene as index
     per_gene_metric.set_index('Gene', inplace=True)    
+    
     ################
     # PER-CELLTYPE METRIC
     ################
@@ -148,12 +149,12 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     sc = np.array(adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X)
     # 1. calculate the distribution vectors for the two datasets
     P, Q = get_probability_distributions_for_sp_and_sc(sp, sc)
-    # 2. if both vectors are empty, return 0
-    if (sum(P) == 0 and sum(Q) == 0):
-        return 0
-    # 3. if one of the vectors is empty, return 1 (maximum distance)
-    elif (sum(P) == 0 and sum(Q) != 0) or (sum(P) != 0 and sum(Q) == 0):
-        return 1
+    # # 2. if both vectors are empty, return 0
+    # if (sum(P) == 0 and sum(Q) == 0):
+    #     return 0
+    # # 3. if one of the vectors is empty, return 1 (maximum distance)
+    # elif (sum(P) == 0 and sum(Q) != 0) or (sum(P) != 0 and sum(Q) == 0):
+    #     return 1
     # 4. calculate the Jensen-Shannon distance
     return distance.jensenshannon(P, Q)
 
