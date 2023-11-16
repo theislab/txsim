@@ -53,10 +53,6 @@ def calc_annotation_matrix(adata_list: list, name_list: list):
     ann_matrix = pd.DataFrame(ann_matrix)
     for i in range(len(adata_list)):
         for j in range(len(adata_list)): #TODO Mirror matrix instead of running it twice?
-            # print(name_list[i])
-            # print("-")
-            # print(name_list[j])
-            # print("-")
             adata1 = adata_list[i]
             adata2 = adata_list[j]
             ann_matrix.iloc[i, j] = calc_annotation_similarity(adata1, adata2)
