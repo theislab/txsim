@@ -135,3 +135,182 @@ def get_crop_with_high_ct_heterogeneity(
     y_max = (y_idx+1)*n_pixel_y
 
     return y_min, x_min
+
+
+
+##########
+# Tiling #
+##########
+
+def get_tile_intervals(x:int,y:int,nx:int,ny:int,x_len:int,y_len:int,extend_n_pixels:int):
+    """Get x,y start and end points of a tile
+    
+    Arguments
+    ---------
+    x: int
+        x-id of the tile
+    y: int
+        y-id of the tile
+    nx: int
+        Number of tiles along x (total number of tiles = nx * ny)
+    ny: int
+        Number of tiles along y (total number of tiles = nx * ny)
+    x_len: int
+        Image x-length
+    y_len: int
+        Image y-length
+    extend_n_pixels: int
+        Nr of pixels to add at the tile borders (don't extend further than (0,x_len) and (0,y_len))
+        
+    Returns
+    -------
+    x_min, x_max, y_min, y_max: ints
+        Interval start and end points
+    offset_x, offset_y: 
+        Tile offsets due to `extend_n_pixels`. Can be either 0 (tile at left/top border) or `extend_n_pixels`.
+    
+    """
+    
+    tile_len_x = x_len // nx
+    tile_len_y = y_len // ny
+    
+    if extend_n_pixels > min(tile_len_y,tile_len_x):
+        raise ValueError(
+            f"The tiles are smaller ({(tile_len_y,tile_len_x)}) than the tile extension ({extend_n_pixels})"
+        )
+    
+    x_min = (x * tile_len_x) - extend_n_pixels if x > 0 else 0
+    x_max = ((x+1) * tile_len_x) + extend_n_pixels if x < (nx-1) else x_len
+    y_min = (y * tile_len_y) - extend_n_pixels if y > 0 else 0
+    y_max = ((y+1) * tile_len_y) + extend_n_pixels if y < (ny-1) else y_len
+    
+    offset_x = extend_n_pixels if x > 0 else 0
+    offset_y = extend_n_pixels if y > 0 else 0
+    
+    return x_min, x_max, y_min, y_max, offset_x, offset_y
+
+
+def get_tile_mask(spots, x_min, x_max, y_min, y_max, x_col="x", y_col="y"):
+    """
+    """
+    mask = (spots[x_col].round() >= x_min) & (spots[x_col].round() < x_max) 
+    mask &=(spots[y_col].round() >= y_min) & (spots[y_col].round() < y_max)
+    return mask
+
+def get_nr_of_spots_in_tile(spots, x_min, x_max, y_min, y_max, x_col="x", y_col="y"):
+    """
+    """
+    mask = get_tile_mask(spots, x_min, x_max, y_min, y_max, x_col=x_col, y_col=y_col)
+    return mask.sum()
+
+def get_spots_tile(spots: pd.DataFrame, x_min: int, x_max: int, y_min: int, y_max:int, x_col="x", y_col="y"):
+    """ Subset spots table to tile and translate coordinates
+    """
+    mask = get_tile_mask(spots, x_min, x_max, y_min, y_max, x_col=x_col, y_col=y_col)
+    spots = spots.loc[mask]
+    spots[x_col] -= x_min
+    spots[y_col] -= y_min
+    return spots
+    
+    
+    
+
+def find_optimal_tile_division_for_nspots_limit(img_shape, spots, n_spots_max=10000000, extend_n_pixels=20):
+    """
+    
+    """
+    
+    y_len, x_len = img_shape
+    
+    n_spots = len(spots)
+    
+    # Start with the minimal expected number of tiles
+    n_tiles = n_spots // n_spots_max + bool(n_spots % n_spots_max)
+    
+    while n_spots > n_spots_max:
+        
+        # Get x, y tile splitting that produces the most square like tiles (to minimize tile perimeter)
+        ny, nx = find_optimal_tile_division(img_shape, n_tiles)
+        
+        print(f"n_tiles = {n_tiles}, n_spots = {n_spots}, nx = {nx}, ny = {ny}")
+        
+        for x in range(nx):
+            for y in range(ny):
+                
+                # Get tile interval (including tile extensions)
+                x_min, x_max, y_min, y_max, _, _ = get_tile_intervals(x, y, nx, ny, x_len, y_len, extend_n_pixels)
+                          
+                # Update n_spots (Start with first tile, update if tile with higher n_spots is found)
+                n_spots_tile = get_nr_of_spots_in_tile(spots, x_min, x_max, y_min, y_max, x_col="x", y_col="y")
+                if (n_spots_tile > n_spots) or (x==0 and y==0):
+                    n_spots = n_spots_tile
+                
+                print(f"\tx = {x}, y = {y}, n_spots_tile = {n_spots_tile}, n_spots = {n_spots}")
+                    
+        n_tiles += 1
+                    
+    return ny, nx
+
+
+
+
+
+def find_multiplication_factors(n):
+    """Find pairs of factors of an integer n."""
+    factors = []
+    for i in range(1, int(n**0.5) + 1):
+        if n % i == 0:
+            factors.append((i, n // i))
+    return factors
+
+def find_optimal_tile_division(img_shape, n):
+    """
+    Determine the optimal division of a rectangle (image) into tiles with the goal of making 
+    the tiles as square-like as possible.
+
+    Arguments
+    ---------
+    img_shape:
+        shape of image.
+    n: The number of tiles to divide the rectangle into.
+
+    Returns
+    -------
+    tuple: A pair (divisions_y, divisions_x) indicating the number of divisions 
+           along the y-axis and x-axis, respectively, to achieve the most square-like tiles.
+    """
+    
+    rect_y, rect_x = img_shape
+    
+    longer_side_x = (rect_x > rect_y)
+    if longer_side_x:
+        width, length = (rect_x, rect_y)
+    else:
+        width, length = (rect_y, rect_x)
+        
+    # Find all factor pairs of tile_count
+    factor_pairs = find_multiplication_factors(n)
+
+    # Initialize variables to store the optimal division
+    optimal_divisions_wid = None
+    optimal_divisions_len = None
+    min_diff = float('inf')
+
+    # Iterate through each pair of factors
+    for divisions_len, divisions_wid in factor_pairs:
+        # Calculate aspect ratios for each division
+        tile_aspect_ratio = (width / divisions_wid) / (length / divisions_len)
+        aspect_ratio_difference = abs(tile_aspect_ratio - 1)
+
+        # Update the optimal divisions if this one is closer to square
+        if aspect_ratio_difference < min_diff:
+            min_diff = aspect_ratio_difference
+            optimal_divisions_wid = divisions_wid
+            optimal_divisions_len = divisions_len
+
+    if longer_side_x:
+        optimal_divisions_y, optimal_divisions_x = (optimal_divisions_len, optimal_divisions_wid)
+    else:
+        optimal_divisions_y, optimal_divisions_x = (optimal_divisions_wid, optimal_divisions_len)
+        
+    return (optimal_divisions_y, optimal_divisions_x)
