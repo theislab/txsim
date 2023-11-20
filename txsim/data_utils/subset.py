@@ -193,8 +193,11 @@ def get_tile_intervals(x:int,y:int,nx:int,ny:int,x_len:int,y_len:int,extend_n_pi
 def get_tile_mask(spots, x_min, x_max, y_min, y_max, x_col="x", y_col="y"):
     """
     """
-    mask = (spots[x_col].round() >= x_min) & (spots[x_col].round() < x_max) 
-    mask &=(spots[y_col].round() >= y_min) & (spots[y_col].round() < y_max)
+    #TODO: clarify the position of spots wrt pixels (center vs top left)
+    #mask = (spots[x_col].round() >= x_min) & (spots[x_col].round() < x_max) 
+    #mask &=(spots[y_col].round() >= y_min) & (spots[y_col].round() < y_max)
+    mask = (spots[x_col] >= x_min) & (spots[x_col] < x_max)
+    mask &=(spots[y_col] >= y_min) & (spots[y_col] < y_max)
     return mask
 
 def get_nr_of_spots_in_tile(spots, x_min, x_max, y_min, y_max, x_col="x", y_col="y"):
@@ -207,7 +210,7 @@ def get_spots_tile(spots: pd.DataFrame, x_min: int, x_max: int, y_min: int, y_ma
     """ Subset spots table to tile and translate coordinates
     """
     mask = get_tile_mask(spots, x_min, x_max, y_min, y_max, x_col=x_col, y_col=y_col)
-    spots = spots.loc[mask]
+    spots = spots.loc[mask].copy()
     spots[x_col] -= x_min
     spots[y_col] -= y_min
     return spots
