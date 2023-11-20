@@ -7,7 +7,7 @@ from scipy.sparse import issparse
 from scipy.spatial import distance
 
 def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData, 
-                              key:str='celltype', layer:str='norm', 
+                              key:str='celltype', layer:str='lognorm', 
                               pipeline_output: bool=True):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
@@ -147,18 +147,11 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     # 0. get all expression values for the gene of interest for the celltype of interest
     sp = np.array(adata_sp[adata_sp.obs['celltype']==celltype][:,gene].X)
     sc = np.array(adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X)
-    #flatten the arrays to 1-dim vectors
-    sp = sp.flatten().astype(int)
-    sc = sc.flatten().astype(int)
-    # 1. calculate the distribution vectors for the two datasets
+    # 1.flatten the arrays to 1-dim vectors
+    sp = sp.flatten()
+    sc = sc.flatten()
+    # 2. get the probability distributions for the two vectors
     P, Q = get_probability_distributions_for_sp_and_sc(sp, sc)
-    # # 2. if both vectors are empty, return 0
-    # if (sum(P) == 0 and sum(Q) == 0):
-    #     return 0
-    # # 3. if one of the vectors is empty, return 1 (maximum distance)
-    # elif (sum(P) == 0 and sum(Q) != 0) or (sum(P) != 0 and sum(Q) == 0):
-    #     return 1
-    # 4. calculate the Jensen-Shannon distance
     return distance.jensenshannon(P, Q)
 
 
@@ -186,8 +179,6 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
     # Calculate the histogram
     hist_sp, bin_edges = np.histogram(v_sp, bins=min(100, int(max_value - min_value + 1)), density=True)
     hist_sc, bin_edges = np.histogram(v_sc, bins=min(100, int(max_value - min_value + 1)), density=True)
-    # hist_sp, bin_edges = np.histogram(v_sp, bins=100, density=True)
-    # hist_sc, bin_edges = np.histogram(v_sc, bins=100, density=True)
 
     # Normalize the histogram to obtain the probability distribution
     d_sp = hist_sp / np.sum(hist_sp)
