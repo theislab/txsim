@@ -58,8 +58,6 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
     intersect_celltypes = list(set(adata_sp.obs[key]).intersection(set(adata_sc.obs[key])))
 
-    # number of celltypes
-    n_celltypes = len(intersect_celltypes)
     # number of genes
     n_genes = len(intersect_genes)
 
@@ -76,7 +74,10 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     celltype_count_sc = adata_sc.obs[key].value_counts().loc[intersect_celltypes]
     celltype_count_sp = adata_sp.obs[key].value_counts().loc[intersect_celltypes]
     ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
+    # celltypes that we will use for the metric (are in both datasets and have enough cells)
     celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
+    # number of celltypes we will use for the metric (are in both datasets and have enough cells)
+    n_celltypes = len(intersect_celltypes)
 
     # subset adata_sc and adata_sp to only include eligible celltypes
     adata_sc=adata_sc[adata_sc.obs[key].isin(celltypes)]
@@ -85,7 +86,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     ################
     # OVERALL METRIC
     ################
-    overall_metric = 0
+    overall_metric = 0 
     for gene in adata_sc.var_names:
         sum = 0
         for celltype in set(adata_sp.obs['celltype']):
@@ -99,7 +100,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     ################
     # PER-GENE METRIC
     ################
-    per_gene_metric = pd.DataFrame(columns=['Gene', 'JSD'])
+    per_gene_metric = pd.DataFrame(columns=['Gene', 'JSD']) 
     for gene in adata_sc.var_names:
         sum = 0
         for celltype in celltypes:
@@ -115,7 +116,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     # PER-CELLTYPE METRIC
     ################
     per_celltype_metric = pd.DataFrame(columns=['celltype', 'JSD'])
-    for celltype in set(adata_sp.obs['celltype']):
+    for celltype in celltypes:
         sum = 0
         for gene in intersect_genes:
             sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype, smooth_distributions)
@@ -123,7 +124,8 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
         new_entry = pd.DataFrame([[celltype, jsd]],
                      columns=['celltype', 'JSD'])
         per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
-    # add the rows with celltypes which were filtered out because of the min_number_cells threshold
+
+    # add the rows with celltypes which were filtered out because of the min_number_cells threshold and set their JSD to NaN
     celltypes_with_nan = list(set(intersect_celltypes) - set(celltypes))
     for celltype in celltypes_with_nan:
         new_entry = pd.DataFrame([[celltype, np.nan]],
@@ -242,6 +244,8 @@ def gaussian_smooth(data, sigma=1):
 # 2. Idea: make "bridges" between similar histogram blocks
 # TODO: change the functions structure so that it is not calculating per gene and per celltype metrics twice
 # TODO: my code has a match statement, so we need python >= 3.10, is that ok?
+# TODO; introduce a parameter to hide the Nan celltypes per default
+# TODO: allow setting the window size or sigma for smoothing
 
 
 ####
