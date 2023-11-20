@@ -5,9 +5,14 @@ import math
 from anndata import AnnData
 from scipy.sparse import issparse
 from scipy.spatial import distance
+from scipy.stats import gaussian_kde
+from scipy.interpolate import UnivariateSpline
+
+from statsmodels.nonparametric.smoothers_lowess import lowess
+
 
 def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData, 
-                              key:str='celltype', layer:str='lognorm', 
+                              key:str='celltype', layer:str='lognorm', smooth_distributions:str='no',
                               pipeline_output: bool=True):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
@@ -25,6 +30,14 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     pipeline_output: bool (default: True)
         whether to return only the overall metric (pipeline style)
         (if False, will return the overall metric, per-gene metric and per-celltype metric)
+    smooth_distributions: str (default: 'no')
+        whether to smooth the distributions before calculating the metric per gene and per celltype
+        'no' - no smoothing
+        'kde' - kernel density estimation
+        'moving_average' - moving average
+        'lowess' - LOWESS (locally weighted scatterplot smoothing)
+        'spline_interpolation' - spline interpolation
+        'histogram_equalization' - histogram equalization
 
     Returns
     -------
@@ -80,7 +93,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     for gene in adata_sc.var_names:
         sum = 0
         for celltype in set(adata_sp.obs['celltype']):
-            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype)
+            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype, smooth_distributions)
         overall_metric += sum
     overall_metric = overall_metric / (n_celltypes * n_genes)
 
@@ -94,7 +107,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     for gene in adata_sc.var_names:
         sum = 0
         for celltype in celltypes:
-            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype)
+            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype, smooth_distributions)
         jsd = sum / n_celltypes
         new_entry = pd.DataFrame([[gene, jsd]],
                    columns=['Gene', 'JSD'])
@@ -109,7 +122,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     for celltype in set(adata_sp.obs['celltype']):
         sum = 0
         for gene in intersect_genes:
-            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype)
+            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype, smooth_distributions)
         jsd = sum / n_genes
         new_entry = pd.DataFrame([[celltype, jsd]],
                      columns=['celltype', 'JSD'])
@@ -125,7 +138,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     ################
     return overall_metric, per_gene_metric, per_celltype_metric
 
-def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:AnnData, gene:str, celltype:str):
+def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:AnnData, gene:str, celltype:str, smooth_distributions):
     """Calculate the Jensen-Shannon distance between two distributions:
     1. expression values for a given gene in a given celltype from spatial data
     2. expression values for a given gene in a given celltype from single-cell data
@@ -151,11 +164,11 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     sp = sp.flatten()
     sc = sc.flatten()
     # 2. get the probability distributions for the two vectors
-    P, Q = get_probability_distributions_for_sp_and_sc(sp, sc)
+    P, Q = get_probability_distributions_for_sp_and_sc(sp, sc, smooth_distributions)
     return distance.jensenshannon(P, Q)
 
 
-def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
+def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array, smooth_distributions):
     """Calculate the probability distribution vectors from one celltype and one gene
     from spatial and single-cell data
     ---------- 
@@ -171,21 +184,85 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
     probability_distribution_sc: np.array
         probability distribution from dissociated sc data for one celltype and one gene, 1-dim vector
     """
-    # find the maximum value in the two given vectors
+    # 0. find the maximum and minimus value in the two given vectors
     max_value = max(max(v_sp), max(v_sc))
-    # find the minimum value in the two given vectors
     min_value = min(min(v_sp), min(v_sc))
 
-    # Calculate the histogram
+    # 1. Calculate the histograms for the two vectors
+    # 1.1 spatial
+    if sum(v_sp) == 0:
+        # if it's a zero vector, make it a uniform distribution
+        v_sp = np.ones(len(v_sp))
     hist_sp, bin_edges = np.histogram(v_sp, bins=min(100, int(max_value - min_value + 1)), density=True)
+
+    # 1.2 dissociated sc
+    if sum(v_sc) == 0:
+        # if it's a zero vector, make it a uniform distribution
+        v_sc = np.ones(len(v_sp))
     hist_sc, bin_edges = np.histogram(v_sc, bins=min(100, int(max_value - min_value + 1)), density=True)
 
-    # Normalize the histogram to obtain the probability distribution
-    d_sp = hist_sp / np.sum(hist_sp)
-    d_sc = hist_sc / np.sum(hist_sc)
-    return d_sp, d_sc
+    # 2. Smooth the distributions if the method is specified
+    match smooth_distributions:
+        case 'no':
+            pass
+        case 'kde':
+            hist_sp = kde_smooth(hist_sp)
+            hist_sc = kde_smooth(hist_sc)
+        case 'moving_average':
+            hist_sp = moving_average_smooth(hist_sp)
+            hist_sc = moving_average_smooth(hist_sc)
+        case 'lowess':
+            hist_sp = lowess_smooth(hist_sp)
+            hist_sc = lowess_smooth(hist_sc)
+        case 'spline_interpolation':
+            hist_sp = spline_interpolation(hist_sp)
+            hist_sc = spline_interpolation(hist_sc)
+        case 'histogram_equalization':
+            hist_sp = histogram_equalization(hist_sp)
+            hist_sc = histogram_equalization(hist_sc)
+        case _:
+            raise ValueError(f"Unknown smoothing method: {smooth_distributions}")
 
-# TODO: deal with empty expression vectors per gene per celltype
+    return hist_sp, hist_sc
+
+def kde_smooth(histogram):
+    # Creating a KDE object with a Gaussian kernel
+    kde = gaussian_kde(histogram)
+    
+    # Generating a smooth curve using the KDE
+    smooth_curve = kde(np.linspace(min(histogram), max(histogram), len(histogram)))
+    
+    return smooth_curve
+
+def moving_average_smooth(histogram, window_size=3):
+    # Applying moving average
+    weights = np.repeat(1.0, window_size) / window_size
+    smoothed_values = np.convolve(histogram, weights, 'valid')
+    
+    return np.concatenate((smoothed_values, np.zeros(window_size-1)))
+
+def lowess_smooth(histogram, frac=0.3):
+    # Applying LOESS smoothing
+    smoothed_values = lowess(histogram, np.arange(len(histogram)), frac=frac)[:, 1]
+    
+    return smoothed_values
+
+def spline_interpolation(histogram):
+    # Applying spline interpolation
+    x = np.arange(len(histogram))
+    spline = UnivariateSpline(x, histogram, s=0)
+    
+    return spline(x)
+
+def histogram_equalization(histogram):
+    # Applying histogram equalization
+    cumulative_distribution = np.cumsum(histogram) / np.sum(histogram)
+    equalized_values = np.interp(histogram, np.linspace(0, 1, len(histogram)), cumulative_distribution)
+    
+    return equalized_values
+
+
+# TODO: deal with empty expression vectors per gene per celltype # I decided to impute and make it a uniform distribution
 # TODO: if the expression vector is empty, then I get: "FutureWarning: 
 # The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. 
 # In a future version, this will no longer exclude empty or all-NA columns when 
