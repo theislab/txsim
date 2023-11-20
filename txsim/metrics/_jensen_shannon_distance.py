@@ -246,6 +246,7 @@ def gaussian_smooth(data, sigma=1):
 # TODO: my code has a match statement, so we need python >= 3.10, is that ok?
 # TODO; introduce a parameter to hide the Nan celltypes per default
 # TODO: allow setting the window size or sigma for smoothing
+# TODO: maybe implement Wasserstein or maybe even the Cramer distance in addition to Jensen-Shannon
 
 
 ####
