@@ -230,7 +230,12 @@ def find_optimal_tile_division_for_nspots_limit(img_shape, spots, n_spots_max=10
     # Start with the minimal expected number of tiles
     n_tiles = n_spots // n_spots_max + bool(n_spots % n_spots_max)
     
+    # Get x, y tile splitting that produces the most square like tiles (to minimize tile perimeter)
+    ny, nx = find_optimal_tile_division(img_shape, n_tiles)
+    
     while n_spots > n_spots_max:
+        
+        n_tiles += 1
         
         # Get x, y tile splitting that produces the most square like tiles (to minimize tile perimeter)
         ny, nx = find_optimal_tile_division(img_shape, n_tiles)
@@ -249,8 +254,6 @@ def find_optimal_tile_division_for_nspots_limit(img_shape, spots, n_spots_max=10
                     n_spots = n_spots_tile
                 
                 print(f"\tx = {x}, y = {y}, n_spots_tile = {n_spots_tile}, n_spots = {n_spots}")
-                    
-        n_tiles += 1
                     
     return ny, nx
 
