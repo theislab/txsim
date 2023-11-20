@@ -203,8 +203,6 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
 # per_celltype_metric = pd.concat([per_celltype_metric, new_entry])" - I NEED TO
 # build a check for empty vectors, then this concatination won't cause an issue in 
 # the future versions
-# TODO: filtering out celltypes with less than x cells somehow does not work yet
-# TODO: I convert the float values to integers now, change that to use the normalized values
 
 
 ####
