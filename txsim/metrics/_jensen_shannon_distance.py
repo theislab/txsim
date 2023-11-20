@@ -38,7 +38,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
 
     ### SET UP 
     # Set threshold parameters
-    min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
+    min_number_cells=20 # minimum number of cells belonging to a cluster to consider it in the analysis
 
     # set the .X layer of each of the adatas to be log-normalized counts
     # adata_sp.X = adata_sp.layers[layer]
@@ -115,7 +115,7 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
                      columns=['celltype', 'JSD'])
         per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
     # add the rows with celltypes which were filtered out because of the min_number_cells threshold
-    celltypes_with_nan = list(set(adata_sp.obs['celltype']) - set(celltypes))
+    celltypes_with_nan = list(set(intersect_celltypes) - set(celltypes))
     for celltype in celltypes_with_nan:
         new_entry = pd.DataFrame([[celltype, np.nan]],
                      columns=['celltype', 'JSD'])
@@ -205,6 +205,7 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
 # the future versions
 # TODO: filtering out celltypes with less than x cells somehow does not work yet
 # TODO: I convert the float values to integers now, change that to use the normalized values
+# TODO: change the raw layer to normzaalized layer
 
 
 ####
