@@ -5,10 +5,7 @@ import math
 from anndata import AnnData
 from scipy.sparse import issparse
 from scipy.spatial import distance
-from scipy.stats import gaussian_kde
-from scipy.interpolate import UnivariateSpline
-
-from statsmodels.nonparametric.smoothers_lowess import lowess
+from scipy.ndimage import gaussian_filter1d
 
 
 def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData, 
@@ -33,11 +30,9 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     smooth_distributions: str (default: 'no')
         whether to smooth the distributions before calculating the metric per gene and per celltype
         'no' - no smoothing
-        'kde' - kernel density estimation
         'moving_average' - moving average
-        'lowess' - LOWESS (locally weighted scatterplot smoothing)
-        'spline_interpolation' - spline interpolation
-        'histogram_equalization' - histogram equalization
+        'rolling_median' - rolling median
+        'gaussian' - gaussian filter
 
     Returns
     -------
@@ -205,61 +200,31 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array, sm
     match smooth_distributions:
         case 'no':
             pass
-        case 'kde':
-            hist_sp = kde_smooth(hist_sp)
-            hist_sc = kde_smooth(hist_sc)
         case 'moving_average':
             hist_sp = moving_average_smooth(hist_sp)
             hist_sc = moving_average_smooth(hist_sc)
-        case 'lowess':
-            hist_sp = lowess_smooth(hist_sp)
-            hist_sc = lowess_smooth(hist_sc)
-        case 'spline_interpolation':
-            hist_sp = spline_interpolation(hist_sp)
-            hist_sc = spline_interpolation(hist_sc)
-        case 'histogram_equalization':
-            hist_sp = histogram_equalization(hist_sp)
-            hist_sc = histogram_equalization(hist_sc)
+        case 'rolling_median':
+            hist_sp = rolling_median(hist_sp)
+            hist_sc = rolling_median(hist_sc)
+        case 'gaussian':
+            hist_sp = gaussian_smooth(hist_sp)
+            hist_sc = gaussian_smooth(hist_sc)
         case _:
             raise ValueError(f"Unknown smoothing method: {smooth_distributions}")
-
     return hist_sp, hist_sc
-
-def kde_smooth(histogram):
-    # Creating a KDE object with a Gaussian kernel
-    kde = gaussian_kde(histogram)
-    
-    # Generating a smooth curve using the KDE
-    smooth_curve = kde(np.linspace(min(histogram), max(histogram), len(histogram)))
-    
-    return smooth_curve
 
 def moving_average_smooth(histogram, window_size=3):
     # Applying moving average
     weights = np.repeat(1.0, window_size) / window_size
     smoothed_values = np.convolve(histogram, weights, 'valid')
-    
     return np.concatenate((smoothed_values, np.zeros(window_size-1)))
 
-def lowess_smooth(histogram, frac=0.3):
-    # Applying LOESS smoothing
-    smoothed_values = lowess(histogram, np.arange(len(histogram)), frac=frac)[:, 1]
-    
+def rolling_median(data, window_size=3):
+    return np.convolve(data, np.ones(window_size)/window_size, mode='same')
+
+def gaussian_smooth(data, sigma=1):
+    smoothed_values = gaussian_filter1d(data, sigma=sigma)
     return smoothed_values
-
-def spline_interpolation(histogram):
-    # Applying spline interpolation
-    x = np.arange(len(histogram))
-    spline = UnivariateSpline(x, histogram, s=0)
-    
-    return spline(x)
-
-def histogram_equalization(histogram):
-    # Applying histogram equalization
-    cumulative_distribution = np.cumsum(histogram) / np.sum(histogram)
-    equalized_values = np.interp(histogram, np.linspace(0, 1, len(histogram)), cumulative_distribution)
-    
-    return equalized_values
 
 
 # TODO: deal with empty expression vectors per gene per celltype # I decided to impute and make it a uniform distribution
