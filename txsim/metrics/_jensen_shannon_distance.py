@@ -184,8 +184,8 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
     min_value = min(min(v_sp), min(v_sc))
 
     # Calculate the histogram
-    hist_sp, bin_edges = np.histogram(v_sp, bins=int(max_value - min_value + 1), density=True)
-    hist_sc, bin_edges = np.histogram(v_sc, bins=int(max_value - min_value + 1), density=True)
+    hist_sp, bin_edges = np.histogram(v_sp, bins=min(100, int(max_value - min_value + 1)), density=True)
+    hist_sc, bin_edges = np.histogram(v_sc, bins=min(100, int(max_value - min_value + 1)), density=True)
     # hist_sp, bin_edges = np.histogram(v_sp, bins=100, density=True)
     # hist_sc, bin_edges = np.histogram(v_sc, bins=100, density=True)
 
