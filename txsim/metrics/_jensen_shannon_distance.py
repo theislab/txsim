@@ -10,6 +10,7 @@ from scipy.ndimage import gaussian_filter1d
 
 def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData, 
                               key:str='celltype', layer:str='lognorm', smooth_distributions:str='no',
+                              min_number_cells:int=20,
                               pipeline_output: bool=True):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
@@ -24,15 +25,18 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
         .obs column of ``AnnData`` that contains celltype information
     layer: str (default: 'lognorm')
         layer of ```AnnData`` to use to compute the metric
-    pipeline_output: bool (default: True)
-        whether to return only the overall metric (pipeline style)
-        (if False, will return the overall metric, per-gene metric and per-celltype metric)
     smooth_distributions: str (default: 'no')
         whether to smooth the distributions before calculating the metric per gene and per celltype
         'no' - no smoothing
         'moving_average' - moving average
         'rolling_median' - rolling median
         'gaussian' - gaussian filter
+    min_number_cells: int (default: 20)
+        minimum number of cells belonging to a cluster to consider it in the analysis
+    pipeline_output: bool (default: True)
+        whether to return only the overall metric (pipeline style)
+        (if False, will return the overall metric, per-gene metric and per-celltype metric)
+    
 
     Returns
     -------
@@ -45,10 +49,8 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     """
 
     ### SET UP 
-    # Set threshold parameters
-    min_number_cells=20 # minimum number of cells belonging to a cluster to consider it in the analysis
 
-    # set the .X layer of each of the adatas to be log-normalized counts
+    # set the .X layer of each of the adatas according to the layer parameter
     adata_sp.X = adata_sp.layers[layer]
     adata_sc.X = adata_sc.layers[layer]
 
@@ -58,7 +60,6 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
 
     # number of celltypes
     n_celltypes = len(intersect_celltypes)
-
     # number of genes
     n_genes = len(intersect_genes)
 
