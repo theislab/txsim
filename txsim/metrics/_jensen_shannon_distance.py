@@ -203,6 +203,9 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
 # per_celltype_metric = pd.concat([per_celltype_metric, new_entry])" - I NEED TO
 # build a check for empty vectors, then this concatination won't cause an issue in 
 # the future versions
+# TODO: deal with histograms with very little cells: 
+# 1. Idea: make a uniform distribution for the missing values out of avg
+# 2. Idea: make "bridges" between similar histogram blocks
 
 
 ####
