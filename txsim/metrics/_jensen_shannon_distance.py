@@ -7,7 +7,7 @@ from scipy.sparse import issparse
 from scipy.spatial import distance
 
 def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData, 
-                              key:str='celltype', layer:str='lognorm', 
+                              key:str='celltype', layer:str='norm', 
                               pipeline_output: bool=True):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
@@ -41,8 +41,8 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     min_number_cells=20 # minimum number of cells belonging to a cluster to consider it in the analysis
 
     # set the .X layer of each of the adatas to be log-normalized counts
-    # adata_sp.X = adata_sp.layers[layer]
-    # adata_sc.X = adata_sc.layers[layer]
+    adata_sp.X = adata_sp.layers[layer]
+    adata_sc.X = adata_sc.layers[layer]
 
     # take the intersection of genes present in adata_sp and adata_sc, as a list
     intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
@@ -184,8 +184,8 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
     min_value = min(min(v_sp), min(v_sc))
 
     # Calculate the histogram
-    hist_sp, bin_edges = np.histogram(v_sp, bins=max_value - min_value + 1, density=True)
-    hist_sc, bin_edges = np.histogram(v_sc, bins=max_value - min_value + 1, density=True)
+    hist_sp, bin_edges = np.histogram(v_sp, bins=int(max_value - min_value + 1), density=True)
+    hist_sc, bin_edges = np.histogram(v_sc, bins=int(max_value - min_value + 1), density=True)
     # hist_sp, bin_edges = np.histogram(v_sp, bins=100, density=True)
     # hist_sc, bin_edges = np.histogram(v_sc, bins=100, density=True)
 
@@ -205,7 +205,6 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
 # the future versions
 # TODO: filtering out celltypes with less than x cells somehow does not work yet
 # TODO: I convert the float values to integers now, change that to use the normalized values
-# TODO: change the raw layer to normzaalized layer
 
 
 ####
