@@ -263,7 +263,7 @@ def histogram_equalization(histogram):
 
 
 # TODO: deal with empty expression vectors per gene per celltype # I decided to impute and make it a uniform distribution
-# TODO: if the expression vector is empty, then I get: "FutureWarning: 
+# if the expression vector is empty, then I get: "FutureWarning: 
 # The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. 
 # In a future version, this will no longer exclude empty or all-NA columns when 
 # determining the result dtypes. To retain the old behavior, exclude the relevant 
@@ -274,6 +274,8 @@ def histogram_equalization(histogram):
 # TODO: deal with histograms with very little cells: 
 # 1. Idea: make a uniform distribution for the missing values out of avg
 # 2. Idea: make "bridges" between similar histogram blocks
+# TODO: change the functions structure so that it is not calculating per gene and per celltype metrics twice
+# TODO: my code has a match statement, so we need python >= 3.10, is that ok?
 
 
 ####
