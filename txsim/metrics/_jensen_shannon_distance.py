@@ -41,8 +41,8 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
 
     # set the .X layer of each of the adatas to be log-normalized counts
-    adata_sp.X = adata_sp.layers[layer]
-    adata_sc.X = adata_sc.layers[layer]
+    # adata_sp.X = adata_sp.layers[layer]
+    # adata_sc.X = adata_sc.layers[layer]
 
     # take the intersection of genes present in adata_sp and adata_sc, as a list
     intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
@@ -147,6 +147,9 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     # 0. get all expression values for the gene of interest for the celltype of interest
     sp = np.array(adata_sp[adata_sp.obs['celltype']==celltype][:,gene].X)
     sc = np.array(adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X)
+    #flatten the arrays to 1-dim vectors
+    sp = sp.flatten().astype(int)
+    sc = sc.flatten().astype(int)
     # 1. calculate the distribution vectors for the two datasets
     P, Q = get_probability_distributions_for_sp_and_sc(sp, sc)
     # # 2. if both vectors are empty, return 0
@@ -191,7 +194,7 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
     d_sc = hist_sc / np.sum(hist_sc)
     return d_sp, d_sc
 
-# TODO: deal with empty expression vectors
+# TODO: deal with empty expression vectors per gene per celltype
 # TODO: if the expression vector is empty, then I get: "FutureWarning: 
 # The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. 
 # In a future version, this will no longer exclude empty or all-NA columns when 
@@ -200,8 +203,8 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array):
 # per_celltype_metric = pd.concat([per_celltype_metric, new_entry])" - I NEED TO
 # build a check for empty vectors, then this concatination won't cause an issue in 
 # the future versions
-# TODO: check if my solution for vectors of different lengths is correct
 # TODO: filtering out celltypes with less than x cells somehow does not work yet
+# TODO: I convert the float values to integers now, change that to use the normalized values
 
 
 ####
