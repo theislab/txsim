@@ -11,7 +11,7 @@ from scipy.ndimage import gaussian_filter1d
 def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData, 
                               key:str='celltype', layer:str='lognorm', smooth_distributions:str='no',
                               min_number_cells:int=20,
-                              pipeline_output: bool=True):
+                              pipeline_output: bool=True, show_NaN_ct:bool=False):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
     is an asymmetric metric that measures the relative entropy or difference 
@@ -36,6 +36,8 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
     pipeline_output: bool (default: True)
         whether to return only the overall metric (pipeline style)
         (if False, will return the overall metric, per-gene metric and per-celltype metric)
+    show_NaN_ct: bool (default: True)
+        whether to show the cell types with NaN values (cell types which were filtered out because of the min_number_cells threshold)
     
 
     Returns
@@ -126,13 +128,14 @@ def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData,
         per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
 
     # add the rows with celltypes which were filtered out because of the min_number_cells threshold and set their JSD to NaN
-    celltypes_with_nan = list(set(intersect_celltypes) - set(celltypes))
-    for celltype in celltypes_with_nan:
-        new_entry = pd.DataFrame([[celltype, np.nan]],
-                     columns=['celltype', 'JSD'])
-        per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
-    # set celltype as index
-    per_celltype_metric.set_index('celltype', inplace=True)
+    if show_NaN_ct:
+        celltypes_with_nan = list(set(intersect_celltypes) - set(celltypes))
+        for celltype in celltypes_with_nan:
+            new_entry = pd.DataFrame([[celltype, np.nan]],
+                        columns=['celltype', 'JSD'])
+            per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
+        # set celltype as index
+        per_celltype_metric.set_index('celltype', inplace=True)
     ################
     return overall_metric, per_gene_metric, per_celltype_metric
 
@@ -224,23 +227,16 @@ def gaussian_smooth(data, sigma=1):
     return smoothed_values
 
 
-# TODO: deal with empty expression vectors per gene per celltype # I decided to impute and make it a uniform distribution
-# if the expression vector is empty, then I get: "FutureWarning: 
+# ONGOING
+# TODO: "FutureWarning: 
 # The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. 
 # In a future version, this will no longer exclude empty or all-NA columns when 
 # determining the result dtypes. To retain the old behavior, exclude the relevant 
 # entries before the concat operation.
-# per_celltype_metric = pd.concat([per_celltype_metric, new_entry])" - I NEED TO
-# build a check for empty vectors, then this concatination won't cause an issue in 
-# the future versions
-# TODO: deal with histograms with very little cells: 
-# 1. Idea: make a uniform distribution for the missing values out of avg
-# 2. Idea: make "bridges" between similar histogram blocks
+# per_celltype_metric = pd.concat([per_celltype_metric, new_entry])"
 # TODO: change the functions structure so that it is not calculating per gene and per celltype metrics twice
 # TODO: my code has a match statement, so we need python >= 3.10, is that ok?
-# TODO; introduce a parameter to hide the Nan celltypes per default
+# FUTURE
 # TODO: allow setting the window size or sigma for smoothing
 # TODO: maybe implement Wasserstein or maybe even the Cramer distance in addition to Jensen-Shannon
-
-
 ####
