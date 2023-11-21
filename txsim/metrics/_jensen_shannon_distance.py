@@ -188,15 +188,9 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array, sm
 
     # 1. Calculate the histograms for the two vectors
     # 1.1 spatial
-    if sum(v_sp) == 0:
-        # if it's a zero vector, make it a uniform distribution
-        v_sp = np.ones(len(v_sp))
     hist_sp, bin_edges = np.histogram(v_sp, bins=min(100, int(max_value - min_value + 1)), density=True)
 
     # 1.2 dissociated sc
-    if sum(v_sc) == 0:
-        # if it's a zero vector, make it a uniform distribution
-        v_sc = np.ones(len(v_sp))
     hist_sc, bin_edges = np.histogram(v_sc, bins=min(100, int(max_value - min_value + 1)), density=True)
 
     # 2. Smooth the distributions if the method is specified
