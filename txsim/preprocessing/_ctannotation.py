@@ -25,19 +25,27 @@ def run_majority_voting(
         Anndata object with cell type annotation in ``adata_st.obs['ct_majority']`` and certainty as ``adata_st.obs['ct_majority_cert']`` 
     """
 
+    
+    assert ('celltype' in spots.columns); 'No celltypes available in spots object'
+    
+    #Sort spots table by cell id and get table intervals for each cell
+    spots = spots.sort_values("cell",ascending=True)
+    cells_sorted = spots["cell"].values
+    start_indices = np.flatnonzero(np.concatenate(([True], cells_sorted[1:] != cells_sorted[:-1])))
+    cell_to_start_idx = pd.Series(start_indices, index=cells_sorted[start_indices])
+    cell_to_end_idx = pd.Series(cell_to_start_idx.iloc[1:].tolist()+[len(spots)], index=cell_to_start_idx.index)
+    
     for cell_id in adata_st.obs['cell_id']:
-        cts = spots[spots['cell'] == cell_id ]['Gene'].value_counts()
+        start_idx = cell_to_start_idx.loc[cell_id]
+        end_idx = cell_to_end_idx.loc[cell_id]
+        spots_of_cell = spots.iloc[start_idx:end_idx]
         
-        if 'celltype' in spots.columns:
-            mode = spots[spots['cell'] == cell_id ]['celltype'].mode()
-            adata_st.obs.loc[adata_st.obs['cell_id'] == cell_id, 'ct_majority'] = mode.values[0]
-            adata_st.obs.loc[adata_st.obs['cell_id'] == cell_id, 'ct_majority_cert'] = (spots[spots['cell'] == cell_id ]['celltype'].value_counts()[mode].values[0] / sum(cts))
-            
-        else:
-            print('No celltypes available in spots object')
+        cts = spots_of_cell['Gene'].value_counts()
+        mode = spots_of_cell['celltype'].mode()
+        adata_st.obs.loc[str(cell_id), 'ct_majority'] = mode.values[0]
+        adata_st.obs.loc[str(cell_id), 'ct_majority_cert'] = (spots_of_cell['celltype'].value_counts()[mode].values[0] / sum(cts))
 
     return adata_st
-
 
         
 def run_ssam(

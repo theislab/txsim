@@ -3,6 +3,8 @@ from anndata import AnnData
 import scanpy as sc
 import pandas as pd
 from typing import Optional, Dict
+from scipy.sparse import issparse
+from sklearn.utils import sparsefuncs
 
 def normalize_total(
     adata: AnnData,
@@ -125,8 +127,7 @@ def normalize_pearson_residuals(
 
 def normalize_by_area(
     adata: AnnData,
-    area: Optional[str] = 'area',
-    inplace: Optional[bool] = True
+    area: Optional[str] = 'area'
 ) -> Optional[np.ndarray]:
     """Normalize counts by area of cells
 
@@ -138,8 +139,6 @@ def normalize_by_area(
     area : Optional[str], optional
         Name of the field in `adata.obs` where the area is
         stored, by default 'area'
-    inplace : Optional[bool], optional
-        If ``True``, update ``adata`` with results. Otherwise, return results, by default True
 
     Returns
     -------
@@ -147,15 +146,18 @@ def normalize_by_area(
         If ``inplace=True``, ``adata.X`` is updated with the normalized values. 
         Otherwise, returns normalized numpy array
     """
-    x = adata.X / adata.obs[area].to_numpy()[:,None]
     
-    if(not inplace):
-        return x
     adata.layers['raw'] = adata.X.copy()
-    adata.layers['norm'] = x
-    adata.layers['lognorm'] = adata.layers['norm'].copy()
-    sc.pp.log1p(adata, layer='lognorm')
-  
+    
+    if issparse(adata.X):
+        sparsefuncs.inplace_row_scale(adata.X, 1 / adata.obs[area].to_numpy())
+    else:
+        np.divide(adata.X, adata.obs[area].to_numpy()[:,None], out=adata.X)
+        
+    adata.layers['norm'] = adata.X.copy()
+    sc.pp.log1p(adata)
+    adata.layers['lognorm'] = adata.X
+    
     return adata
 
 
