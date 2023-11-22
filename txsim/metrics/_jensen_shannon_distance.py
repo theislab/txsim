@@ -166,7 +166,7 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     sc = sc.flatten()
     # 2. get the probability distributions for the two vectors
     P, Q = get_probability_distributions_for_sp_and_sc(sp, sc, smooth_distributions)
-    return distance.jensenshannon(P, Q)
+    return distance.jensenshannon(P, Q, base=2)
 
 
 def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array, smooth_distributions):
