@@ -1,11 +1,16 @@
 from anndata import AnnData
 import numpy as np
 import pandas as pd
+from scipy.sparse import issparse
 from ._quality_metrics import *
 
 def all_quality_metrics(
     adata_sp: AnnData,
 ) -> pd.DataFrame:
+
+    #TODO: the metrics should be able to handle sparse matrices
+    if issparse(adata_sp.layers["raw"]):
+        adata_sp.layers["raw"] = adata_sp.layers["raw"].toarray()
 
     #Generate metrics
     metrics = {}

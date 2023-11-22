@@ -150,7 +150,10 @@ def normalize_by_area(
     adata.layers['raw'] = adata.X.copy()
     
     if issparse(adata.X):
-        sparsefuncs.inplace_row_scale(adata.X, 1 / adata.obs[area].to_numpy())
+        areas = adata.obs[area].copy()
+        areas.loc[areas.isnull()] = 1 #Don't normalize cells that don't have an area
+        areas = areas.to_numpy()
+        sparsefuncs.inplace_row_scale(adata.X, 1 / areas)
     else:
         np.divide(adata.X, adata.obs[area].to_numpy()[:,None], out=adata.X)
         
