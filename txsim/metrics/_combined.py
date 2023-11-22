@@ -78,15 +78,17 @@ def aggregate_group_metrics(
 ):
     # Hocus pocus required because sometimes the dataframes switch the levels for the MultiIndex
     # I do not know if there is a better way to do this
-    uni_index = metric_list[0].index #Set of correctly ordered indices
-    for df in metric_list + [aggregated_metric]: 
-        for i in range(len(df.index)):
-            if df.index[i] not in uni_index:
-                pair = df.index[i]
-                df.reset_index(inplace=True)
-                df.loc[i, 'level_0'] = pair[1]
-                df.loc[i, 'level_1'] = pair[0]
-                df.set_index(['level_0','level_1'], inplace=True)
+    # I think it is unnecessary now since the table .csv, but leaving it here
+    # uni_index = metric_list[0].index #Set of correctly ordered indices
+    # for df in metric_list + [aggregated_metric]: 
+    #     for i in range(len(df.index)):
+    #         if df.index[i] not in uni_index:
+    #             print("here")
+    #             pair = df.index[i]
+    #             df.reset_index(inplace=True)
+    #             df.loc[i, 'run1'] = pair[1]
+    #             df.loc[i, 'run2'] = pair[0]
+    #             df.set_index(['run1','run2'], inplace=True)
     
     #combine and fix the names
     mean_metric = pd.concat((metric_list), axis=1)
