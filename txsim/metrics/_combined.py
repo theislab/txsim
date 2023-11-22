@@ -11,6 +11,7 @@ from ._negative_marker_purity import *
 from ._cell_statistics import *
 from ._coembedding import knn_mixing
 from ._gene_set_coexpression import *
+from ._jensen_shannon_distance import *
 
 
 def all_metrics(
@@ -48,6 +49,9 @@ def all_metrics(
     #metrics['ratio_median_genexcells'] = ratio_median_genesXcells(adata_sp,adata_sc)
     ## KNN mixing
     #metrics['knn_mixing'] = knn_mixing(adata_sp,adata_sc)
+
+    ## Distribution similarity metrics
+    metrics['jensen_shannon_distance'] = jensen_shannon_distance(adata_sp,adata_sc)
 
     
     

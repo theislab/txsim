@@ -8,7 +8,7 @@ from scipy.spatial import distance
 from scipy.ndimage import gaussian_filter1d
 
 
-def jensen_shannon_distance_metrics(adata_sp: AnnData, adata_sc: AnnData, 
+def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData, 
                               key:str='celltype', layer:str='lognorm', smooth_distributions:str='no',
                               min_number_cells:int=20,
                               pipeline_output: bool=True, show_NaN_ct:bool=False):
