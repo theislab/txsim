@@ -6,6 +6,8 @@ from anndata import AnnData
 from scipy.sparse import issparse
 from scipy.spatial import distance
 from scipy.ndimage import gaussian_filter1d
+from _util import check_crop_exists
+from _util import get_bin_edges
 
 
 def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData, 
@@ -138,6 +140,62 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
         per_celltype_metric.set_index('celltype', inplace=True)
     ################
     return overall_metric, per_gene_metric, per_celltype_metric
+
+def jensen_shannon_distance_across_genes_local(adata_sp:Anndata, adata_sc:Anndata,
+                                               x_min:int, x_max:int, y_min:int, y_max:int,
+                                               image: np.ndarray, bins: int = 10,
+                                               key:str='celltype', layer:str='lognorm',
+                                               min_number_cells:int=20 # the minimal number of cells per celltype to be considered
+                                               ):
+    """Calculate the Jensen-Shannon divergence between the spatial and dissociated single-cell data distributions
+    for each gene, but using only the cells in a given local area for the spatial data.
+
+    Parameters
+    ----------
+    adata_sp: AnnData
+        annotated ``AnnData`` object containing the spatial single-cell data
+    adata_sc: AnnData
+        annotated ``AnnData`` object containing the dissociated single-cell data
+    x_min: int
+        minimum x coordinate of the local area
+    x_max: int
+        maximum x coordinate of the local area
+    y_min: int
+        minimum y coordinate of the local area
+    y_max: int
+        maximum y coordinate of the local area
+    image: np.ndarray
+        spatial image, represented as a numpy array
+    bins: int or array_like or [int, int] or [array, array] (default: 10)
+        The bin specification:
+        If int, the number of bins for the two dimensions (nx=ny=bins).
+        If array_like, the bin edges for the two dimensions (x_edges=y_edges=bins).
+        If [int, int], the number of bins in each dimension (nx, ny = bins).
+        If [array, array], the bin edges in each dimension (x_edges, y_edges = bins).
+        A combination [int, array] or [array, int], where int is the number of bins and array is the bin edges.
+    key: str (default: 'celltype')
+        .obs column of ``AnnData`` that contains celltype information
+    layer: str (default: 'lognorm')
+        layer of ```AnnData`` to use to compute the metric
+    min_number_cells: int (default: 20)
+        minimum number of cells belonging to a cluster to consider it in the analysis
+
+    Returns
+    -------
+    gridfield_metric: pd.DataFrame
+        Jensen-Shannon divergence for each segment of the gridfield
+
+    """
+    #initialize the dataframe
+    gridfield_metric = pd.DataFrame(columns=['x_min', 'x_max', 'y_min', 'y_max', 'JSD'])
+
+    # check if the crop existis in the image
+    range = check_crop_exists(x_min,x_max,y_min,y_max,image)
+    bins_x, bins_y = get_bin_edges(range, bins)
+
+    #TODO
+
+    return gridfield_metric
 
 def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:AnnData, gene:str, celltype:str, smooth_distributions):
     """Calculate the Jensen-Shannon distance between two distributions:
