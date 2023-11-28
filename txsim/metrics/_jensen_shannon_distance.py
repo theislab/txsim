@@ -186,15 +186,67 @@ def jensen_shannon_distance_across_genes_local(adata_sp:Anndata, adata_sc:Anndat
         Jensen-Shannon divergence for each segment of the gridfield
 
     """
-    #initialize the dataframe
-    gridfield_metric = pd.DataFrame(columns=['x_min', 'x_max', 'y_min', 'y_max', 'JSD'])
-
     # check if the crop existis in the image
     range = check_crop_exists(x_min,x_max,y_min,y_max,image)
     bins_x, bins_y = get_bin_edges(range, bins)
 
-    #TODO
+    # n_bins_x = len(bins_x) - 1
+    # n_bins_y = len(bins_y) - 1
+    
+    # ### SET UP
+    # # set the .X layer of each of the adatas to be log-normalized counts
+    # adata_sp.X = adata_sp.layers[layer]
+    # adata_sc.X = adata_sc.layers[layer]
 
+    # #take the intersection of genes present in adata_sp and adata_sc, as a list
+    # intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
+
+    # # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
+    # adata_sc=adata_sc[:,intersect_genes]
+    # adata_sp=adata_sp[:,intersect_genes]
+
+    # # take the intersection of celltypes present in adata_sp and adata_sc, as a list
+    # intersect_celltypes = list(set(adata_sp.obs[key]).intersection(set(adata_sc.obs[key])))
+
+    # # subset adata_sc and adata_sp to only include celltypes in the intersection of adata_sp and adata_sc
+    # adata_sc = adata_sc[adata_sc.obs[key].isin(intersect_celltypes), :]
+    # adata_sp = adata_sp[adata_sp.obs[key].isin(intersect_celltypes), :]
+
+
+    #initialize the dataframe
+    gridfield_metric = pd.DataFrame(columns=['x_min', 'x_max', 'y_min', 'y_max', 
+                                              'JSD_overall'])
+    # gridfield_metric = pd.DataFrame(columns=['x_min', 'x_max', 'y_min', 'y_max', 
+    #                                          'JSD_overall', 'JSD_gene1', 'JSD_ct1'])
+
+
+    # Iterate through local areas, filter, calculate overall_JSD, 
+    # JSD per each gene and per each celltype for each bin
+    #TODO these are only raw thoughts, implement it properly
+    i, j = 0, 0
+    for x_start, x_end in zip(bins_x[:-1], bins_x[1:]):
+        i = 0
+        for y_start, y_end in zip(bins_y[:-1], bins_y[1:]):    
+            # instead of dataframe, take the cropped adata_sp for one bin here
+            adata_sp_local = adata_sc[(adata_sc.obs['x'] >= x_start) & 
+                                    (adata_sc.obs['x'] < x_end) &
+                                    (adata_sc.obs['y'] >= y_start) & 
+                                    (adata_sc.obs['y'] < y_end)]
+
+            if len(adata_sp_local) < min_number_cells: # write nan if this crop does not have enough cells
+                gridfield_metric = gridfield_metric.append({'x_min': x_min, 'x_max': x_max, 'y_min': y_min, 'y_max': y_min, 
+                                                            'JSD_overall': np.nan}, ignore_index=True)
+                i += 1
+                continue 
+            
+            jsd = jensen_shannon_distance(adata_sp_local, adata_sc, key=key, 
+                                          layer=layer, min_number_cells=min_number_cells, pipeline_output=True)
+            
+            gridfield_metric = gridfield_metric.append({'x_min': x_min, 'x_max': x_max, 'y_min': y_min, 'y_max': y_min, 
+                                                        'JSD_overall': jsd}, ignore_index=True)
+            i += 1
+        j += 1
+            
     return gridfield_metric
 
 def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:AnnData, gene:str, celltype:str, smooth_distributions):
