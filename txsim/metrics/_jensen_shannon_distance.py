@@ -325,14 +325,17 @@ def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array, sm
 
 def moving_average_smooth(histogram, window_size=3):
     # Applying moving average
+    # TODO: make window_size changeable
     weights = np.repeat(1.0, window_size) / window_size
     smoothed_values = np.convolve(histogram, weights, 'valid')
     return np.concatenate((smoothed_values, np.zeros(window_size-1)))
 
 def rolling_median(data, window_size=3):
+    # TODO: make window_size changeable
     return np.convolve(data, np.ones(window_size)/window_size, mode='same')
 
 def gaussian_smooth(data, sigma=1):
+    # TODO: make sigma changeable
     smoothed_values = gaussian_filter1d(data, sigma=sigma)
     return smoothed_values
 
