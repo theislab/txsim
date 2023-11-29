@@ -8,6 +8,7 @@ from scipy.spatial import distance
 from scipy.ndimage import gaussian_filter1d
 from ._util import check_crop_exists
 from ._util import get_bin_edges
+from ._negative_marker_purity import get_eligible_celltypes
 
 
 def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData, 
@@ -58,17 +59,17 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
     adata_sp.X = adata_sp.layers[layer]
     adata_sc.X = adata_sc.layers[layer]
 
+
+    # TODO: use get_eligible_celltypes instead of loose code here
+    ################################################################################
     # take the intersection of genes present in adata_sp and adata_sc, as a list
     intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
     intersect_celltypes = list(set(adata_sp.obs[key]).intersection(set(adata_sc.obs[key])))
-
     # number of genes
     n_genes = len(intersect_genes)
-
     # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
     adata_sc=adata_sc[:,intersect_genes]
     adata_sp=adata_sp[:,intersect_genes]
-
     # sparse matrix support
     for a in [adata_sc, adata_sp]:
         if issparse(a.X):
@@ -86,6 +87,11 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
     # subset adata_sc and adata_sp to only include eligible celltypes
     adata_sc=adata_sc[adata_sc.obs[key].isin(celltypes)]
     adata_sp=adata_sp[adata_sp.obs[key].isin(celltypes)]
+
+    # CPM-Normalization                                    causes the warnings
+    sc.pp.normalize_total(adata_sp,target_sum=1e6)
+    sc.pp.normalize_total(adata_sc,target_sum=1e6)
+    ###################################################################################
 
     ################
     # OVERALL METRIC
@@ -141,7 +147,7 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
     ################
     return overall_metric, per_gene_metric, per_celltype_metric
 
-def jensen_shannon_distance_across_genes_local(adata_sp:Anndata, adata_sc:Anndata,
+def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
                                                x_min:int, x_max:int, y_min:int, y_max:int,
                                                image: np.ndarray, bins: int = 10,
                                                key:str='celltype', layer:str='lognorm',
@@ -190,27 +196,16 @@ def jensen_shannon_distance_across_genes_local(adata_sp:Anndata, adata_sc:Anndat
     range = check_crop_exists(x_min,x_max,y_min,y_max,image)
     bins_x, bins_y = get_bin_edges(range, bins)
 
+    # only necessary if we want to return the gridfield_metric as np.array
     # n_bins_x = len(bins_x) - 1
     # n_bins_y = len(bins_y) - 1
     
     # ### SET UP
-    # # set the .X layer of each of the adatas to be log-normalized counts
-    # adata_sp.X = adata_sp.layers[layer]
-    # adata_sc.X = adata_sc.layers[layer]
+    # set the .X layer of each of the adatas to be log-normalized counts
+    adata_sp.X = adata_sp.layers[layer]
+    adata_sc.X = adata_sc.layers[layer]
 
-    # #take the intersection of genes present in adata_sp and adata_sc, as a list
-    # intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
-
-    # # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
-    # adata_sc=adata_sc[:,intersect_genes]
-    # adata_sp=adata_sp[:,intersect_genes]
-
-    # # take the intersection of celltypes present in adata_sp and adata_sc, as a list
-    # intersect_celltypes = list(set(adata_sp.obs[key]).intersection(set(adata_sc.obs[key])))
-
-    # # subset adata_sc and adata_sp to only include celltypes in the intersection of adata_sp and adata_sc
-    # adata_sc = adata_sc[adata_sc.obs[key].isin(intersect_celltypes), :]
-    # adata_sp = adata_sp[adata_sp.obs[key].isin(intersect_celltypes), :]
+    celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, adata_sp, key=key, min_number_cells=min_number_cells)
 
 
     #initialize the dataframe
@@ -219,14 +214,9 @@ def jensen_shannon_distance_across_genes_local(adata_sp:Anndata, adata_sc:Anndat
     # gridfield_metric = pd.DataFrame(columns=['x_min', 'x_max', 'y_min', 'y_max', 
     #                                          'JSD_overall', 'JSD_gene1', 'JSD_ct1'])
 
-
-    # Iterate through local areas, filter, calculate overall_JSD, 
-    # JSD per each gene and per each celltype for each bin
-    #TODO these are only raw thoughts, implement it properly
-
-    i, j = 0, 0
+    # i, j = 0, 0
     for x_start, x_end in zip(bins_x[:-1], bins_x[1:]):
-        i = 0
+        # i = 0
         for y_start, y_end in zip(bins_y[:-1], bins_y[1:]):    
             # instead of dataframe, take the cropped adata_sp for one bin here
             adata_sp_local = adata_sc[(adata_sc.obs['x'] >= x_start) & 
@@ -234,19 +224,28 @@ def jensen_shannon_distance_across_genes_local(adata_sp:Anndata, adata_sc:Anndat
                                     (adata_sc.obs['y'] >= y_start) & 
                                     (adata_sc.obs['y'] < y_end)]
 
+            #TODO implement the check for the number of cells 
             if len(adata_sp_local) < min_number_cells: # write nan if this crop does not have enough cells
                 gridfield_metric = gridfield_metric.append({'x_min': x_min, 'x_max': x_max, 'y_min': y_min, 'y_max': y_min, 
                                                             'JSD_overall': np.nan}, ignore_index=True)
                 i += 1
                 continue 
             
+            # TODO : I assume we need to normalize after cropping, but I am not sure
+             # CPM-Normalization                                    causes the warnings
+            sc.pp.normalize_total(adata_sp,target_sum=1e6)
+            sc.pp.normalize_total(adata_sc,target_sum=1e6)
+
+            
+            # TODO: only overall or not?
+            # pipeline output=True, so we only get the overall metric, maybe expand this to per gene and per celltype
             jsd = jensen_shannon_distance(adata_sp_local, adata_sc, key=key, 
                                           layer=layer, min_number_cells=min_number_cells, pipeline_output=True)
             
             gridfield_metric = gridfield_metric.append({'x_min': x_min, 'x_max': x_max, 'y_min': y_min, 'y_max': y_min, 
                                                         'JSD_overall': jsd}, ignore_index=True)
-            i += 1
-        j += 1
+        #     i += 1
+        # j += 1
             
     return gridfield_metric
 

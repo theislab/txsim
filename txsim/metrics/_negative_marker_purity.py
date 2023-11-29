@@ -10,7 +10,7 @@ import itertools
 # TODO: Investigate the importance of setting max_ratio_cells, minimum_exp, and min_number_cells
 
 #helper function 
-def get_eligible_celltypes(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype'):
+def get_eligible_celltypes(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype', min_number_cells: int=20):
     """ Get shared celltypes of adata_sp and adata_sc, that have at least min_number_cells members.
 
     Parameters
@@ -25,8 +25,11 @@ def get_eligible_celltypes(adata_sp: AnnData, adata_sc: AnnData, key: str='cellt
     celltypes, adata_sp, adata_sc
 
     """
-    # Set threshold parameters
-    min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
+    # # Set threshold parameters 
+
+    # # Liya: "I think min_number_cells should be a parameter of the function, not a global variable. 
+    # I added it as a parameter and set default to 10."
+    # min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
     
     #check that genes in spatial data is subset of genes in single cell data
     adata_sp = adata_sp[:,adata_sp.var_names.isin(adata_sc.var_names)]
@@ -47,6 +50,8 @@ def get_eligible_celltypes(adata_sp: AnnData, adata_sc: AnnData, key: str='cellt
     celltype_count_sp = adata_sp.obs[key].value_counts().loc[shared_celltypes]      
     ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
     celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
+
+    # TODO: do we have to CPM normalize here?
 
     return celltypes, adata_sp, adata_sc
 

@@ -1,6 +1,6 @@
 from anndata import AnnData
 import numpy as np
-from _negative_marker_purity import get_spot_assignment_col
+from ._negative_marker_purity import get_spot_assignment_col
 import pandas as pd
 
 #TODO: fix Warnings in get_cells_location
@@ -57,7 +57,7 @@ def get_bin_edges(A: list[list[int]], bins):
 
     Parameters
     ----------
-    A : np.ndarray
+    A : range matrix A, np.ndarray
     bins : int or array_like or [int, int] or [array, array]
         The bin specification:
         If int, the number of bins for the two dimensions (nx=ny=bins).
