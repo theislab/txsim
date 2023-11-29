@@ -11,6 +11,7 @@ from ._util import get_bin_edges
 from ._negative_marker_purity import get_eligible_celltypes
 
 
+
 def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData, 
                               key:str='celltype', layer:str='lognorm', smooth_distributions:str='no',
                               min_number_cells:int=20,
@@ -196,9 +197,9 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
     range = check_crop_exists(x_min,x_max,y_min,y_max,image)
     bins_x, bins_y = get_bin_edges(range, bins)
 
-    # only necessary if we want to return the gridfield_metric as np.array
-    # n_bins_x = len(bins_x) - 1
-    # n_bins_y = len(bins_y) - 1
+    # defines the size of the gridfield_metric (np.array) 
+    n_bins_x = len(bins_x) - 1
+    n_bins_y = len(bins_y) - 1
     
     # ### SET UP
     # set the .X layer of each of the adatas to be log-normalized counts
@@ -208,15 +209,12 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
     celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, adata_sp, key=key, min_number_cells=min_number_cells)
 
 
-    #initialize the dataframe
-    gridfield_metric = pd.DataFrame(columns=['x_min', 'x_max', 'y_min', 'y_max', 
-                                              'JSD'])
-    # gridfield_metric = pd.DataFrame(columns=['x_min', 'x_max', 'y_min', 'y_max', 
-    #                                          'JSD_overall', 'JSD_gene1', 'JSD_ct1'])
+    #initialize the np.array that will hold the metric for each segment of the gridfield
+    gridfield_metric = np.zeros((n_bins_x, n_bins_y))
 
-    # i, j = 0, 0
+    i, j = 0, 0
     for x_start, x_end in zip(bins_x[:-1], bins_x[1:]):
-        # i = 0
+        i = 0
         for y_start, y_end in zip(bins_y[:-1], bins_y[1:]):    
             # instead of dataframe, take the cropped adata_sp for one bin here
             adata_sp_local = adata_sc[(adata_sc.obs['x'] >= x_start) & 
@@ -224,23 +222,21 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
                                     (adata_sc.obs['y'] >= y_start) & 
                                     (adata_sc.obs['y'] < y_end)]
 
-            #TODO implement the check for the number of cells 
-            if len(adata_sp_local) < min_number_cells: # write nan if this crop does not have enough cells
-                gridfield_metric = gridfield_metric.append({'x_min': x_min, 'x_max': x_max, 'y_min': y_min, 'y_max': y_min, 
-                                                            'JSD_overall': np.nan}, ignore_index=True)
-                i += 1
-                continue 
 
-            
-            # TODO: only overall or not?
+            if len(adata_sp_local) < min_number_cells:
+                gridfield_metric[n_bins_y-1-i,j] = np.nan   
+                # TODO: check if this position for gridfield_metric is correct
+                i += 1
+                continue  
+
             # pipeline output=True, so we only get the overall metric, maybe expand this to per gene and per celltype
             jsd = jensen_shannon_distance(adata_sp_local, adata_sc, key=key, 
                                           layer=layer, min_number_cells=min_number_cells, pipeline_output=True)
             
-            gridfield_metric = gridfield_metric.append({'x_min': x_min, 'x_max': x_max, 'y_min': y_min, 'y_max': y_min, 
-                                                        'JSD_overall': jsd}, ignore_index=True)
-        #     i += 1
-        # j += 1
+            gridfield_metric[n_bins_y-1-i,j]  = jsd
+            # TODO: check if this position for gridfield_metric is correct
+            i += 1
+        j += 1
             
     return gridfield_metric
 
