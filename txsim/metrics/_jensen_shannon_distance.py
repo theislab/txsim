@@ -230,11 +230,6 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
                                                             'JSD_overall': np.nan}, ignore_index=True)
                 i += 1
                 continue 
-            
-            # TODO : I assume we need to normalize after cropping, but I am not sure
-             # CPM-Normalization                                    causes the warnings
-            sc.pp.normalize_total(adata_sp,target_sum=1e6)
-            sc.pp.normalize_total(adata_sc,target_sum=1e6)
 
             
             # TODO: only overall or not?
