@@ -51,8 +51,6 @@ def get_eligible_celltypes(adata_sp: AnnData, adata_sc: AnnData, key: str='cellt
     ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
     celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
 
-    # TODO: do we have to CPM normalize here?
-
     return celltypes, adata_sp, adata_sc
 
 
