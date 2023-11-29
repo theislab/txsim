@@ -8,14 +8,14 @@ from scipy.spatial import distance
 from scipy.ndimage import gaussian_filter1d
 from ._util import check_crop_exists
 from ._util import get_bin_edges
-from ._negative_marker_purity import get_eligible_celltypes
+from ._util import get_eligible_celltypes
 
 
 
 def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData, 
                               key:str='celltype', layer:str='lognorm', smooth_distributions:str='no',
-                              min_number_cells:int=20,
-                              pipeline_output: bool=True, show_NaN_ct:bool=False):
+                              min_number_cells:int=10,
+                              pipeline_output: bool=True):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
     is an asymmetric metric that measures the relative entropy or difference 
@@ -55,44 +55,44 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
     """
 
     ### SET UP 
-
-    # set the .X layer of each of the adatas according to the layer parameter
-    adata_sp.X = adata_sp.layers[layer]
-    adata_sc.X = adata_sc.layers[layer]
-
-
     # TODO: use get_eligible_celltypes instead of loose code here
+
     ################################################################################
-    # take the intersection of genes present in adata_sp and adata_sc, as a list
-    intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
-    intersect_celltypes = list(set(adata_sp.obs[key]).intersection(set(adata_sc.obs[key])))
-    # number of genes
-    n_genes = len(intersect_genes)
-    # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
-    adata_sc=adata_sc[:,intersect_genes]
-    adata_sp=adata_sp[:,intersect_genes]
-    # sparse matrix support
-    for a in [adata_sc, adata_sp]:
-        if issparse(a.X):
-            a.layers[layer]= a.layers[layer].toarray()
+    # # set the .X layer of each of the adatas according to the layer parameter
+    # adata_sp.X = adata_sp.layers[layer]
+    # adata_sc.X = adata_sc.layers[layer]
+    # # take the intersection of genes present in adata_sp and adata_sc, as a list
+    # intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
+    # intersect_celltypes = list(set(adata_sp.obs[key]).intersection(set(adata_sc.obs[key])))
+    # # number of genes
+    # n_genes = len(intersect_genes)
+    # # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
+    # adata_sc=adata_sc[:,intersect_genes]
+    # adata_sp=adata_sp[:,intersect_genes]
+    # # sparse matrix support
+    # for a in [adata_sc, adata_sp]:
+    #     if issparse(a.X):
+    #         a.layers[layer]= a.layers[layer].toarray()
 
-    # Filter cell types by minimum number of cells
-    celltype_count_sc = adata_sc.obs[key].value_counts().loc[intersect_celltypes]
-    celltype_count_sp = adata_sp.obs[key].value_counts().loc[intersect_celltypes]
-    ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
-    # celltypes that we will use for the metric (are in both datasets and have enough cells)
-    celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
-    # number of celltypes we will use for the metric (are in both datasets and have enough cells)
-    n_celltypes = len(intersect_celltypes)
+    # # Filter cell types by minimum number of cells
+    # celltype_count_sc = adata_sc.obs[key].value_counts().loc[intersect_celltypes]
+    # celltype_count_sp = adata_sp.obs[key].value_counts().loc[intersect_celltypes]
+    # ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
+    # # celltypes that we will use for the metric (are in both datasets and have enough cells)
+    # celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
+    # # number of celltypes we will use for the metric (are in both datasets and have enough cells)
+    # n_celltypes = len(intersect_celltypes)
 
-    # subset adata_sc and adata_sp to only include eligible celltypes
-    adata_sc=adata_sc[adata_sc.obs[key].isin(celltypes)]
-    adata_sp=adata_sp[adata_sp.obs[key].isin(celltypes)]
-
-    # CPM-Normalization                                    causes the warnings
-    sc.pp.normalize_total(adata_sp,target_sum=1e6)
-    sc.pp.normalize_total(adata_sc,target_sum=1e6)
+    # # subset adata_sc and adata_sp to only include eligible celltypes
+    # adata_sc=adata_sc[adata_sc.obs[key].isin(celltypes)]
+    # adata_sp=adata_sp[adata_sp.obs[key].isin(celltypes)]
     ###################################################################################
+
+    celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, adata_sp, key=key, 
+                                                           layer=layer, 
+                                                           min_number_cells=min_number_cells)
+    n_celltypes = len(celltypes)
+    n_genes = len(adata_sc.var_names)
 
     ################
     # OVERALL METRIC
@@ -129,23 +129,26 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
     per_celltype_metric = pd.DataFrame(columns=['celltype', 'JSD'])
     for celltype in celltypes:
         sum = 0
-        for gene in intersect_genes:
+        for gene in adata_sc.var_names:
             sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype, smooth_distributions)
         jsd = sum / n_genes
         new_entry = pd.DataFrame([[celltype, jsd]],
                      columns=['celltype', 'JSD'])
         per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
 
-    # add the rows with celltypes which were filtered out because of the min_number_cells threshold and set their JSD to NaN
-    if show_NaN_ct:
-        celltypes_with_nan = list(set(intersect_celltypes) - set(celltypes))
-        for celltype in celltypes_with_nan:
-            new_entry = pd.DataFrame([[celltype, np.nan]],
-                        columns=['celltype', 'JSD'])
-            per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
-        # set celltype as index
-        per_celltype_metric.set_index('celltype', inplace=True)
-    ################
+    # Liya: I want to remove this functonality, because it is not clear what to do with the NaN values, you can not plot them
+    # TODO: remove
+    # # add the rows with celltypes which were filtered out because of the min_number_cells threshold and set their JSD to NaN
+    # if show_NaN_ct:
+    #     celltypes_with_nan = list(set(intersect_celltypes) - set(celltypes))
+    #     for celltype in celltypes_with_nan:
+    #         new_entry = pd.DataFrame([[celltype, np.nan]],
+    #                     columns=['celltype', 'JSD'])
+    #         per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
+    #     # set celltype as index
+    #     per_celltype_metric.set_index('celltype', inplace=True)
+    # ################
+
     return overall_metric, per_gene_metric, per_celltype_metric
 
 def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
@@ -201,12 +204,14 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
     n_bins_x = len(bins_x) - 1
     n_bins_y = len(bins_y) - 1
     
-    # ### SET UP
-    # set the .X layer of each of the adatas to be log-normalized counts
-    adata_sp.X = adata_sp.layers[layer]
-    adata_sc.X = adata_sc.layers[layer]
+    # # ### SET UP
+    # # set the .X layer of each of the adatas to be log-normalized counts
+    # adata_sp.X = adata_sp.layers[layer]
+    # adata_sc.X = adata_sc.layers[layer]
 
-    celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, adata_sp, key=key, min_number_cells=min_number_cells)
+    celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, adata_sp, key=key, 
+                                                           layer=layer, 
+                                                           min_number_cells=min_number_cells)
 
 
     #initialize the np.array that will hold the metric for each segment of the gridfield

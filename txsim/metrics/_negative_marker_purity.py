@@ -4,54 +4,58 @@ from anndata import AnnData
 from scipy.sparse import issparse
 from scipy.sparse import isspmatrix 
 import itertools
+from ._util import get_eligible_celltypes
 
 # TODO: probably better to combine both metrics to one function with argument `flavor in ["reads", "cells"]`
 # TODO: Write test
 # TODO: Investigate the importance of setting max_ratio_cells, minimum_exp, and min_number_cells
 
+
+# Liya: TODO: move get_eligible_celltypes to _util.py, delete this function later
 #helper function 
-def get_eligible_celltypes(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype', min_number_cells: int=20):
-    """ Get shared celltypes of adata_sp and adata_sc, that have at least min_number_cells members.
 
-    Parameters
-    ----------
-    adata_sp : AnnData
-        Annotated ``AnnData`` object with counts from spatial data
-    adata_sc : AnnData
-        Annotated ``AnnData`` object with counts scRNAseq data
+# def get_eligible_celltypes(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype', min_number_cells: int=10):
+#     """ Get shared celltypes of adata_sp and adata_sc, that have at least min_number_cells members.
 
-    Returns
-    -------
-    celltypes, adata_sp, adata_sc
+#     Parameters
+#     ----------
+#     adata_sp : AnnData
+#         Annotated ``AnnData`` object with counts from spatial data
+#     adata_sc : AnnData
+#         Annotated ``AnnData`` object with counts scRNAseq data
 
-    """
-    # # Set threshold parameters 
+#     Returns
+#     -------
+#     celltypes, adata_sp, adata_sc
 
-    # # Liya: "I think min_number_cells should be a parameter of the function, not a global variable. 
-    # I added it as a parameter and set default to 10."
-    # min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
+#     """
+#     # # Set threshold parameters 
+
+#     # # Liya: "I think min_number_cells should be a parameter of the function, not a global variable. 
+#     # I added it as a parameter and set default to 10."
+#     # min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
     
-    #check that genes in spatial data is subset of genes in single cell data
-    adata_sp = adata_sp[:,adata_sp.var_names.isin(adata_sc.var_names)]
+#     #check that genes in spatial data is subset of genes in single cell data
+#     adata_sp = adata_sp[:,adata_sp.var_names.isin(adata_sc.var_names)]
 
-    # Subset adata_sc to genes of spatial data
-    adata_sc = adata_sc[:,adata_sp.var_names]
+#     # Subset adata_sc to genes of spatial data
+#     adata_sc = adata_sc[:,adata_sp.var_names]
     
-    # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
-    for a in [adata_sc, adata_sp]:
-        if issparse(a.layers["raw"]):
-            a.layers["raw"] = a.layers["raw"].toarray()
+#     # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
+#     for a in [adata_sc, adata_sp]:
+#         if issparse(a.layers["raw"]):
+#             a.layers["raw"] = a.layers["raw"].toarray()
     
-    # Get cell types that we find in both modalities
-    shared_celltypes = adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
+#     # Get cell types that we find in both modalities
+#     shared_celltypes = adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
     
-    # Filter cell types by minimum number of cells
-    celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
-    celltype_count_sp = adata_sp.obs[key].value_counts().loc[shared_celltypes]      
-    ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
-    celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
+#     # Filter cell types by minimum number of cells
+#     celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
+#     celltype_count_sp = adata_sp.obs[key].value_counts().loc[shared_celltypes]      
+#     ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
+#     celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
 
-    return celltypes, adata_sp, adata_sc
+#     return celltypes, adata_sp, adata_sc
 
 
 def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype', pipeline_output: bool=True):
@@ -75,9 +79,12 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
     negative marker purity : float
        Increase in proportion of positive cells assigned in spatial data to pairs of genes-celltyes with no/very low expression in scRNAseq
     """ 
+    # set threshold parameters
+    min_number_cells=10 #minimum number of cells belonging to a cluster to consider it in the analysis
     max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair  
     
-    celltypes, adata_sp, adata_sc  = get_eligible_celltypes(adata_sp, adata_sc, key)
+    # Get eligible cell types
+    celltypes, adata_sp, adata_sc  = get_eligible_celltypes(adata_sp, adata_sc, key=key, layer='raw', min_number_cells=min_number_cells)
     
     # Return nan if too few cell types were found
     if len(celltypes) < 2:
@@ -88,9 +95,10 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
         else:
             return negative_marker_purity, None, None
     
-    # Filter cells to eligible cell types
-    adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
-    adata_sp = adata_sp[adata_sp.obs[key].isin(celltypes)]
+    #unneccesary, done upstream by the function get_eligible_celltypes
+    # # Filter cells to eligible cell types
+    # adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
+    # adata_sp = adata_sp[adata_sp.obs[key].isin(celltypes)]
     
     # besides the threshold parameter till here neg. marker purity reads and cells are the same
     
@@ -167,7 +175,7 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
     min_number_cells=10 #minimum number of cells belonging to a cluster to consider it in the analysis
     minimum_exp=0.005 #maximum relative expression allowed in a gene in a cluster to consider the gene-celltype pair the analysis 
     
-    celltypes, adata_sp, adata_sc  = get_eligible_celltypes(adata_sp, adata_sc, key)
+    celltypes, adata_sp, adata_sc  = get_eligible_celltypes(adata_sp, adata_sc, key, layer='raw', min_number_cells=min_number_cells)
 
     # Return nan if too few cell types were found
     if len(celltypes) < 2:
@@ -178,9 +186,10 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
         else:
             return negative_marker_purity, None, None
     
-    # Filter cells to eligible cell types
-    adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
-    adata_sp = adata_sp[adata_sp.obs[key].isin(celltypes)]
+    # Liya: unnecessary, done upstream by the function get_eligible_celltypes
+    # # Filter cells to eligible cell types
+    # adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
+    # adata_sp = adata_sp[adata_sp.obs[key].isin(celltypes)]
     
     # Get mean expression per cell type
     exp_sc = pd.DataFrame(adata_sc.layers['raw'],columns=adata_sp.var_names)
@@ -267,11 +276,12 @@ def get_negative_marker_dict(adata_sp: AnnData, adata_sc: AnnData, key: str='cel
     """
     max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair
            
-    celltypes, adata_sp, adata_sc  = get_eligible_celltypes(adata_sp, adata_sc, key)  
+    celltypes, adata_sp, adata_sc  = get_eligible_celltypes(adata_sp, adata_sc, key=key, layer='raw')  
     
-    # Filter cells to eligible cell types
-    adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
-    genes = adata_sc.var_names
+    # Liya: unnecessary, done upstream by the function get_eligible_celltypes
+    # # Filter cells to eligible cell types
+    # adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
+    # genes = adata_sc.var_names
     
     # Get ratio of positive cells per cell type
     pos_exp_sc = pd.DataFrame(adata_sc.layers["raw"] > 0,columns=adata_sp.var_names)     

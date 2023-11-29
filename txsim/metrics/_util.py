@@ -2,6 +2,8 @@ from anndata import AnnData
 import numpy as np
 from ._negative_marker_purity import get_spot_assignment_col
 import pandas as pd
+from scipy.sparse import issparse
+from scipy.sparse import isspmatrix 
 
 #TODO: fix Warnings in get_cells_location
 
@@ -95,3 +97,67 @@ def get_bin_edges(A: list[list[int]], bins):
         raise ValueError("Invalid 'bins' parameter format")
 
     return bins_x, bins_y
+
+#helper function 
+def get_eligible_celltypes(adata_sp: AnnData, 
+                           adata_sc: AnnData, 
+                           key: str='celltype', 
+                           layer: str='lognorm',
+                           min_number_cells: int=10):
+    """ Get shared celltypes of adata_sp and adata_sc, that have at least min_number_cells members.
+
+    Parameters
+    ----------
+    adata_sp : AnnData
+        Annotated ``AnnData`` object with counts from spatial data
+    adata_sc : AnnData
+        Annotated ``AnnData`` object with counts scRNAseq data
+
+    Returns
+    -------
+    celltypes, adata_sp, adata_sc
+
+    """
+    # # Set threshold parameters 
+
+    # # Liya: "I think min_number_cells should be a parameter of the function, not a global variable. 
+    # I added it as a parameter and set default to 10."
+    # min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
+
+    # set the layer for adata_sc and adata_sp
+    # for most metrics, we use the lognorm layer
+    # for negative marker purity, we use the raw layer
+    adata_sp.X = adata_sp.layers[layer]
+    adata_sc.X = adata_sc.layers[layer]
+
+    # take the intersection of genes in adata_sp and adata_sc, as a list
+    intersect = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
+
+    # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
+    adata_sc=adata_sc[:,intersect]
+    adata_sp=adata_sp[:,intersect]
+
+    # take the intersection of genes present in adata_sp and adata_sc, as a list
+    intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
+
+    # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
+    adata_sc=adata_sc[:,intersect_genes]
+    adata_sp=adata_sp[:,intersect_genes]
+    
+    # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
+    # sparse matrix support
+    for a in [adata_sc, adata_sp]:
+        if issparse(a.X):
+            a.X = a.X.toarray()
+    
+    # Filter cell types by minimum number of cells
+    celltype_count_sc = adata_sc.obs[key].value_counts().loc[intersect]
+    celltype_count_sp = adata_sp.obs[key].value_counts().loc[intersect]      
+    ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
+    celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
+
+    # Filter cells to eligible cell types
+    adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
+    adata_sp = adata_sp[adata_sp.obs[key].isin(celltypes)]
+    
+    return celltypes, adata_sp, adata_sc
