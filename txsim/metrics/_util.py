@@ -1,6 +1,6 @@
 from anndata import AnnData
 import numpy as np
-from _negative_marker_purity import get_spot_assignment_col
+from ._negative_marker_purity import get_spot_assignment_col
 import pandas as pd
 
 #TODO: fix Warnings in get_cells_location

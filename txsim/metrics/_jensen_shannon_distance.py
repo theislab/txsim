@@ -6,8 +6,8 @@ from anndata import AnnData
 from scipy.sparse import issparse
 from scipy.spatial import distance
 from scipy.ndimage import gaussian_filter1d
-from _util import check_crop_exists
-from _util import get_bin_edges
+from ._util import check_crop_exists
+from ._util import get_bin_edges
 
 
 def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData, 
@@ -215,7 +215,7 @@ def jensen_shannon_distance_across_genes_local(adata_sp:Anndata, adata_sc:Anndat
 
     #initialize the dataframe
     gridfield_metric = pd.DataFrame(columns=['x_min', 'x_max', 'y_min', 'y_max', 
-                                              'JSD_overall'])
+                                              'JSD'])
     # gridfield_metric = pd.DataFrame(columns=['x_min', 'x_max', 'y_min', 'y_max', 
     #                                          'JSD_overall', 'JSD_gene1', 'JSD_ct1'])
 
@@ -223,6 +223,7 @@ def jensen_shannon_distance_across_genes_local(adata_sp:Anndata, adata_sc:Anndat
     # Iterate through local areas, filter, calculate overall_JSD, 
     # JSD per each gene and per each celltype for each bin
     #TODO these are only raw thoughts, implement it properly
+
     i, j = 0, 0
     for x_start, x_end in zip(bins_x[:-1], bins_x[1:]):
         i = 0
