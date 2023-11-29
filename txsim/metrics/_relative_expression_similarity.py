@@ -76,11 +76,6 @@ def relative_expression_similarity_across_genes_local(
     # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
     adata_sc=adata_sc[:,intersect_genes]
     adata_sp=adata_sp[:,intersect_genes]
-
-    # Liya: this is not correct, has to be removed
-    # # CPM-Normalization                                 causes the warnings
-    # sc.pp.normalize_total(adata_sp,target_sum=1e6)
-    # sc.pp.normalize_total(adata_sc,target_sum=1e6)
             
     # find the intersection of unique celltypes in adata_sc and adata_sp
     intersect_celltypes = list(set(adata_sp.obs["celltype"]).intersection(set(adata_sc.obs["celltype"])))
@@ -223,11 +218,6 @@ def relative_expression_similarity_across_cell_type_clusters(
     # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
     adata_sc=adata_sc[:,intersect_genes]
     adata_sp=adata_sp[:,intersect_genes]
-
-    # Liya: this is not correct, has to be removed
-    # # CPM-Normalization                                    causes the warnings
-    # sc.pp.normalize_total(adata_sp,target_sum=1e6)
-    # sc.pp.normalize_total(adata_sc,target_sum=1e6)
             
     # find the intersection of unique celltypes in adata_sc and adata_sp
     intersect_celltypes = list(set(adata_sp.obs["celltype"]).intersection(set(adata_sc.obs["celltype"])))
