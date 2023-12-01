@@ -138,8 +138,8 @@ def get_eligible_celltypes(adata_sp: AnnData,
     intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
 
     # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
-    adata_sc=adata_sc[:,intersect_genes]
-    adata_sp=adata_sp[:,intersect_genes]
+    adata_sc=adata_sc[:,intersect_genes].copy()
+    adata_sp=adata_sp[:,intersect_genes].copy()
 
     # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
     # sparse matrix support
