@@ -257,6 +257,27 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
         return negative_marker_purity, purity_per_gene, purity_per_celltype
 
 
+
+def get_cells_location(adata_sp: AnnData, adata_sc: AnnData):
+    """Add x,y coordinate columns of cells to adata_sp.obs.
+
+        Parameters
+        ----------
+        adata_sp : AnnData
+            Annotated ``AnnData`` object with counts from spatial data
+        adata_sc : AnnData
+            Annotated ``AnnData`` object with counts scRNAseq data
+    """
+
+    get_spot_assignment_col(adata_sp,adata_sc)
+    spots = adata_sp.uns["spots"]
+    df_cells = spots.loc[spots["spot_assignment"]!="unassigned"]      
+    df_cells = df_cells.groupby(["cell"])[["x","y"]].mean()
+    df_cells = df_cells.reset_index().rename(columns={'cell':'cell_id'})
+    adata_sp.obs = pd.merge(df_cells,adata_sp.obs,left_on="cell_id",right_on="cell_id",how="inner")
+
+
+
 def get_negative_marker_dict(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype'):
     """Add dictionary of negative marker genes for different celltypes.
     
@@ -281,7 +302,7 @@ def get_negative_marker_dict(adata_sp: AnnData, adata_sc: AnnData, key: str='cel
     # Liya: unnecessary, done upstream by the function get_eligible_celltypes
     # # Filter cells to eligible cell types
     # adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
-    # genes = adata_sc.var_names
+    genes = adata_sc.var_names
     
     # Get ratio of positive cells per cell type
     pos_exp_sc = pd.DataFrame(adata_sc.layers["raw"] > 0,columns=adata_sp.var_names)     

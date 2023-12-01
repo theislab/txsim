@@ -227,9 +227,8 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
                                     (adata_sc.obs['y'] >= y_start) & 
                                     (adata_sc.obs['y'] < y_end)]
 
-
             if len(adata_sp_local) < min_number_cells:
-                gridfield_metric[n_bins_y-1-i,j] = np.nan   
+                gridfield_metric[i,j] = np.nan   
                 # TODO: check if this position for gridfield_metric is correct
                 i += 1
                 continue  
@@ -238,7 +237,7 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
             jsd = jensen_shannon_distance(adata_sp_local, adata_sc, key=key, 
                                           layer=layer, min_number_cells=min_number_cells, pipeline_output=True)
             
-            gridfield_metric[n_bins_y-1-i,j]  = jsd
+            gridfield_metric[i,j]  = jsd
             # TODO: check if this position for gridfield_metric is correct
             i += 1
         j += 1
@@ -271,6 +270,7 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     sp = sp.flatten()
     sc = sc.flatten()
     # 2. get the probability distributions for the two vectors
+    print(sp.shape, sc.shape)
     P, Q = get_probability_distributions_for_sp_and_sc(sp, sc, smooth_distributions)
     return distance.jensenshannon(P, Q, base=2)
 
