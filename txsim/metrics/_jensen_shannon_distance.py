@@ -222,10 +222,12 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
         i = 0
         for y_start, y_end in zip(bins_y[:-1], bins_y[1:]):    
             # instead of dataframe, take the cropped adata_sp for one bin here
-            adata_sp_local = adata_sc[(adata_sp.obs['x'] >= x_start) & 
-                                    (adata_sp.obs['x'] < x_end) &
-                                    (adata_sp.obs['y'] >= y_start) & 
-                                    (adata_sp.obs['y'] < y_end)]
+            cell_ids = adata_sp.uns['spots'][(adata_sp.uns['spots']['x'] < x_end) &
+                                    (adata_sp.uns['spots']['y'] < y_end) & 
+                                    (adata_sp.uns['spots']['x'] >= x_start) &
+                                    (adata_sp.uns['spots']['y'] >= y_start)]['cell_ID']
+
+            adata_sp_local = adata_sp[adata_sp.obs['cell_id'].isin(cell_ids)].copy()
 
             if len(adata_sp_local) < min_number_cells:
                 gridfield_metric[i,j] = np.nan   
