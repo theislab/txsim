@@ -199,6 +199,8 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
     # check if the crop existis in the image
     range = check_crop_exists(x_min,x_max,y_min,y_max,image)
     bins_x, bins_y = get_bin_edges(range, bins)
+    print(bins_x)
+    print(bins_y)
 
     # defines the size of the gridfield_metric (np.array) 
     n_bins_x = len(bins_x) - 1
@@ -222,12 +224,12 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
         i = 0
         for y_start, y_end in zip(bins_y[:-1], bins_y[1:]):    
             # instead of dataframe, take the cropped adata_sp for one bin here
-            cell_ids = adata_sp.uns['spots'][(adata_sp.uns['spots']['x'] < x_end) &
-                                    (adata_sp.uns['spots']['y'] < y_end) & 
-                                    (adata_sp.uns['spots']['x'] >= x_start) &
-                                    (adata_sp.uns['spots']['y'] >= y_start)]['cell_ID']
 
-            adata_sp_local = adata_sp[adata_sp.obs['cell_id'].isin(cell_ids)].copy()
+            adata_sp_local = adata_sp[(adata_sp.obs['centroid_x'] >= x_start) & 
+                                        (adata_sp.obs['centroid_x'] < x_end) &
+                                        (adata_sp.obs['centroid_y'] >= y_start) &
+                                        (adata_sp.obs['centroid_y'] < y_end)].copy()
+            print(len(adata_sp_local))
 
             if len(adata_sp_local) < min_number_cells:
                 gridfield_metric[i,j] = np.nan   
