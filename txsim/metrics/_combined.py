@@ -48,12 +48,12 @@ def all_metrics(
     #### KNN mixing
     #metrics['knn_mixing'] = knn_mixing(adata_sp.copy(),adata_sc.copy())
     
-    ## Cell statistics
-    #metrics['ratio_median_readsxcell'] = ratio_median_readsXcells(adata_sp,adata_sc)
-    #metrics['ratio_mean_readsxcell'] = ratio_mean_readsXcells(adata_sp,adata_sc)
-    #metrics['ratio_n_cells'] = ratio_number_of_cells(adata_sp,adata_sc)
-    #metrics['ratio_mean_genexcells'] = ratio_mean_genesXcells(adata_sp,adata_sc)
-    #metrics['ratio_median_genexcells'] = ratio_median_genesXcells(adata_sp,adata_sc)
+    # Cell statistics
+    metrics['ratio_median_readsxcell'] = ratio_median_readsXcells(adata_sp,adata_sc)
+    metrics['ratio_mean_readsxcell'] = ratio_mean_readsXcells(adata_sp,adata_sc)
+    metrics['ratio_n_cells'] = ratio_number_of_cells(adata_sp,adata_sc)
+    metrics['ratio_mean_genexcells'] = ratio_mean_genesXcells(adata_sp,adata_sc)
+    metrics['ratio_median_genexcells'] = ratio_median_genesXcells(adata_sp,adata_sc)
         
     
     return pd.DataFrame.from_dict(metrics, orient='index')
@@ -68,5 +68,39 @@ def aggregate_metrics(
     mean_metric["mean"] = mean_metric.mean(axis=1)
     mean_metric["std"] = mean_metric.std(axis=1)
     aggregated_metric.columns = ["AGGREGATED_METRIC"]
+    mean_metric = pd.concat((mean_metric,aggregated_metric), axis=1)
+    return mean_metric
+
+def aggregate_group_metrics(
+    metric_list: list,
+    aggregated_metric: DataFrame,
+    name_list: list = None
+):
+    # Hocus pocus required because sometimes the dataframes switch the levels for the MultiIndex
+    # I do not know if there is a better way to do this
+    # I think it is unnecessary now since the table .csv, but leaving it here
+    # uni_index = metric_list[0].index #Set of correctly ordered indices
+    # for df in metric_list + [aggregated_metric]: 
+    #     for i in range(len(df.index)):
+    #         if df.index[i] not in uni_index:
+    #             print("here")
+    #             pair = df.index[i]
+    #             df.reset_index(inplace=True)
+    #             df.loc[i, 'run1'] = pair[1]
+    #             df.loc[i, 'run2'] = pair[0]
+    #             df.set_index(['run1','run2'], inplace=True)
+    
+    #combine and fix the names
+    mean_metric = pd.concat((metric_list), axis=1)
+    if name_list is not None: mean_metric.columns = name_list 
+    metric_types = {name.split('-')[-1] for name in mean_metric.columns}
+
+    #find mean and std
+    for m in metric_types:
+        mean_metric["mean-"+m] = mean_metric[[x for x in mean_metric.columns if m in x]].mean(axis=1)
+        mean_metric["std-"+ m] = mean_metric[[x for x in mean_metric.columns if (m in x and "mean-" not in x)]].std(axis=1)
+    
+    #add in aggregated and return
+    aggregated_metric.columns = ["aggregated-"+x for x in aggregated_metric.columns]
     mean_metric = pd.concat((mean_metric,aggregated_metric), axis=1)
     return mean_metric

@@ -153,7 +153,6 @@ def aggregate_count_matrices(
     # Copy in the first anndata, and set the replicate number
     adata = adata_list[0].copy()
     spots = adata.uns["spots"].copy()
-
     adata.obs["replicate"] = rep_list[0]
     spots['replicate'] = rep_list[0]
 
@@ -177,6 +176,8 @@ def aggregate_count_matrices(
         adata = adata.concatenate(new_adata)
 
     adata.uns['spots'] = spots
+    adata.uns['spots']['celltype'].fillna("None") #TODO Maybe fix this, just edited so it would save
+    adata.uns['spots']['celltype'] = adata.uns['spots']['celltype'].astype("category")
     
     return adata
 
