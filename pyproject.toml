@@ -9,7 +9,6 @@ requires = [
     "cellpose",
     "shapely",
     "scikit-image",
-    "pyitlib",
     "planktonspace"
 ]
 build-backend = "setuptools.build_meta"

@@ -169,8 +169,6 @@ def coexpression_similarity(
 
 
 def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output):
-    from pyitlib import discrete_random_variable as drv
-    # Apply distance metric
     """
     Computing normalised mutual information between all pairs of random variables(?) in the expression data.
     
@@ -184,6 +182,12 @@ def compute_mutual_information(spt_mat, seq_mat, common, thresh, pipeline_output
     
     The output is a matrix of (n_gene, n_gene) in the common expression data.
     """
+    
+    import warnings
+    warnings.warn("The pyitlib package which is required for the current mutual information implementation is currently not in txsim's dependencies since it has too strong dependency restrictions on scikit-learn.")
+    
+    from pyitlib import discrete_random_variable as drv
+    # Apply distance metric
 
     print("  - Spatial data...")
     if scipy.sparse.issparse(spt_mat):
