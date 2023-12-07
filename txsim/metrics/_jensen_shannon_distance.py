@@ -53,7 +53,6 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
     per_celltype_metric: float
         per celltype Jensen-Shannon divergence between the two distributions
     """
-
     celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, adata_sp, key=key, 
                                                            layer=layer, 
                                                            min_number_cells=min_number_cells)
@@ -61,16 +60,22 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
     n_genes = len(adata_sc.var_names)
 
     ################
+    # PER-CELLTYPE METRIC
+    ################
+    per_celltype_metric = pd.DataFrame(columns=['celltype', 'JSD'])
+    for celltype in celltypes:
+        sum = 0
+        for gene in adata_sc.var_names:
+            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype, smooth_distributions)
+        jsd = sum / n_genes
+        new_entry = pd.DataFrame([[celltype, jsd]],
+                     columns=['celltype', 'JSD'])
+        per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
+    
+    ################
     # OVERALL METRIC
     ################
-    overall_metric = 0 
-    for gene in adata_sc.var_names:
-        sum = 0
-        for celltype in set(adata_sp.obs['celltype']):
-            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype, smooth_distributions)
-            overall_metric += sum
-    overall_metric /= (n_celltypes * n_genes)
-
+    overall_metric = (per_celltype_metric["JSD"].sum()) / (per_celltype_metric.shape[0])
     if pipeline_output: # the execution stops here if pipeline_output=True
          return overall_metric
 
@@ -86,34 +91,6 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
         new_entry = pd.DataFrame([[gene, jsd]],
                    columns=['Gene', 'JSD'])
         per_gene_metric = pd.concat([per_gene_metric, new_entry])
-    # set gene as index
-    per_gene_metric.set_index('Gene', inplace=True)    
-    
-    ################
-    # PER-CELLTYPE METRIC
-    ################
-    per_celltype_metric = pd.DataFrame(columns=['celltype', 'JSD'])
-    for celltype in celltypes:
-        sum = 0
-        for gene in adata_sc.var_names:
-            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype, smooth_distributions)
-        jsd = sum / n_genes
-        new_entry = pd.DataFrame([[celltype, jsd]],
-                     columns=['celltype', 'JSD'])
-        per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
-
-    # Liya: I want to remove this functonality, because it is not clear what to do with the NaN values, you can not plot them
-    # TODO: remove
-    # # add the rows with celltypes which were filtered out because of the min_number_cells threshold and set their JSD to NaN
-    # if show_NaN_ct:
-    #     celltypes_with_nan = list(set(intersect_celltypes) - set(celltypes))
-    #     for celltype in celltypes_with_nan:
-    #         new_entry = pd.DataFrame([[celltype, np.nan]],
-    #                     columns=['celltype', 'JSD'])
-    #         per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
-    #     # set celltype as index
-    #     per_celltype_metric.set_index('celltype', inplace=True)
-    # ################
 
     return overall_metric, per_gene_metric, per_celltype_metric
 
@@ -171,11 +148,6 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
     # defines the size of the gridfield_metric (np.array) 
     n_bins_x = len(bins_x) - 1
     n_bins_y = len(bins_y) - 1
-    
-    # # ### SET UP
-    # # set the .X layer of each of the adatas to be log-normalized counts
-    # adata_sp.X = adata_sp.layers[layer]
-    # adata_sc.X = adata_sc.layers[layer]
 
     celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, adata_sp, key=key, 
                                                            layer=layer, 
@@ -233,15 +205,16 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     jsd: float
         Jensen-Shannon distance between the two distributions, single value
     """
+    # 1. get the vectors for the two distributions
     sp = adata_sp[adata_sp.obs['celltype']==celltype][:,gene].X.ravel()
     sc = adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X.ravel()
 
     # 2. get the probability distributions for the two vectors
-    P, Q = get_probability_distributions_for_sp_and_sc(sp, sc, smooth_distributions)
+    P, Q = get_probability_distributions(sp, sc, smooth_distributions)
     return distance.jensenshannon(P, Q, base=2)
 
 
-def get_probability_distributions_for_sp_and_sc(v_sp:np.array, v_sc:np.array, smooth_distributions):
+def get_probability_distributions(v_sp:np.array, v_sc:np.array, smooth_distributions):
     """Calculate the probability distribution vectors from one celltype and one gene
     from spatial and single-cell data
     ---------- 
@@ -310,8 +283,6 @@ def gaussian_smooth(data, sigma=1):
 # entries before the concat operation.
 # per_celltype_metric = pd.concat([per_celltype_metric, new_entry])"
 # TODO: change the functions structure so that it is not calculating per gene and per celltype metrics twice
-# TODO: my code has a match statement, so we need python >= 3.10, is that ok?
-# FUTURE
 # TODO: allow setting the window size or sigma for smoothing
 # TODO: maybe implement Wasserstein or maybe even the Cramer distance in addition to Jensen-Shannon
 ####
