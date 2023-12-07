@@ -58,6 +58,14 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
                                                            min_number_cells=min_number_cells)
     n_celltypes = len(celltypes)
     n_genes = len(adata_sc.var_names)
+    overall_metric = 0
+
+    # if there are no eligible celltypes, return NaN
+    if n_celltypes == 0:
+        if pipeline_output:
+            return np.nan
+        else:
+            return np.nan, np.nan, np.nan
 
     ################
     # PER-CELLTYPE METRIC
@@ -71,11 +79,12 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
         new_entry = pd.DataFrame([[celltype, jsd]],
                      columns=['celltype', 'JSD'])
         per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
+        overall_metric += sum
     
     ################
     # OVERALL METRIC
     ################
-    overall_metric = (per_celltype_metric["JSD"].sum()) / (per_celltype_metric.shape[0])
+    overall_metric = overall_metric / (n_celltypes * n_genes)
     if pipeline_output: # the execution stops here if pipeline_output=True
          return overall_metric
 
@@ -142,8 +151,6 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
     # check if the crop existis in the image
     range = check_crop_exists(x_min,x_max,y_min,y_max,image)
     bins_x, bins_y = get_bin_edges(range, bins)
-    print(bins_x)
-    print(bins_y)
 
     # defines the size of the gridfield_metric (np.array) 
     n_bins_x = len(bins_x) - 1
@@ -167,20 +174,15 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
                                         (adata_sp.obs['centroid_x'] < x_end) &
                                         (adata_sp.obs['centroid_y'] >= y_start) &
                                         (adata_sp.obs['centroid_y'] < y_end)].copy()
-            print(len(adata_sp_local))
 
-            if len(adata_sp_local) < min_number_cells:
+            if adata_sp_local.shape[0] < min_number_cells:
                 gridfield_metric[i,j] = np.nan   
-                # TODO: check if this position for gridfield_metric is correct
                 i += 1
-                continue  
-
-            # pipeline output=True, so we only get the overall metric, maybe expand this to per gene and per celltype
-            jsd = jensen_shannon_distance(adata_sp_local, adata_sc, key=key, 
+            else:
+                # pipeline output=True, so we only get the overall metric, maybe expand this to per gene and per celltype
+                jsd = jensen_shannon_distance(adata_sp_local, adata_sc, key=key, 
                                           layer=layer, min_number_cells=min_number_cells, pipeline_output=True)
-            
-            gridfield_metric[i,j]  = jsd
-            # TODO: check if this position for gridfield_metric is correct
+                gridfield_metric[i,j]  = jsd
             i += 1
         j += 1
             
