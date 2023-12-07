@@ -102,8 +102,8 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
         sum = 0
         for celltype in set(adata_sp.obs['celltype']):
             sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype, smooth_distributions)
-        overall_metric += sum
-    overall_metric = overall_metric / (n_celltypes * n_genes)
+            overall_metric += sum
+    overall_metric /= (n_celltypes * n_genes)
 
     if pipeline_output: # the execution stops here if pipeline_output=True
          return overall_metric
@@ -267,12 +267,9 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     jsd: float
         Jensen-Shannon distance between the two distributions, single value
     """
-    # 0. get all expression values for the gene of interest for the celltype of interest
-    sp = np.array(adata_sp[adata_sp.obs['celltype']==celltype][:,gene].X)
-    sc = np.array(adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X)
-    # 1.flatten the arrays to 1-dim vectors
-    sp = sp.flatten()
-    sc = sc.flatten()
+    sp = adata_sp[adata_sp.obs['celltype']==celltype][:,gene].X.ravel()
+    sc = adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X.ravel()
+
     # 2. get the probability distributions for the two vectors
     P, Q = get_probability_distributions_for_sp_and_sc(sp, sc, smooth_distributions)
     return distance.jensenshannon(P, Q, base=2)
