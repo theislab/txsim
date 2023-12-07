@@ -134,18 +134,18 @@ def get_eligible_celltypes(adata_sp: AnnData,
     adata_sp.X = adata_sp.layers[layer]
     adata_sc.X = adata_sc.layers[layer]
 
+    # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
+    # sparse matrix support
+    for a in [adata_sc, adata_sp]:
+        if issparse(a.X):
+            a.X = a.X.toarray()
+
     # take the intersection of genes in adata_sp and adata_sc, as a list
     intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
 
     # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
     adata_sc=adata_sc[:,intersect_genes].copy()
     adata_sp=adata_sp[:,intersect_genes].copy()
-
-    # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
-    # sparse matrix support
-    for a in [adata_sc, adata_sp]:
-        if issparse(a.X):
-            a.X = a.X.toarray()
 
     # get the celltypes that are in both adata_sp and adata_sc
     intersect_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
