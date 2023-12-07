@@ -157,7 +157,7 @@ def get_eligible_celltypes(adata_sp: AnnData,
     celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
 
     # Filter cells to eligible cell types
-    adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
-    adata_sp = adata_sp[adata_sp.obs[key].isin(celltypes)]
+    adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)].copy()
+    adata_sp = adata_sp[adata_sp.obs[key].isin(celltypes)].copy()
     
     return celltypes, adata_sp, adata_sc
