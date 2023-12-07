@@ -54,40 +54,6 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
         per celltype Jensen-Shannon divergence between the two distributions
     """
 
-    ### SET UP 
-    # TODO: use get_eligible_celltypes instead of loose code here
-
-    ################################################################################
-    # # set the .X layer of each of the adatas according to the layer parameter
-    # adata_sp.X = adata_sp.layers[layer]
-    # adata_sc.X = adata_sc.layers[layer]
-    # # take the intersection of genes present in adata_sp and adata_sc, as a list
-    # intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
-    # intersect_celltypes = list(set(adata_sp.obs[key]).intersection(set(adata_sc.obs[key])))
-    # # number of genes
-    # n_genes = len(intersect_genes)
-    # # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
-    # adata_sc=adata_sc[:,intersect_genes]
-    # adata_sp=adata_sp[:,intersect_genes]
-    # # sparse matrix support
-    # for a in [adata_sc, adata_sp]:
-    #     if issparse(a.X):
-    #         a.layers[layer]= a.layers[layer].toarray()
-
-    # # Filter cell types by minimum number of cells
-    # celltype_count_sc = adata_sc.obs[key].value_counts().loc[intersect_celltypes]
-    # celltype_count_sp = adata_sp.obs[key].value_counts().loc[intersect_celltypes]
-    # ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
-    # # celltypes that we will use for the metric (are in both datasets and have enough cells)
-    # celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
-    # # number of celltypes we will use for the metric (are in both datasets and have enough cells)
-    # n_celltypes = len(intersect_celltypes)
-
-    # # subset adata_sc and adata_sp to only include eligible celltypes
-    # adata_sc=adata_sc[adata_sc.obs[key].isin(celltypes)]
-    # adata_sp=adata_sp[adata_sp.obs[key].isin(celltypes)]
-    ###################################################################################
-
     celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, adata_sp, key=key, 
                                                            layer=layer, 
                                                            min_number_cells=min_number_cells)
