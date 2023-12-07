@@ -155,7 +155,7 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
                                                x_min:int, x_max:int, y_min:int, y_max:int,
                                                image: np.ndarray, bins: int = 10,
                                                key:str='celltype', layer:str='lognorm',
-                                               min_number_cells:int=20 # the minimal number of cells per celltype to be considered
+                                               min_number_cells:int=10 # the minimal number of cells per celltype to be considered
                                                ):
     """Calculate the Jensen-Shannon divergence between the spatial and dissociated single-cell data distributions
     for each gene, but using only the cells in a given local area for the spatial data.
