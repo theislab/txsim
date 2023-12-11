@@ -1,9 +1,11 @@
 import squidpy as sq
 import numpy as np
+import pandas as pd
 from squidpy.im._container import ImageContainer
 from squidpy.im._segment import SegmentationModel
 from typing import Union,  Optional, Any, Mapping, Callable, Sequence, TYPE_CHECKING, Tuple
 from squidpy._utils import NDArrayA
+import skimage
 
 def segment_nuclei(
     img: ImageContainer,
@@ -200,6 +202,162 @@ def segment_cellpose(
         
     return res
 
+
+
+##### Util fcts for watershed
+def get_mean_intensity_per_cell(img, labels):
+    """Calculate mean intensitiy of img for each cell in labels.
+    
+    Arguments
+    ---------
+    img: np.array
+        image of fluorescence intensities
+    labels: np.array
+        labels of cells in image (all integers between [0, np.max(labels)] must be present)
+        
+    Returns
+    -------
+    mean_intensities: np.array
+        mean intensity for each cell (starting with cell 1, cell 0 is background and was left out. To match indices 
+        to initial cell ids use e.g. `np.concatenate(([np.nan], mean_intensities))`)
+        
+    """
+    labels_not_zero = labels[labels > 0]
+    intensities = img[labels > 0]
+    # get unique labels and indices
+    uniques, indices = np.unique(labels_not_zero, return_inverse=True)
+    intensity_sum = np.bincount(indices, weights=intensities).astype(float)
+    cell_size = np.bincount(indices).astype(float)
+    mean_intensity_df = pd.Series(index=uniques, data=0, dtype=float)
+    mean_intensity_df.loc[cell_size > 0] = intensity_sum[cell_size > 0] / cell_size[cell_size > 0]
+    assert len(df) == np.max(df.index)
+    return mean_intensity_df.values
+
+def get_local_background_mean_intensity_per_cell(img, labels, window_size=1000, bg_size = 2000):
+    """
+    
+    Note that the same cell can occur in multiple windows (cells at window border), we take the minimum of the 
+    background over the windows for those cells.
+    
+    Arguments
+    ---------
+    img: np.array
+        image of fluorescence intensities
+    labels: np.array
+        labels of cells in image (all integers between [0, np.max(labels)] must be present)
+    window_size: int
+        size of window to choose cells from to compute local background
+    bg_size: int
+        size of window to compute local background in
+        
+    Returns
+    -------
+    bg_intensities: np.array
+        background intensities for each cell (starting with cell 1, cell 0 is background and was left out. To match 
+        indices to initial cell ids use e.g. `np.concatenate(([np.nan], bg_intensities))`)
+    
+    """
+
+    # initialize each cells local background intensity to the maximum intensity in the image
+    unique_labels = np.unique(labels)
+    bg_intensities = np.ones(len(unique_labels)) * np.max(img)
+
+    assert np.max(labels) == len(unique_labels) - 1
+
+    assert window_size < bg_size
+    extend = int((bg_size - window_size) / 2)
+    
+    nx = img.shape[1] // window_size + bool(img.shape[1] % window_size)
+    ny = img.shape[0] // window_size + bool(img.shape[0] % window_size)
+    
+    for i in range(nx):
+        for j in range(ny):
+            # window coordinates
+            x_min = i * window_size
+            x_max = min(x_min + window_size, img.shape[1])
+            y_min = j * window_size
+            y_max = min(y_min + window_size, img.shape[0])
+            # background window coordinates
+            bg_x_min = max(0, x_min-extend)
+            bg_x_max = min(img.shape[1], x_max+extend)
+            bg_y_min = max(0, y_min-extend)
+            bg_y_max = min(img.shape[0], y_max+extend)
+            
+            ## test plot: show window and background window
+            #plot_img = np.zeros_like(img)
+            #plot_img[bg_y_min:bg_y_max, bg_x_min:bg_x_max] = 2
+            #plot_img[y_min:y_max, x_min:x_max] = 1
+            #plt.imshow(plot_img)
+            #plt.title(f"nx = {nx}, ny = {ny}, x_min = {x_min}, x_max = {x_max}, y_min = {y_min}, y_max = {y_max}")
+            #plt.show()
+            
+            # labels in window
+            window_labels = labels[y_min:y_max, x_min:x_max]
+            window_labels = window_labels[window_labels > 0]
+            window_labels = np.unique(window_labels)
+            # background mean intensity
+            bg_window = img[bg_y_min:bg_y_max, bg_x_min:bg_x_max]
+            bg_mask = labels[bg_y_min:bg_y_max, bg_x_min:bg_x_max] == 0
+            bg_intensity = np.mean(bg_window[bg_mask])
+            
+            # update background intensity for each cell
+            bg_intensities[window_labels] = np.minimum(bg_intensities[window_labels], bg_intensity)
+            
+    return bg_intensities[1:]
+
+
+def filter_cells_based_on_local_background_intensity(
+        img, labels, window_size=1000, bg_size = 2000, bg_factor=0.3, reindex_cells=True
+    ):
+    """ Filter cells based on their mean intensity relative to the local background intensity.
+    
+    Arguments
+    ---------
+    img: np.array
+        image of fluorescence intensities
+    labels: np.array
+        labels of cells in image (all integers between [0, np.max(labels)] must be present)
+    window_size: int
+        size of window to choose cells from to compute local background
+    bg_size: int
+        size of window to compute local background in
+    bg_factor: float
+        factor to multiply local background intensity with to get threshold for cell intensity. Cells below this 
+        threshold are filtered out.
+    reindex_cells: bool
+        whether to reindex cells after filtering (i.e. remove gaps in cell ids)
+        
+    Returns
+    -------
+    labels: np.array
+        labels of cells in image after filtering
+        
+    """
+    
+    # Get intensities of cells and local backgrounds
+    intensities = get_mean_intensity_per_cell(img, labels)
+    bg_intensities = get_local_background_mean_intensity_per_cell(img, labels, window_size=window_size, bg_size=bg_size)
+    
+    # Cell filtering
+    cell_mask = intensities < bg_factor * bg_intensities
+    
+    # Add first element (background) to cell_mask
+    cell_mask = np.concatenate([[False], cell_mask])
+    
+    # Get labels filtered according cell_mask
+    labels[cell_mask[labels]] = 0
+    
+    # Check that background is in labels
+    assert (0 in labels)
+    
+    # Reindex cells
+    if reindex_cells:
+        _, inverse_indices = np.unique(labels, return_inverse=True)
+        labels = inverse_indices.reshape(labels.shape)
+    
+    return labels
+
+
 def segment_watershed(
     img: NDArrayA,
     hyperparams: Optional[dict]
@@ -306,6 +464,8 @@ def segment_watershed(
 
     threshold_apply = lambda  img: img > threshold_value
 
+    original_img = img.copy()
+
     # Get parameters
     if hyperparams is not None:
         
@@ -358,6 +518,8 @@ def segment_watershed(
 
         # Threshold (Masking), Apply thresholding to detect nuclei
         if threshold_func is not None:
+
+            img = skimage.util.img_as_ubyte(img)
 
             threshold_params = {
                 "nbins": hyperparams.get("threshold_nbins", 256),
@@ -447,10 +609,21 @@ def segment_watershed(
 
         segmentation_labels = watershed(-distance_transform, local_maxima, **hyperparams.get("watershed_params", {}),mask=nuclei, watershed_line=True)
         
+        
+        # Filter based on local background intensity
+        if hyperparams["bg_intensity_filter_bg_factor"] > 0:
+            segmentation_labels = filter_cells_based_on_local_background_intensity(
+                original_img, segmentation_labels, 
+                window_size=hyperparams["bg_intensity_filter_window_size"],
+                bg_size=hyperparams["bg_intensity_filter_bg_size"],
+                bg_factor=hyperparams["bg_intensity_filter_bg_factor"],
+                reindex_cells=True,
+            )        
+        
         if "visualize" in hyperparams:
             
             visualize(img,segmentation_labels, hyperparams.get("visualize", "img"))
-    else:
+    else: #TODO: delete?
         min_distance = 10
         gaussian_sigma = 1
         min_size = 15
