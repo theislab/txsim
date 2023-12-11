@@ -49,11 +49,11 @@ def all_metrics(
     #metrics['knn_mixing'] = knn_mixing(adata_sp.copy(),adata_sc.copy())
     
     # Cell statistics
-    metrics['ratio_median_readsxcell'] = ratio_median_readsXcells(adata_sp,adata_sc)
-    metrics['ratio_mean_readsxcell'] = ratio_mean_readsXcells(adata_sp,adata_sc)
-    metrics['ratio_n_cells'] = ratio_number_of_cells(adata_sp,adata_sc)
-    metrics['ratio_mean_genexcells'] = ratio_mean_genesXcells(adata_sp,adata_sc)
-    metrics['ratio_median_genexcells'] = ratio_median_genesXcells(adata_sp,adata_sc)
+    #metrics['ratio_median_readsxcell'] = ratio_median_readsXcells(adata_sp,adata_sc)
+    #metrics['ratio_mean_readsxcell'] = ratio_mean_readsXcells(adata_sp,adata_sc)
+    #metrics['ratio_n_cells'] = ratio_number_of_cells(adata_sp,adata_sc)
+    #metrics['ratio_mean_genexcells'] = ratio_mean_genesXcells(adata_sp,adata_sc)
+    #metrics['ratio_median_genexcells'] = ratio_median_genesXcells(adata_sp,adata_sc)
         
     
     return pd.DataFrame.from_dict(metrics, orient='index')
