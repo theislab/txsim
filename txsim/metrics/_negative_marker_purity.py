@@ -105,7 +105,7 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
         return negative_marker_purity
     else:
         # Calculate per gene and per cell type purities
-        purities = (ratio_celltype_sc - ratio_celltype_sp).cip(0,None)
+        purities = (ratio_celltype_sc - ratio_celltype_sp).clip(0,None)
         purities.values[~neg_marker_mask] = np.nan
         purities = purities.loc[~(purities.isnull().all(axis=1)), ~(purities.isnull().all(axis=0))]
         purity_per_gene = purities.mean(axis=0, skipna=True)
@@ -230,7 +230,7 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
         return negative_marker_purity
     else:
         # Calculate per gene and per cell type purities
-        purities = (mean_ct_sp_norm - mean_ct_sc_norm).cip(0,None)
+        purities = (mean_ct_sp_norm - mean_ct_sc_norm).clip(0,None)
         purities.values[~neg_marker_mask] = np.nan
         purities = purities.loc[~(purities.isnull().all(axis=1)), ~(purities.isnull().all(axis=0))]
         purity_per_gene = purities.mean(axis=0, skipna=True)
