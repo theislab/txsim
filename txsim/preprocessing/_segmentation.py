@@ -230,7 +230,7 @@ def get_mean_intensity_per_cell(img, labels):
     cell_size = np.bincount(indices).astype(float)
     mean_intensity_df = pd.Series(index=uniques, data=0, dtype=float)
     mean_intensity_df.loc[cell_size > 0] = intensity_sum[cell_size > 0] / cell_size[cell_size > 0]
-    assert len(df) == np.max(df.index)
+    assert len(mean_intensity_df) == np.max(mean_intensity_df.index)
     return mean_intensity_df.values
 
 def get_local_background_mean_intensity_per_cell(img, labels, window_size=1000, bg_size = 2000):

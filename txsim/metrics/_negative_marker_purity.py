@@ -152,7 +152,7 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
     
     # Filter cell types by minimum number of cells
     celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
-    celltype_count_sp = adata_sc.obs[key].value_counts().loc[shared_celltypes]
+    celltype_count_sp = adata_sp.obs[key].value_counts().loc[shared_celltypes]
     ct_filter = (celltype_count_sc >= min_number_cells) & (celltype_count_sp >= min_number_cells)
     celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
     
@@ -196,7 +196,11 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
     
     
     # Get gene-cell type pairs with negative marker expression
-    neg_marker_mask = np.array(mean_ct_sc_rel < minimum_exp)
+    #neg_marker_mask = np.array(mean_ct_sc_rel < minimum_exp) #NOTE: Old criteria, lead to too few negative markers
+    neg_marker_mask = np.array(mean_ct_sc_norm < minimum_exp) #TODO: Add an extra function to retrieve the negative 
+    # marker-cell type pairs, and use that function across NMP formulations (including the local one). Also delete
+    # the lines above that are not needed anymore. This new constraint is simpler than the previous one. Check the 
+    # negative marker selection on different datasets with the plotting function to see how well it generalises.
     
     # Return nan if no negative markers were found
     if np.sum(neg_marker_mask) < 1:
