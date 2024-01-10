@@ -239,3 +239,114 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
         return negative_marker_purity, purity_per_gene, purity_per_celltype
 
     
+    
+def negative_marker_purity_reads_FP_based_optimum(
+        adata_sc: AnnData, 
+        spots: pd.DataFrame, 
+        FP_rate: float, 
+        key: str = "celltype",
+        gene_key: str = "Gene",
+    ):
+    """ Calculate the negative marker purity for an optimal segmentation of all annotated reads based on a false positive rate
+    
+    The false positive rate refers to rates e.g. based on control probes as used in e.g. Xenium ("Negative control 
+    probe rate"). This refers to falsely detected spots. Note that e.g. falsely decoded spots as e.g. in MERFISH are
+    conceptually different. For these rates a different compuatation approach would be needed.
+    
+    The computation goes as follows. txsim input spots tables come with expert annotated cell type annotations mapped to 
+    spots. We only take into account those spots that belong to cell types occuring in adata_sc.obs[key]. The negative
+    marker-cell type pairs are calculated as in the NMP metrics. For each cell type all spots of negative markers are
+    deleted except of FP_rate * n_spots_g_ct (n_spots_g_ct = the number of spots of the given negative marker in the
+    given cell type). Finally the negative marker purity is calculated as usual.
+    
+    Arguments
+    ---------
+    adata_sc: AnnData
+        Annotated ``AnnData`` object with counts scRNAseq data. Raw counts are expected in adata_sc['raw'].
+    spots: pd.DataFrame
+        The spots table with columns spots["Gene"] and spots[key].
+    FP_rate: float
+        False positive rate of counts in the given dataset.
+    key: str
+        Obs key for cell types of `adata.obs` and `spots`.
+    gene_key: str
+        Gene columns name of `spots`
+    
+    Returns
+    -------
+    float
+        Negative marker purity for the theoretical case of ideal segmentations except of falsly positive detected reads
+        of the peak calling. (Negative marker purity := 1 - (X_neg,sp - X_neg,sc), where X_neg,m is the normalized mean
+        expression over negative marker-cell type pairs in modality m)
+    float
+        Like the first return value, except that we neglect the comparison term of scRNAseq, i.e. 
+        Negative marker purity := 1 - X_neg,sp.
+        
+        
+    """
+    
+    celltypes_sc = adata_sc.obs[key].unique()
+    spots = spots.loc[spots[key].isin(celltypes_sc)]
+    shared_celltypes = [ct for ct in spots[key].unique() if ct in celltypes_sc]
+    genes = spots[gene_key].unique().tolist()
+    assert np.all([g in adata_sc.var_names for g in genes]); "All genes in `spots[gene_key]` must occur in `adata_sc.var_names`"
+    
+    # Get negative markers of adata_sc #TODO: Provide a shared function for this
+    min_number_cells=10 
+    minimum_exp=0.005 #maximum relative expression allowed in a gene in a cluster to consider the gene-celltype pair the analysis 
+    # Subset adata_sc to genes of spatial data
+    adata_sc = adata_sc[:,genes]
+    if issparse(adata_sc.layers["raw"]):
+        adata_sc.layers["raw"] = adata_sc.layers["raw"].toarray()
+    # Filter cell types by minimum number of cells
+    celltype_count_sc = adata_sc.obs[key].value_counts().loc[shared_celltypes]
+    ct_filter = (celltype_count_sc >= min_number_cells)
+    celltypes = celltype_count_sc.loc[ct_filter].index.tolist()
+    # Return nan if too few cell types were found
+    if len(celltypes) < 2:
+        print("Not enough cell types (>1) eligible to calculate negative marker purity")
+        negative_marker_purity = 'nan'
+        return negative_marker_purity
+    # Filter cells to eligible cell types
+    adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
+    # Get mean expression per cell type
+    exp_sc = pd.DataFrame(adata_sc.layers['raw'],columns=genes)
+    exp_sc['celltype'] = list(adata_sc.obs[key])
+    mean_celltype_sc = exp_sc.groupby('celltype').mean()
+    # Get normalized mean expressions over cell types (this will be summed up over negative cell types)
+    mean_ct_sc_norm = mean_celltype_sc.div(mean_celltype_sc.sum(axis=0),axis=1)
+    # Get gene-cell type pairs with negative marker expression
+    #neg_marker_mask = np.array(mean_ct_sc_rel < minimum_exp) #NOTE: Old criteria, lead to too few negative markers
+    neg_marker_mask = np.array(mean_ct_sc_norm.loc[celltypes,genes] < minimum_exp) 
+    
+    # NOTE: This here is the actual interesting part.
+    # We apply a different approach for the spatial reads here, as we don't have segmented cells
+    # To achieve the cell type balance as in the NMP formulation we need a weighted sum of reads
+    counts_per_ct = [(spots[key]==ct).sum() for ct in celltypes]
+    min_n_counts = min(counts_per_ct)
+    ct_weights = [min_n_counts/count for count in counts_per_ct]
+    sp_counts_per_gene_and_ct = pd.crosstab(spots[key],spots[gene_key]).loc[celltypes,genes]
+    sp_counts_per_gene_and_ct = sp_counts_per_gene_and_ct.mul(ct_weights, axis=0)
+    # Throw out negative marker counts in cells where they shouldn't be (except of FP_rate * n_counts)
+    tmp = sp_counts_per_gene_and_ct.values.copy()
+    tmp[neg_marker_mask] *= FP_rate
+    sp_counts_per_gene_and_ct.loc[:,:] = tmp
+    mean_ct_sp_norm = sp_counts_per_gene_and_ct.div(sp_counts_per_gene_and_ct.sum(axis=0),axis=1)
+    
+    #TODO: this should then just call some final NMP fct maybe(?)
+    # Get marker expressions in negative marker-cell type pairs
+    lowvals_sc = np.full_like(neg_marker_mask, np.nan, dtype=np.float32)
+    lowvals_sc = mean_ct_sc_norm.values[neg_marker_mask]
+    lowvals_sp = mean_ct_sp_norm.values[neg_marker_mask]
+    
+    # Take the mean over the normalized expressions of the genes' negative cell types
+    mean_sc_lowexp = np.nanmean(lowvals_sc)
+    mean_sp_lowexp = np.nanmean(lowvals_sp)
+    
+    # Calculate summary metric
+    negative_marker_purity = 1
+    if mean_sp_lowexp > mean_sc_lowexp:
+        negative_marker_purity -= (mean_sp_lowexp - mean_sc_lowexp)
+    
+    return negative_marker_purity, (1 - mean_sp_lowexp)
+
