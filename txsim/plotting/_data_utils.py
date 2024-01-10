@@ -76,7 +76,7 @@ def negative_marker_dotplot(
     dp = sc.pl.dotplot(adata_sc,adata_sc.var_names,"celltype", show=False, **sc_dotplot_kws)
     plt.sca(dp['mainplot_ax'])
     plt.imshow(
-        (mean_ct_sc_norm.loc[:,adata_sc.var_names[::-1]] < max_ratio_cells), #0.005
+        (mean_ct_sc_norm.loc[adata_sc.obs[key].cat.categories,adata_sc.var_names[::-1]] < max_ratio_cells), #0.005
         alpha=0.8, zorder=0, cmap="PuOr",
         extent=(len(adata_sc.var_names),0,len(mean_ct_sc_norm),0)
     )
