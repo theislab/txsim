@@ -44,7 +44,7 @@ def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
     Input
     ----------
     spots_df : pandas.DataFrame
-        DataFrame with columns 'x', 'y', 'gene'.
+        DataFrame with columns 'x', 'y', 'Gene'.
     source_segmentation : numpy.ndarray
         Segmentation array of the source segmentation.
     target_segmentation : numpy.ndarray
@@ -66,6 +66,13 @@ def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
         Pearson correlation coefficient between the intersection gene expression
         vector and the difference gene expression vector.
     """
+    # if the thresholds make no sense - throw an error
+    if upper_threshold >= 1:
+        raise ValueError('upper_threshold must be < 1')
+    elif upper_threshold <= lower_threshold:
+        raise ValueError('upper_threshold must be > lower_threshold')
+    elif lower_threshold <= 0:
+        raise ValueError('lower_threshold must be > 0')
 
     # allocate spots to pixels
     spots_df = allocate_spots_to_pixels(spots_df)
@@ -140,7 +147,7 @@ def main_inter_diff_expression_correlation_local(spots_df : pd.DataFrame,
     Input
     ----------
     spots_df : pandas.DataFrame
-        DataFrame with columns 'x', 'y', 'gene'.
+        DataFrame with columns 'x', 'y', 'Gene'.
     source_segmentation : numpy.ndarray
         Segmentation array of the source segmentation.
     target_segmentation : numpy.ndarray
@@ -171,6 +178,14 @@ def main_inter_diff_expression_correlation_local(spots_df : pd.DataFrame,
     gridfield_metric : numpy.ndarray
         Local correlation for each segment of the gridfield in a given crop.
     """
+    # if the thresholds make no sense - throw an error
+    if upper_threshold >= 1:
+        raise ValueError('upper_threshold must be < 1')
+    elif upper_threshold <= lower_threshold:
+        raise ValueError('upper_threshold must be > lower_threshold')
+    elif lower_threshold <= 0:
+        raise ValueError('lower_threshold must be > 0')
+
     # check if the crop exists
     check_crop_exists(x_min, x_max, y_min, y_max, source_segmentation)
 
@@ -230,12 +245,12 @@ def allocate_spots_to_pixels(spots_df):
     Input
     ----------
     spots_df : pandas.DataFrame
-        DataFrame with columns 'x', 'y' and 'gene'.
+        DataFrame with columns 'x', 'y' and 'Gene'.
     
     Output
     -------
     spots_df_copy : pandas.DataFrame
-        DataFrame with columns 'x', 'y', 'gene', 'pixel_x' and 'pixel_y'.
+        DataFrame with columns 'x', 'y', 'Gene', 'pixel_x' and 'pixel_y'.
     """
     spots_df['pixel_x'] = spots_df['x'].astype(int)
     spots_df['pixel_y'] = spots_df['y'].astype(int)
@@ -250,14 +265,14 @@ def add_segmentation_to_spots_df(spots_df : pd.DataFrame,
     Input
     ----------
     spots_df : pandas.DataFrame
-        DataFrame with columns 'x', 'y', 'gene', 'pixel_x' and 'pixel_y'.
+        DataFrame with columns 'x', 'y', 'Gene', 'pixel_x' and 'pixel_y'.
     segmentation : numpy.ndarray
         Segmentation array
     
     Output
     -------
     spots_df : pandas.DataFrame
-        DataFrame with columns 'x', 'y', 'gene', 'pixel_x', 'pixel_y' and 'segmentation'.
+        DataFrame with columns 'x', 'y', 'Gene', 'pixel_x', 'pixel_y' and 'segmentation'.
     """
     spots_df[segmentation_name] = segmentation[spots_df['pixel_y'], spots_df['pixel_x']]
     return spots_df
@@ -283,7 +298,7 @@ def calculate_main_overlap_and_rest_one_cell(cell_id_source : int,
     cell_id_source : int
         Cell id of the cell in the source segmentation.
     spots_df : pandas.DataFrame
-        DataFrame with columns 'x', 'y', 'gene', 'pixel_x', 'pixel_y', source_column_name and target_column_name.
+        DataFrame with columns 'x', 'y', 'Gene', 'pixel_x', 'pixel_y', source_column_name and target_column_name.
     upper_threshold : float
         Upper threshold for share of spots in the main overlap. Default is 0.75.
     lower_threshold : float
@@ -301,10 +316,6 @@ def calculate_main_overlap_and_rest_one_cell(cell_id_source : int,
         Expression vector for the rest of the spots in the source cell.
     
     """
-    # if upper threshold is set to >=1, throw an error
-    if upper_threshold >= 1:
-        raise ValueError('Upper_threshold must be < 1')
-
     # get the spots of the cell in the source segmentation 
     # which are allocated to some cell in the target segmentation
     spots_source = spots_df[(spots_df[source_column_name] == cell_id_source) &
@@ -314,7 +325,7 @@ def calculate_main_overlap_and_rest_one_cell(cell_id_source : int,
     spots_source_grouped = spots_source.groupby(target_column_name).count()
 
     # find out which target cell has the most spots in common with the source cell
-    cell_id_target = spots_source_grouped['gene'].idxmax()
+    cell_id_target = spots_source_grouped['Gene'].idxmax()
 
     # main overlap spots
     spots_main_overlap = spots_source[spots_source[target_column_name] == cell_id_target]
@@ -329,13 +340,13 @@ def calculate_main_overlap_and_rest_one_cell(cell_id_source : int,
         return None, None
     else:
         # generate the list of all spots in the spots_df
-        all_spots = spots_df['gene'].unique()
+        all_spots = spots_df['Gene'].unique()
         # generate the expression vectors for the main overlap and the rest
         expression_vector_main_overlap = np.zeros(len(all_spots))
         expression_vector_rest = np.zeros(len(all_spots))
-        for spot in spots_main_overlap['gene']:
+        for spot in spots_main_overlap['Gene']:
             expression_vector_main_overlap[np.where(all_spots == spot)] += 1
-        for spot in spots_rest['gene']:
+        for spot in spots_rest['Gene']:
             expression_vector_rest[np.where(all_spots == spot)] += 1
 
         return expression_vector_main_overlap, expression_vector_rest
