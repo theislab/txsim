@@ -4,35 +4,60 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import issparse
 from scipy.sparse import isspmatrix 
+import warnings
 
 #TODO: fix Warnings in get_cells_location
 
 #helper function 
-def check_crop_exists(x_min: int, x_max: int, y_min: int, y_max: int, image: np.ndarray):
-    """Check if crop coordinates exist.
-    
-    For this, we check if either (x_min, x_max, y_min, y_max) or an image was provided. If not, we raise a ValueError. 
+import numpy as np
 
+def check_crop_exists(image: np.ndarray, 
+                      x_min: int = None, 
+                      x_max: int = None, 
+                      y_min: int = None,
+                      y_max: int = None):
+    """Check if crop coordinates are valid or use the entire image.
+    
+    This function checks if valid crop coordinates are provided. If not, and an image is provided,
+    it defaults to using the entire image dimensions as the crop coordinates.
+    
     Parameters
     ----------
-    x_min: int, x_max: int, y_min: int, y_max: int
-        crop coordinates
-    image: np.ndarray
-
+    x_min, x_max, y_min, y_max : int
+        Crop coordinates.
+    image : np.ndarray
+        Image from which the crop is to be taken.
+    
     Returns
     -------
-    if no ValueError was raised, returns range  
-    """
-    if (x_min is None or x_max is None or y_min is None or y_max is None) and image is None:
-        raise ValueError("please provide an image or crop")         
-        
-    if x_min is not None and x_max is not None and y_min is not None and y_max is not None:
-        range = [[x_min,x_max],[y_min,y_max]]
+    crop_coordinates : list of lists
+        The validated or computed crop coordinates [[x_min, x_max], [y_min, y_max]].
     
+    Raises
+    ------
+    ValueError
+        If crop coordinates are invalid or neither coordinates nor an image is provided.
+    """
+    # Validate provided coordinates
+    if any(coord is None for coord in [x_min, x_max, y_min, y_max]):
+        if image is None:
+            raise ValueError("Please provide either crop coordinates or an image.")
+        else:
+            # Use full image if coordinates are not provided
+            x_min, x_max, y_min, y_max = 0, image.shape[1], 0, image.shape[0]
+            warnings.warn("No crop coordinates provided. Using the entire image dimensions as crop coordinates.")
     else:
-        range = [[0,image.shape[0]],[0,image.shape[1]]]
-        
-    return range 
+        # Validate the logic of the coordinates
+        if x_max <= x_min or y_max <= y_min:
+            raise ValueError("x_max must be larger than x_min and y_max must be larger than y_min.")
+        if x_min < 0 or y_min < 0:
+            raise ValueError("x_min and y_min must be equal to or greater than 0.")
+        if x_max > image.shape[1] or y_max > image.shape[0]:
+            raise ValueError("x_max and y_max must be equal to or smaller than the image dimensions.")
+    
+    crop_coordinates = [[x_min, x_max], [y_min, y_max]]
+    return crop_coordinates
+
 
 """TODO: I moved get_cells_location from here back to _negative_marker_purity.py, 
 # because it is dependent on the function get_spot_assignment_col
