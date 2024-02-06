@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import anndata as ad
 from ._util import check_crop_exists
 from ._util import get_bin_edges
 
@@ -17,8 +18,7 @@ coefficients across all cells detected in source.
 
 # Main functions
 
-def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
-                                source_segmentation : np.ndarray,
+def global_MIDEC(adata_sp : ad.AnnData,
                                 target_segmentation : np.ndarray,
                                 min_number_of_spots_per_cell : int = 10,
                                 upper_threshold : float = 0.75,
@@ -74,51 +74,26 @@ def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
     elif lower_threshold <= 0:
         raise ValueError('lower_threshold must be > 0')
 
+    spots_df = adata_sp.uns['spots']
+
+    # rename the column 'cell' to source_segmentation_name and make it integer type
+    spots_df = spots_df.rename(columns={'cell': source_segmentation_name})
+    spots_df[source_segmentation_name] = spots_df[source_segmentation_name].fillna(0).astype(int)
     # allocate spots to pixels
     spots_df = allocate_spots_to_pixels(spots_df)
-    # add segmentations to spots_df
-    spots_df = add_segmentation_to_spots_df(spots_df, source_segmentation, source_segmentation_name)
-    spots_df = add_segmentation_to_spots_df(spots_df, target_segmentation, target_segmentation_name)
-    # get the ids from the source segmentation
-    source_segmentation_ids = np.unique(source_segmentation)
-    # remove the 0 (background) from the ids
-    source_segmentation_ids = source_segmentation_ids[source_segmentation_ids != 0]
 
-    pearson_correlations = []
-
-    for cell_id_source in source_segmentation_ids:
-        # check if the cell has enough spots
-        spots_source = spots_df[(spots_df[source_segmentation_name] == cell_id_source) &
-                        (spots_df[target_segmentation_name] != 0)]
-        if spots_source.shape[0] <= min_number_of_spots_per_cell:
-            continue
-
-        # calculate the intersection and the difference gene expression vectors for one cell
-        main_overlap, rest = calculate_main_overlap_and_rest_one_cell(cell_id_source, 
-                                                                              spots_df, 
-                                                                              upper_threshold=upper_threshold,
-                                                                              lower_threshold=lower_threshold,
-                                                                              source_column_name=source_segmentation_name,
-                                                                              target_column_name=target_segmentation_name)
-        
-        # if there is no overlap or no rest, continue with the next cell
-        if main_overlap is None or rest is None:
-            continue
-        # calculate the pearson correlation coefficient between intersection and difference
-        pearson_correlation = np.corrcoef(main_overlap, rest)[0, 1]
-
-        # add the pearson correlation coefficient to the list
-        pearson_correlations.append(pearson_correlation)
-
-    # calculate the mean of the pearson correlation coefficients
-    correlation = np.mean(pearson_correlations)
-    print(f"{len(pearson_correlations)} cells were considered for the calculation.")
+    correlation = main_inter_diff_expression_correlation(spots_df,
+                                target_segmentation,
+                                min_number_of_spots_per_cell,
+                                upper_threshold,
+                                lower_threshold,
+                                source_segmentation_name,
+                                target_segmentation_name)
 
     return correlation
 
-def main_inter_diff_expression_correlation_local(spots_df : pd.DataFrame,
-                                source_segmentation : np.ndarray,
-                                target_segmentation : np.ndarray,
+def local_MIDEC(adata_sp : ad.AnnData,
+                target_segmentation : np.ndarray,
                                 x_min : int,
                                 x_max : int,
                                 y_min : int,
@@ -186,28 +161,33 @@ def main_inter_diff_expression_correlation_local(spots_df : pd.DataFrame,
     elif lower_threshold <= 0:
         raise ValueError('lower_threshold must be > 0')
 
-    # check if the crop exists
-    check_crop_exists(x_min, x_max, y_min, y_max, source_segmentation)
-
+    # 1. check if the crop exists at all
+    check_crop_exists(target_segmentation, x_min, x_max, y_min, y_max)
     bins_x, bins_y = get_bin_edges([[x_min, x_max], [y_min, y_max]], bins)
     # make the values in bins_x and bins_y integers
     bins_x = bins_x.astype(int)
     bins_y = bins_y.astype(int)
-
     # define the size of the gridfield_metric (np.array) 
     n_bins_x = len(bins_x) - 1
     n_bins_y = len(bins_y) - 1
 
-    #initialize the np.array that will hold the metric for each segment of the gridfield
+    # 2. get the spots from the adata_sp and prepare it
+    spots_df = adata_sp.uns['spots']
+    # rename the column 'cell' to source_segmentation_name and make it integer type
+    spots_df = spots_df.rename(columns={'cell': source_segmentation_name})
+    spots_df[source_segmentation_name] = spots_df[source_segmentation_name].fillna(0).astype(int)
+    # allocate spots to pixels
+    spots_df = allocate_spots_to_pixels(spots_df)
+
+    # 3. initialize the np.array that will hold the metric for each segment of the gridfield
     gridfield_metric = np.zeros((n_bins_x, n_bins_y))
 
+    # 4. generate the gridfield_metric
     j = 0
     for x_start, x_end in zip(bins_x[:-1], bins_x[1:]):
         i = 0
         for y_start, y_end in zip(bins_y[:-1], bins_y[1:]):
             print(f"crop: {x_start}:{x_end}, {y_start}:{y_end}")
-            source_segmentation_crop = source_segmentation[y_start:y_end, x_start:x_end]
-            target_segmentation_crop = target_segmentation[y_start:y_end, x_start:x_end]
             
             # crop the spots_df
             spots_crop = spots_df[(spots_df['x'].astype(int) >= x_start) &
@@ -218,11 +198,14 @@ def main_inter_diff_expression_correlation_local(spots_df : pd.DataFrame,
             # adjust the coordinates of the cropped dataframe
             spots_crop['x'] = spots_crop['x'] - x_start
             spots_crop['y'] = spots_crop['y'] - y_start
+            spots_crop['pixel_x'] = spots_crop['pixel_x'] - x_start
+            spots_crop['pixel_y'] = spots_crop['pixel_y'] - y_start
             spots_crop = spots_crop.reset_index(drop=True)
+
+            target_segmentation_crop = target_segmentation[y_start:y_end, x_start:x_end]
             
             # calculate the metric for the crop
             gridfield_metric[i, j] = main_inter_diff_expression_correlation(spots_df=spots_crop,
-                                                                            source_segmentation=source_segmentation_crop,
                                                                             target_segmentation=target_segmentation_crop,
                                                                             min_number_of_spots_per_cell=min_number_of_spots_per_cell,
                                                                             upper_threshold=upper_threshold,
@@ -231,12 +214,97 @@ def main_inter_diff_expression_correlation_local(spots_df : pd.DataFrame,
                                                                             target_segmentation_name=target_segmentation_name)
             i += 1
         j += 1 
-            
-
     return gridfield_metric
 
 
 # Helper functions
+def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
+                                target_segmentation : np.ndarray,
+                                min_number_of_spots_per_cell : int = 10,
+                                upper_threshold : float = 0.75,
+                                lower_threshold : float = 0.25,
+                                source_segmentation_name : str = 'source',
+                                target_segmentation_name : str = 'target'):
+    """
+    Main Intersection over Difference Expression Correlation (MIDEC).
+
+    Calculate pearson correlation between the gene expression vectors 1 and 2:
+
+    1. gene expression vector of the main overlap (intersection between one source 
+    segmentation cell and one target segmentation cell). The intersection with the most
+    spots is considered as the main overlap (intersection).
+    2. gene expression vector from the rest of the source segmentation cell which is not 
+    containing the intersection (or in other words, the difference)
+
+    is computed for each cell.
+
+    The result of the metric is the mean of the correlation coefficients across all cells in 
+    the source segmentation.
+
+    Input
+    ----------
+    spots_df : pandas.DataFrame
+        DataFrame with columns 'x', 'y', 'Gene'.
+    source_segmentation : numpy.ndarray
+        Segmentation array of the source segmentation.
+    target_segmentation : numpy.ndarray
+        Segmentation array of the target segmentation.
+    min_number_of_spots_per_cell : int
+        Minimum number of spots per cell. Default is 10.
+    upper_threshold : float
+        Upper threshold for share of spots in the intersection (<1.0). Default is 0.75.
+    lower_threshold : float
+        Lower threshold for share of spots in the intersection. Default is 0.25.
+    source_segmentation_name : str
+        Name of the column with the source segmentation. Default is 'source'.
+    target_segmentation_name : str
+        Name of the column with the target segmentation. Default is 'target'.
+    
+    Output
+    -------
+    correlation : float
+        Pearson correlation coefficient between the intersection gene expression
+        vector and the difference gene expression vector.
+    """
+    # add the target segmentation to spots_df
+    spots_df = add_segmentation_to_spots_df(spots_df, target_segmentation, target_segmentation_name)
+
+    # get the ids from the source segmentation
+    source_segmentation_ids = np.unique(spots_df[source_segmentation_name])
+    # remove the 0 (background) from the ids
+    source_segmentation_ids = source_segmentation_ids[source_segmentation_ids != 0]
+
+    pearson_correlations = []
+
+    for cell_id_source in source_segmentation_ids:
+        # check if the cell has enough spots
+        spots_source = spots_df[(spots_df[source_segmentation_name] == cell_id_source) &
+                        (spots_df[target_segmentation_name] != 0)]
+        if spots_source.shape[0] <= min_number_of_spots_per_cell:
+            continue
+
+        # calculate the intersection and the difference gene expression vectors for one cell
+        main_overlap, rest = calculate_main_overlap_and_rest_one_cell(cell_id_source, 
+                                                                        spots_df, 
+                                                                        upper_threshold=upper_threshold,
+                                                                        lower_threshold=lower_threshold,
+                                                                        source_column_name=source_segmentation_name,
+                                                                        target_column_name=target_segmentation_name)
+        
+        # if there is no overlap or no rest, continue with the next cell
+        if main_overlap is None or rest is None:
+            continue
+        # calculate the pearson correlation coefficient between intersection and difference
+        pearson_correlation = np.corrcoef(main_overlap, rest)[0, 1]
+
+        # add the pearson correlation coefficient to the list
+        pearson_correlations.append(pearson_correlation)
+
+    # calculate the mean of the pearson correlation coefficients
+    correlation = np.mean(pearson_correlations)
+    print(f"{len(pearson_correlations)} cells were considered for the calculation.")
+
+    return correlation
 
 def allocate_spots_to_pixels(spots_df):
     """

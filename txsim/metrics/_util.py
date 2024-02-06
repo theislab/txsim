@@ -49,6 +49,7 @@ def check_crop_exists(image: np.ndarray,
     else:
         # Validate the logic of the coordinates
         if x_max <= x_min or y_max <= y_min:
+            print(f"x_min: {x_min}, x_max: {x_max}, y_min: {y_min}, y_max: {y_max}")
             raise ValueError("x_max must be larger than x_min and y_max must be larger than y_min.")
         if x_min < 0 or y_min < 0:
             raise ValueError("x_min and y_min must be equal to or greater than 0.")
