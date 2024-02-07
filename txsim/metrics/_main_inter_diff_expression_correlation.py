@@ -10,10 +10,13 @@ Main Intersection over Difference Expression Correlation (MIDEC)
 source - annotated segmentation (e.g. expert annotation)
 target - target segmentation (e.g. automatic segmentation)
 
-Pearson correlation between the gene expression vector in the main 
+Correlation between the gene expression vector in the main 
 intersection and the difference (source - target) is computed for 
 each cell. The result of the metric is the mean of the correlation 
 coefficients across all cells detected in source.
+The functionaliry of the metric also includes the substitution of
+the default correlation (Pearson) with Spearman's rank correlation
+and other metrics (MSE, absolute error).
 """
 
 # Main functions
@@ -28,7 +31,7 @@ def global_MIDEC(adata_sp : ad.AnnData,
     """
     Main Intersection over Difference Expression Correlation (MIDEC).
 
-    Calculate pearson correlation between the gene expression vectors 1 and 2:
+    Calculate correlation (or other metric) between the gene expression vectors 1 and 2:
 
     1. gene expression vector of the main overlap (intersection between one source 
     segmentation cell and one target segmentation cell). The intersection with the most
@@ -38,15 +41,15 @@ def global_MIDEC(adata_sp : ad.AnnData,
 
     is computed for each cell.
 
-    The result of the metric is the mean of the correlation coefficients across all cells in 
-    the source segmentation.
+    The result of the metric is the mean of the correlation coefficients (or other metrics,
+    like MSE) across all cells in the source segmentation.
 
     Input
     ----------
-    spots_df : pandas.DataFrame
-        DataFrame with columns 'x', 'y', 'Gene'.
-    source_segmentation : numpy.ndarray
-        Segmentation array of the source segmentation.
+    adata_sp : anndata.AnnData
+        anndata object from spatial data containing spots in adata.uns['spots'] 
+        with spots allocated to the cells of the source segmentation in the 
+        column adata.uns['spots']['cell'].
     target_segmentation : numpy.ndarray
         Segmentation array of the target segmentation.
     min_number_of_spots_per_cell : int
@@ -121,10 +124,10 @@ def local_MIDEC(adata_sp : ad.AnnData,
 
     Input
     ----------
-    spots_df : pandas.DataFrame
-        DataFrame with columns 'x', 'y', 'Gene'.
-    source_segmentation : numpy.ndarray
-        Segmentation array of the source segmentation.
+    adata_sp : anndata.AnnData
+        anndata object from spatial data containing spots in adata.uns['spots'] 
+        with spots allocated to the cells of the source segmentation in the 
+        column adata.uns['spots']['cell'].
     target_segmentation : numpy.ndarray
         Segmentation array of the target segmentation.
     x_min : int
@@ -226,27 +229,10 @@ def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
                                 source_segmentation_name : str = 'source',
                                 target_segmentation_name : str = 'target'):
     """
-    Main Intersection over Difference Expression Correlation (MIDEC).
-
-    Calculate pearson correlation between the gene expression vectors 1 and 2:
-
-    1. gene expression vector of the main overlap (intersection between one source 
-    segmentation cell and one target segmentation cell). The intersection with the most
-    spots is considered as the main overlap (intersection).
-    2. gene expression vector from the rest of the source segmentation cell which is not 
-    containing the intersection (or in other words, the difference)
-
-    is computed for each cell.
-
-    The result of the metric is the mean of the correlation coefficients across all cells in 
-    the source segmentation.
-
     Input
     ----------
     spots_df : pandas.DataFrame
-        DataFrame with columns 'x', 'y', 'Gene'.
-    source_segmentation : numpy.ndarray
-        Segmentation array of the source segmentation.
+        DataFrame with columns 'x', 'y', 'Gene' and 'cell'
     target_segmentation : numpy.ndarray
         Segmentation array of the target segmentation.
     min_number_of_spots_per_cell : int
