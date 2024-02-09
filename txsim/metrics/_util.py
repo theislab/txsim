@@ -96,12 +96,6 @@ def get_eligible_celltypes(adata_sp: AnnData,
     celltypes, adata_sp, adata_sc
 
     """
-    # # Set threshold parameters 
-
-    # # Liya: "I think min_number_cells should be a parameter of the function, not a global variable. 
-    # I added it as a parameter and set default to 10."
-    # min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
-
     # set the layer for adata_sc and adata_sp
     # for most metrics, we use the lognorm layer
     # for negative marker purity, we use the raw layer
