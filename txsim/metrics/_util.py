@@ -1,11 +1,8 @@
 from anndata import AnnData
 import numpy as np
-# from ._negative_marker_purity import get_spot_assignment_col
 import pandas as pd
 from scipy.sparse import issparse
 from scipy.sparse import isspmatrix 
-
-#TODO: fix Warnings in get_cells_location
 
 #helper function 
 def check_crop_exists(x_min: int, x_max: int, y_min: int, y_max: int, image: np.ndarray):
@@ -32,30 +29,7 @@ def check_crop_exists(x_min: int, x_max: int, y_min: int, y_max: int, image: np.
     else:
         range = [[0,image.shape[0]],[0,image.shape[1]]]
         
-    return range 
-
-"""TODO: I moved get_cells_location from here back to _negative_marker_purity.py, 
-# because it is dependent on the function get_spot_assignment_col
-# from _negative_marker_purity.py, which is again dependent on 
-# another function from _negative_marker_purity.py: get_negative_marker_dict """
-# def get_cells_location(adata_sp: AnnData, adata_sc: AnnData):
-#     """Add x,y coordinate columns of cells to adata_sp.obs.
-
-#         Parameters
-#         ----------
-#         adata_sp : AnnData
-#             Annotated ``AnnData`` object with counts from spatial data
-#         adata_sc : AnnData
-#             Annotated ``AnnData`` object with counts scRNAseq data
-#     """
-
-#     get_spot_assignment_col(adata_sp,adata_sc)
-#     spots = adata_sp.uns["spots"]
-#     df_cells = spots.loc[spots["spot_assignment"]!="unassigned"]      
-#     df_cells = df_cells.groupby(["cell"])[["x","y"]].mean()
-#     df_cells = df_cells.reset_index().rename(columns={'cell':'cell_id'})
-#     adata_sp.obs = pd.merge(df_cells,adata_sp.obs,left_on="cell_id",right_on="cell_id",how="inner")
-
+    return range
 
 #helper function
 def get_bin_edges(A: list[list[int]], bins):
