@@ -1,8 +1,11 @@
 import numpy as np
 import pandas as pd
 import anndata as ad
+import math
+from scipy.stats import spearmanr
 from ._util import check_crop_exists
 from ._util import get_bin_edges
+
 
 """
 Main Intersection over Difference Expression Correlation (MIDEC)
@@ -21,17 +24,19 @@ and other metrics (MSE, absolute error).
 
 # Main functions
 
-def global_MIDEC(adata_sp : ad.AnnData,
-                                target_segmentation : np.ndarray,
+def global_MIDEC(adata_sp_source : ad.AnnData,
+                                adata_sp_target : ad.AnnData,
                                 min_number_of_spots_per_cell : int = 10,
+                                min_number_of_cells : int = 10,
                                 upper_threshold : float = 0.75,
                                 lower_threshold : float = 0.25,
                                 source_segmentation_name : str = 'source',
-                                target_segmentation_name : str = 'target'):
+                                target_segmentation_name : str = 'target',
+                                which_metric = 'pearson'):
     """
     Main Intersection over Difference Expression Correlation (MIDEC).
 
-    Calculate correlation (or other metric) between the gene expression vectors 1 and 2:
+    Calculate pearson correlation between the gene expression vectors 1 and 2:
 
     1. gene expression vector of the main overlap (intersection between one source 
     segmentation cell and one target segmentation cell). The intersection with the most
@@ -41,15 +46,15 @@ def global_MIDEC(adata_sp : ad.AnnData,
 
     is computed for each cell.
 
-    The result of the metric is the mean of the correlation coefficients (or other metrics,
-    like MSE) across all cells in the source segmentation.
+    The result of the metric is the mean of the correlation coefficients across all cells in 
+    the source segmentation.
 
     Input
     ----------
-    adata_sp : anndata.AnnData
-        anndata object from spatial data containing spots in adata.uns['spots'] 
-        with spots allocated to the cells of the source segmentation in the 
-        column adata.uns['spots']['cell'].
+    spots_df : pandas.DataFrame
+        DataFrame with columns 'x', 'y', 'Gene'.
+    source_segmentation : numpy.ndarray
+        Segmentation array of the source segmentation.
     target_segmentation : numpy.ndarray
         Segmentation array of the target segmentation.
     min_number_of_spots_per_cell : int
@@ -77,36 +82,43 @@ def global_MIDEC(adata_sp : ad.AnnData,
     elif lower_threshold <= 0:
         raise ValueError('lower_threshold must be > 0')
 
-    spots_df = adata_sp.uns['spots']
+    source_spots = adata_sp_source.uns['spots'].copy()
+    target_spots = adata_sp_target.uns['spots'].copy()
 
     # rename the column 'cell' to source_segmentation_name and make it integer type
-    spots_df = spots_df.rename(columns={'cell': source_segmentation_name})
+    spots_df = source_spots.rename(columns={'cell': source_segmentation_name}).copy()
+    # add the column 'cell' from target segmentation to the spots_df
+    spots_df[target_segmentation_name] = target_spots['cell'].copy()
+    # fill the NaN values with 0 and make the column integer type
     spots_df[source_segmentation_name] = spots_df[source_segmentation_name].fillna(0).astype(int)
-    # allocate spots to pixels
-    spots_df = allocate_spots_to_pixels(spots_df)
+    spots_df[target_segmentation_name] = spots_df[target_segmentation_name].fillna(0).astype(int)
 
-    correlation = main_inter_diff_expression_correlation(spots_df,
-                                target_segmentation,
-                                min_number_of_spots_per_cell,
-                                upper_threshold,
-                                lower_threshold,
-                                source_segmentation_name,
-                                target_segmentation_name)
+    metric = main_inter_diff_expression_correlation(spots_df=spots_df,
+                                min_number_of_spots_per_cell=min_number_of_spots_per_cell,
+                                min_number_of_cells=min_number_of_cells,
+                                upper_threshold=upper_threshold,
+                                lower_threshold=lower_threshold,
+                                source_segmentation_name=source_segmentation_name,
+                                target_segmentation_name=target_segmentation_name,
+                                which_metric=which_metric)
 
-    return correlation
+    return metric
 
-def local_MIDEC(adata_sp : ad.AnnData,
-                target_segmentation : np.ndarray,
+def local_MIDEC(adata_sp_source : ad.AnnData,
+                adata_sp_target : ad.AnnData,
+                image : np.ndarray,
                                 x_min : int,
                                 x_max : int,
                                 y_min : int,
                                 y_max : int,
                                 min_number_of_spots_per_cell = 10,
+                                min_number_of_cells = 10,
                                 upper_threshold = 0.75,
                                 lower_threshold = 0.25,
                                 source_segmentation_name='source',
                                 target_segmentation_name = 'target',
-                                bins = 10):
+                                bins = 10,
+                                which_metric = 'pearson'):
     """
     Local Main Intersection over Difference Expression Correlation (MIDEC).
 
@@ -124,12 +136,12 @@ def local_MIDEC(adata_sp : ad.AnnData,
 
     Input
     ----------
-    adata_sp : anndata.AnnData
-        anndata object from spatial data containing spots in adata.uns['spots'] 
-        with spots allocated to the cells of the source segmentation in the 
-        column adata.uns['spots']['cell'].
-    target_segmentation : numpy.ndarray
-        Segmentation array of the target segmentation.
+    adata_sp_source : anndata.AnnData 
+        AnnData object containing the spots with the source segmentation in adata.uns['spots']
+    adata_sp_target : anndata.AnnData
+        AnnData object containing the spots with the target segmentation in adata.uns['spots']
+    source_segmentation : numpy.ndarray
+        Segmentation array of the source segmentation.
     x_min : int
         Minimum x coordinate of the segment of interest.
     x_max : int
@@ -140,6 +152,8 @@ def local_MIDEC(adata_sp : ad.AnnData,
         Maximum y coordinate of the segment of interest.
     min_number_of_spots_per_cell : int
         Minimum number of spots per cell. Default is 10.
+    min_number_of_cells : int
+        Minimum number of cells for the metric to be calculated. Default is 10.
     upper_threshold : float
         Upper threshold for share of spots in the intersection (<1.0). Default is 0.75.
     lower_threshold : float
@@ -164,8 +178,19 @@ def local_MIDEC(adata_sp : ad.AnnData,
     elif lower_threshold <= 0:
         raise ValueError('lower_threshold must be > 0')
 
-    # 1. check if the crop exists at all
-    check_crop_exists(target_segmentation, x_min, x_max, y_min, y_max)
+    # 1. get one spot table with both segmentations
+    source_spots = adata_sp_source.uns['spots']
+    target_spots = adata_sp_target.uns['spots']
+    # rename the column 'cell' to source_segmentation_name and make it integer type
+    spots_df = source_spots.rename(columns={'cell': source_segmentation_name}).copy()
+    # add the column 'cell' from target segmentation to the spots_df
+    spots_df[target_segmentation_name] = target_spots['cell'].copy()
+    # fill the NaN values with 0 and make the column integer type
+    spots_df[source_segmentation_name] = spots_df[source_segmentation_name].fillna(0).astype(int)
+    spots_df[target_segmentation_name] = spots_df[target_segmentation_name].fillna(0).astype(int)
+
+    # 2. check crop, get bins
+    check_crop_exists(image, x_min, x_max, y_min, y_max)
     bins_x, bins_y = get_bin_edges([[x_min, x_max], [y_min, y_max]], bins)
     # make the values in bins_x and bins_y integers
     bins_x = bins_x.astype(int)
@@ -173,14 +198,6 @@ def local_MIDEC(adata_sp : ad.AnnData,
     # define the size of the gridfield_metric (np.array) 
     n_bins_x = len(bins_x) - 1
     n_bins_y = len(bins_y) - 1
-
-    # 2. get the spots from the adata_sp and prepare it
-    spots_df = adata_sp.uns['spots']
-    # rename the column 'cell' to source_segmentation_name and make it integer type
-    spots_df = spots_df.rename(columns={'cell': source_segmentation_name})
-    spots_df[source_segmentation_name] = spots_df[source_segmentation_name].fillna(0).astype(int)
-    # allocate spots to pixels
-    spots_df = allocate_spots_to_pixels(spots_df)
 
     # 3. initialize the np.array that will hold the metric for each segment of the gridfield
     gridfield_metric = np.zeros((n_bins_x, n_bins_y))
@@ -201,20 +218,17 @@ def local_MIDEC(adata_sp : ad.AnnData,
             # adjust the coordinates of the cropped dataframe
             spots_crop['x'] = spots_crop['x'] - x_start
             spots_crop['y'] = spots_crop['y'] - y_start
-            spots_crop['pixel_x'] = spots_crop['pixel_x'] - x_start
-            spots_crop['pixel_y'] = spots_crop['pixel_y'] - y_start
             spots_crop = spots_crop.reset_index(drop=True)
-
-            target_segmentation_crop = target_segmentation[y_start:y_end, x_start:x_end]
             
             # calculate the metric for the crop
             gridfield_metric[i, j] = main_inter_diff_expression_correlation(spots_df=spots_crop,
-                                                                            target_segmentation=target_segmentation_crop,
                                                                             min_number_of_spots_per_cell=min_number_of_spots_per_cell,
+                                                                            min_number_of_cells=min_number_of_cells,
                                                                             upper_threshold=upper_threshold,
                                                                             lower_threshold=lower_threshold,
                                                                             source_segmentation_name=source_segmentation_name,
-                                                                            target_segmentation_name=target_segmentation_name)
+                                                                            target_segmentation_name=target_segmentation_name,
+                                                                            which_metric=which_metric)
             i += 1
         j += 1 
     return gridfield_metric
@@ -222,17 +236,35 @@ def local_MIDEC(adata_sp : ad.AnnData,
 
 # Helper functions
 def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
-                                target_segmentation : np.ndarray,
                                 min_number_of_spots_per_cell : int = 10,
+                                min_number_of_cells : int = 10,
                                 upper_threshold : float = 0.75,
                                 lower_threshold : float = 0.25,
                                 source_segmentation_name : str = 'source',
-                                target_segmentation_name : str = 'target'):
+                                target_segmentation_name : str = 'target',
+                                which_metric : str = 'pearson'):
     """
+    Main Intersection over Difference Expression Correlation (MIDEC).
+
+    Calculate pearson correlation between the gene expression vectors 1 and 2:
+
+    1. gene expression vector of the main overlap (intersection between one source 
+    segmentation cell and one target segmentation cell). The intersection with the most
+    spots is considered as the main overlap (intersection).
+    2. gene expression vector from the rest of the source segmentation cell which is not 
+    containing the intersection (or in other words, the difference)
+
+    is computed for each cell.
+
+    The result of the metric is the mean of the correlation coefficients across all cells in 
+    the source segmentation.
+
     Input
     ----------
     spots_df : pandas.DataFrame
-        DataFrame with columns 'x', 'y', 'Gene' and 'cell'
+        DataFrame with columns 'x', 'y', 'Gene', source_segmentation_name and target_segmentation_name.
+    source_segmentation : numpy.ndarray
+        Segmentation array of the source segmentation.
     target_segmentation : numpy.ndarray
         Segmentation array of the target segmentation.
     min_number_of_spots_per_cell : int
@@ -252,15 +284,14 @@ def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
         Pearson correlation coefficient between the intersection gene expression
         vector and the difference gene expression vector.
     """
-    # add the target segmentation to spots_df
-    spots_df = add_segmentation_to_spots_df(spots_df, target_segmentation, target_segmentation_name)
+    spots_df = allocate_spots_to_pixels(spots_df)
 
     # get the ids from the source segmentation
     source_segmentation_ids = np.unique(spots_df[source_segmentation_name])
     # remove the 0 (background) from the ids
     source_segmentation_ids = source_segmentation_ids[source_segmentation_ids != 0]
 
-    pearson_correlations = []
+    values = []
 
     for cell_id_source in source_segmentation_ids:
         # check if the cell has enough spots
@@ -280,17 +311,35 @@ def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
         # if there is no overlap or no rest, continue with the next cell
         if main_overlap is None or rest is None:
             continue
-        # calculate the pearson correlation coefficient between intersection and difference
-        pearson_correlation = np.corrcoef(main_overlap, rest)[0, 1]
+        if which_metric == 'pearson':
+            # calculate the pearson correlation coefficient between intersection and difference
+            pearson_correlation = np.corrcoef(main_overlap, rest)[0, 1]
+            # add the pearson correlation coefficient to the list
+            values.append(pearson_correlation)
+        elif which_metric == 'spearman':
+            spearman_correlation = spearmanr(main_overlap, rest)[0]
+            values.append(spearman_correlation)
+        elif which_metric == 'abs_error':
+            main_overlap_normalized = main_overlap/np.linalg.norm(main_overlap)
+            rest_normalized = rest/np.linalg.norm(rest)
+            abs_error = np.abs(np.subtract(main_overlap_normalized, rest_normalized)).mean()
+            values.append(abs_error)
+        elif which_metric == 'MSE':
+            main_overlap_normalized = main_overlap/np.linalg.norm(main_overlap)
+            rest_normalized = rest/np.linalg.norm(rest)
+            mse = np.square(np.subtract(main_overlap_normalized, rest_normalized)).mean()
+            values.append(mse)
+        else:
+            raise ValueError('Invalid metric')
 
-        # add the pearson correlation coefficient to the list
-        pearson_correlations.append(pearson_correlation)
+    # calculate the mean for the overall value
+    if len(values) < min_number_of_cells:
+        metric = None
+    else:
+        metric = np.mean(values)
+    #print(f"{len(values)} cells were considered for the calculation.")
 
-    # calculate the mean of the pearson correlation coefficients
-    correlation = np.mean(pearson_correlations)
-    print(f"{len(pearson_correlations)} cells were considered for the calculation.")
-
-    return correlation
+    return metric
 
 def allocate_spots_to_pixels(spots_df):
     """
@@ -406,7 +455,4 @@ def calculate_main_overlap_and_rest_one_cell(cell_id_source : int,
         return expression_vector_main_overlap, expression_vector_rest
   
 
-
-# TODOs:
-    # - decide what to do with empty df slices (gives nan correlation coefficient)
 

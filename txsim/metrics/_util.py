@@ -5,13 +5,12 @@ import pandas as pd
 from scipy.sparse import issparse
 from scipy.sparse import isspmatrix 
 import warnings
-
-#TODO: fix Warnings in get_cells_location
+from typing import Tuple
 
 #helper function 
 import numpy as np
 
-def check_crop_exists(image: np.ndarray, 
+def check_crop_exists(image: np.ndarray | Tuple[int, int],
                       x_min: int = None, 
                       x_max: int = None, 
                       y_min: int = None,
@@ -25,8 +24,9 @@ def check_crop_exists(image: np.ndarray,
     ----------
     x_min, x_max, y_min, y_max : int
         Crop coordinates.
-    image : np.ndarray
-        Image from which the crop is to be taken.
+    image : np.ndarray | Tuple[int, int]
+        Image from which the crop is to be taken or the size of the image as a tuple of integers.
+        The coordinates are [image.shape[0],image.shape[1]] or [height, width].
     
     Returns
     -------
@@ -38,14 +38,20 @@ def check_crop_exists(image: np.ndarray,
     ValueError
         If crop coordinates are invalid or neither coordinates nor an image is provided.
     """
+    if isinstance(image, np.ndarray):
+        # Process the image
+        image_x, image_y = image.shape[1], image.shape[0]
+    elif isinstance(image, tuple) and len(image) == 2 and all(isinstance(i, int) for i in image):
+        # Process the size
+        image_x, image_y = image[1], image[0]
+    else:
+        raise ValueError("Invalid image parameter format. Provide an image or its size as a tuple of integers.")
+
     # Validate provided coordinates
     if any(coord is None for coord in [x_min, x_max, y_min, y_max]):
-        if image is None:
-            raise ValueError("Please provide either crop coordinates or an image.")
-        else:
-            # Use full image if coordinates are not provided
-            x_min, x_max, y_min, y_max = 0, image.shape[1], 0, image.shape[0]
-            warnings.warn("No crop coordinates provided. Using the entire image dimensions as crop coordinates.")
+        # Use full image if coordinates are not provided
+        x_min, x_max, y_min, y_max = 0, image_x, 0, image_y
+        warnings.warn("No crop coordinates provided. Using the entire image dimensions as crop coordinates.")
     else:
         # Validate the logic of the coordinates
         if x_max <= x_min or y_max <= y_min:
@@ -53,34 +59,11 @@ def check_crop_exists(image: np.ndarray,
             raise ValueError("x_max must be larger than x_min and y_max must be larger than y_min.")
         if x_min < 0 or y_min < 0:
             raise ValueError("x_min and y_min must be equal to or greater than 0.")
-        if x_max > image.shape[1] or y_max > image.shape[0]:
+        if x_max > image_x or y_max > image_y:
             raise ValueError("x_max and y_max must be equal to or smaller than the image dimensions.")
     
     crop_coordinates = [[x_min, x_max], [y_min, y_max]]
     return crop_coordinates
-
-
-"""TODO: I moved get_cells_location from here back to _negative_marker_purity.py, 
-# because it is dependent on the function get_spot_assignment_col
-# from _negative_marker_purity.py, which is again dependent on 
-# another function from _negative_marker_purity.py: get_negative_marker_dict """
-# def get_cells_location(adata_sp: AnnData, adata_sc: AnnData):
-#     """Add x,y coordinate columns of cells to adata_sp.obs.
-
-#         Parameters
-#         ----------
-#         adata_sp : AnnData
-#             Annotated ``AnnData`` object with counts from spatial data
-#         adata_sc : AnnData
-#             Annotated ``AnnData`` object with counts scRNAseq data
-#     """
-
-#     get_spot_assignment_col(adata_sp,adata_sc)
-#     spots = adata_sp.uns["spots"]
-#     df_cells = spots.loc[spots["spot_assignment"]!="unassigned"]      
-#     df_cells = df_cells.groupby(["cell"])[["x","y"]].mean()
-#     df_cells = df_cells.reset_index().rename(columns={'cell':'cell_id'})
-#     adata_sp.obs = pd.merge(df_cells,adata_sp.obs,left_on="cell_id",right_on="cell_id",how="inner")
 
 
 #helper function
@@ -148,12 +131,6 @@ def get_eligible_celltypes(adata_sp: AnnData,
     celltypes, adata_sp, adata_sc
 
     """
-    # # Set threshold parameters 
-
-    # # Liya: "I think min_number_cells should be a parameter of the function, not a global variable. 
-    # I added it as a parameter and set default to 10."
-    # min_number_cells=10 # minimum number of cells belonging to a cluster to consider it in the analysis
-
     # set the layer for adata_sc and adata_sp
     # for most metrics, we use the lognorm layer
     # for negative marker purity, we use the raw layer
