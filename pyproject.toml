@@ -9,6 +9,7 @@ requires = [
     "cellpose",
     "shapely",
     "scikit-image",
-    "planktonspace"
+    "planktonspace",
+    "geopandas"
 ]
 build-backend = "setuptools.build_meta"
