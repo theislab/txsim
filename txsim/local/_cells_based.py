@@ -123,7 +123,7 @@ def spot_uniformity_per_cell_score(
 
     df = adata_sp.uns["spots"]
     unique_cell_ids = adata_sp.obs.index.unique()
-    adata_sp.obs[key_added] = 0  # was set to np.nan in Jakob's implementation
+    adata_sp.obs[key_added] = np.nan
 
     for i in unique_cell_ids:
         spots = df.loc[df["cell_id"] == i].copy()
