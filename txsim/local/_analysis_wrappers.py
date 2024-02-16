@@ -152,9 +152,80 @@ def cell_and_spot_statistics(
         out_dict["cell_density"] = _get_cell_density_grid(adata_sp, region_range, bins, cells_x_col, cells_y_col)
            
     return out_dict, grid_coords
-        
 
 
+def cell_and_spot_statistics(
+        adata_sp1: ad.AnnData, #TODOOO
+        adata_sp2: ad.AnnData,
+        metrics: Union[str, List[str]] = "all",
+        grid_region: Optional[List[Union[float, List[float]]]] = None,
+        bin_width: Optional[float] = None,
+        n_bins: Optional[List[int]] = None,
+        cells_x_col: str = "x",
+        cells_y_col: str = "y",
+        spots_x_col: str = "x",
+        spots_y_col: str = "y",
+) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+    """Compute cell and spot statistics over a spatial grid.
+
+    This function calculates various spatial statistics for cells and spots across a defined grid.
+    It allows customization of the grid and selection of specific metrics for detailed spatial analysis.
+
+    Parameters
+    ----------
+    adata_sp : AnnData
+        Annotated AnnData object containing spatial transcriptomics data.
+        The spots' coordinates should be in adata.uns["spots"][[spots_x_col, spots_y_col]],
+        and the cells' coordinates in adata.obs[[cells_x_col, cells_y_col]].
+    metrics : str or List[str], default "all"
+        The metrics to compute. Specify "all" to compute all available metrics or provide a list of specific metrics.
+        Supported metrics include: [TODO]. #NOTE: Add supported metrics
+    grid_region : List[Union[float, List[float]]], optional
+        The spatial domain over which to set the grid. Options include:
+        1. [y_max, x_max] (e.g., the shape of the associated DAPI image).
+        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy <= xy_max).
+        3. None (if None, the grid is inferred from the min and max spots' coordinates).
+    bin_width : float, optional
+        The width of each grid field. Use either `bin_width` or `n_bins` to define grid cells.
+    n_bins : List[int], optional
+        The number of bins along the y and x axes, formatted as [ny, nx].
+        Use either `bin_width` or `n_bins` to define grid cells.
+    cells_x_col : str, default "x"
+        The column name in adata.obs for the x-coordinates of cells.
+    cells_y_col : str, default "y"
+        The column name in adata.obs for the y-coordinates of cells.
+    spots_x_col : str, default "x"
+        The column name in adata.uns["spots"] for the x-coordinates of spots.
+    spots_y_col : str, default "y"
+        The column name in adata.uns["spots"] for the y-coordinates of spots.
+
+    Returns
+    -------
+    Dict[str, np.ndarray]
+        A tuple containing the calculated statistics. The first element is a dictionary with each metric's name as keys
+        (note that some metrics might be converted to multiple keys, e.g. celltype_density -> celltype_density_Tcells,
+        celltype_density_Bcells, ...) and their corresponding numpy arrays as values.
+    np.ndarray
+        The second element is a numpy array representing the coordinates of the grid used for calculations.
+
+    """
+
+    # Set metrics
+    metrics = _convert_metrics_input_to_list(metrics, SUPPORTED_CELL_AND_SPOT_STATISTICS)
+
+    # Set grid region
+    spots = adata_sp.uns["spots"] if "spots" in adata_sp.uns else None  # Some metrics can be run without spots
+    region_range, bins = _convert_grid_specification_to_range_and_bins(
+        spots, grid_region, bin_width, n_bins, spots_x_col, spots_y_col
+    )
+    grid_coords = _convert_range_and_bins_to_grid_coordinates(region_range, bins)
+
+    # Compute metrics
+    out_dict = {}
+    if "cell_density" in metrics:
+        out_dict["cell_density"] = _get_cell_density_grid(adata_sp, region_range, bins, cells_x_col, cells_y_col)
+
+    return out_dict, grid_coords
 
 #TODO: Implement the following wrapper functions    
 # - tx.local.image_features(image, adata_sp=None) # adata_sp needs to be given if grid_region is None
