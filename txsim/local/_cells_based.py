@@ -40,13 +40,13 @@ def _get_cell_density_grid(
     return H
 
 
-def major_celltype_perc(
+def _major_celltype_perc(
     adata_sp: ad.AnnData,
     region_range: Tuple[Tuple[float, float], Tuple[float, float]],
     bins: Tuple[int, int],
-)-> np.ndarray:
+    obs_key: str= "celltype"
+) -> np.ndarray:
     """calculates most common celltype (percentage) for each grid bin.
-
     Parameters
     ----------
     adata_sp : AnnData
@@ -55,16 +55,59 @@ def major_celltype_perc(
         The range of the grid specified as ((y_min, y_max), (x_min, x_max)).
     bins : Tuple[int, int]
         The number of bins along the y and x axes, formatted as (ny, nx).
+        default "celltype"
+        The column name in adata_sp.obs and adata_sc.obs for the cell type annotations.
     Returns
     -------
     np.ndarray
         A 2D numpy array representing the percentage of the most common  cell type in each grid bin.
     """
+    df = adata_sp.obs
+    df = df.loc[df[obs_key]=="celltype"]
     celltypes = adata_sp.obs["celltype"].unique()
     grid_major_celltype_empty = np.zeros((len(celltypes),bins[0],bins[1]))
     
     for i in range(len(celltypes)):
-        grid_major_celltype_empty[i,...] = get_celltype_density(adata_sp, celltypes[i],region_range[1][0],region_range[1][1], region_range[0][0],region_range[0][1],bins)[0]
+        grid_major_celltype_empty[i,...] = _get_celltype_density(adata_sp, region_range, bins, celltypes[i])[0]
     grid_major_celltype_perc = np.max(grid_major_celltype_empty,axis=0)
 
     return grid_major_celltype_perc
+
+
+def _get_celltype_density(adata_sp: ad, region_range: Tuple[Tuple[float, float], Tuple[float, float]], bins: Tuple[int, int], celltype, obs_key: str = "celltype",cells_x_col: str = "x",
+    cells_y_col: str = "y",)-> np.ndarray:
+    """Get celltype density.
+
+    Parameters
+    ----------
+    adata_sp: AnnData
+        Annotated `AnnData` object with counts from spatial data
+    region_range : Tuple[Tuple[float, float], Tuple[float, float]]
+        The range of the grid specified as ((y_min, y_max), (x_min, x_max)).
+    bins : Tuple[int, int]
+        The number of bins along the y and x axes, formatted as (ny, nx).
+    obs_key : str, default "celltype"
+        The column name in adata_sp.obs and adata_sc.obs for the cell type annotations.
+    cells_x_col : str, default "x"
+        The column name in adata_sp.obs for the x-coordinates of cells.
+    cells_y_col : str, default "y"
+        The column name in adata_sp.obs for the y-coordinates of cells.
+    Returns
+    -------
+    H : array of floats
+        density of celltype per bin
+    range : range of binning
+    """
+    df =  adata_sp.obs
+
+    H_total = np.histogram2d(df[cells_y_col],df[cells_x_col], bins=bins, range=region_range)[0]
+
+    df = df.loc[df[obs_key]==celltype]
+
+    H_celltype = np.histogram2d(df[cells_y_col], df[cells_x_col], bins=bins, range=region_range)[0]
+
+    H = H_celltype/H_total
+    H[np.isnan(H)] = 0
+    H = H.T
+
+    return H, range
