@@ -4,6 +4,7 @@ import anndata as ad
 from typing import List, Dict, Tuple, Optional, Union
 
 from ._cells_based import _get_cell_density_grid
+from ._spots_based import _get_spot_density_grid
 from ._metrics import _get_knn_mixing_grid
 
 
@@ -151,6 +152,8 @@ def cell_and_spot_statistics(
     out_dict = {}
     if "cell_density" in metrics:
         out_dict["cell_density"] = _get_cell_density_grid(adata_sp, region_range, bins, cells_x_col, cells_y_col)
+    if "spot_density" in metrics:
+        out_dict["spot_density"] = _get_spot_density_grid(adata_sp, region_range, bins, spots_x_col, spots_y_col)
            
     return out_dict, grid_coords
         
