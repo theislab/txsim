@@ -107,7 +107,8 @@ def cell_and_spot_statistics(
         and the cells' coordinates in adata.obs[[cells_x_col, cells_y_col]]. 
     metrics : str or List[str], default "all"
         The metrics to compute. Specify "all" to compute all available metrics or provide a list of specific metrics. 
-        Supported metrics include: [TODO]. #NOTE: Add supported metrics
+        Supported metrics include: ["cell_density", "spot_density", "celltype_density", "number_of_celltypes",
+                                    "major_celltype_perc", "summed_cell_area", "spot_uniformity_within_cells"].
     grid_region : List[Union[float, List[float]]], optional
         The spatial domain over which to set the grid. Options include:
         1. [y_max, x_max] (e.g., the shape of the associated DAPI image).
@@ -156,7 +157,87 @@ def cell_and_spot_statistics(
         out_dict["spot_density"] = _get_spot_density_grid(adata_sp, region_range, bins, spots_x_col, spots_y_col)
            
     return out_dict, grid_coords
-        
+
+
+def self_consistency_metrics(
+        adata_sp1: ad.AnnData,
+        adata_sp2: ad.AnnData,
+        metrics: Union[str, List[str]] = "all",
+        grid_region: Optional[List[Union[float, List[float]]]] = None,
+        bin_width: Optional[float] = None,
+        n_bins: Optional[List[int]] = None,
+        obs_key: str = "celltype",
+        cells_x_col: str = "x",
+        cells_y_col: str = "y",
+        spots_x_col: str = "x",
+        spots_y_col: str = "y",
+) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+    """Compute similarity statistics for two spatial datasets over a spatial grid.
+
+    This function calculates various spatial statistics for comparing two spatial transcriptomic datasets across a defined grid.
+    It allows customization of the grid and selection of specific metrics for detailed spatial analysis.
+
+    Parameters
+    ----------
+    adata_sp1 : AnnData
+        First annotated AnnData object containing spatial transcriptomics data.
+        The spots' coordinates should be in adata_sp1.uns["spots"][[spots_x_col, spots_y_col]],
+        and the cells' coordinates in adata_sp1.obs[[cells_x_col, cells_y_col]].
+    adata_sp2 : AnnData
+        Second annotated AnnData object containing spatial transcriptomics data.
+        Requirements are the same as for adata_sp1.
+    metrics : str or List[str], default "all"
+        The metrics to compute. Specify "all" to compute all available metrics or provide a list of specific metrics.
+        Supported metrics include: ["ARI_spot_clusters", "annotation_similarity"].
+    grid_region : List[Union[float, List[float]]], optional
+        The spatial domain over which to set the grid. The same grid is used for both spatial datasets. Options include:
+        1. [y_max, x_max] (e.g., the shape of the associated DAPI image).
+        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy <= xy_max).
+        3. None (if None, the grid is inferred from the min and max spots' coordinates).
+    bin_width : float, optional
+        The width of each grid field. Use either `bin_width` or `n_bins` to define grid cells.
+    n_bins : List[int], optional    
+        The number of bins along the y and x axes, formatted as [ny, nx].
+        Use either `bin_width` or `n_bins` to define grid cells.
+    obs_key : str, default "celltype"
+        The column name in adata.obs for the cell type annotations. Must be the same for both datasets.
+    cells_x_col : str, default "x"
+        The column name in adata.obs for the x-coordinates of cells. Must be the same for both datasets.
+    cells_y_col : str, default "y"
+        The column name in adata.obs for the y-coordinates of cells. Must be the same for both datasets.
+    spots_x_col : str, default "x"
+        The column name in adata.uns["spots"] for the x-coordinates of spots. Must be the same for both datasets.
+    spots_y_col : str, default "y"
+        The column name in adata.uns["spots"] for the y-coordinates of spots. Must be the same for both datasets.
+
+    Returns
+    -------
+    Dict[str, np.ndarray]
+        A tuple containing the calculated statistics. The first element is a dictionary with each metric's name as keys
+        and their corresponding numpy arrays as values.
+    np.ndarray
+        The second element is a numpy array representing the coordinates of the grid used for calculations.
+
+    """
+
+    # Set metrics
+    metrics = _convert_metrics_input_to_list(metrics, SUPPORTED_SELF_CONSISTENCY_METRICS)
+
+    # Set grid region using the first spatial dataset, but the same grid is used for both datasets
+    spots = adata_sp1.uns["spots"] if "spots" in adata_sp1.uns else None  # Some metrics can be run without spots
+    region_range, bins = _convert_grid_specification_to_range_and_bins(
+        spots, grid_region, bin_width, n_bins, spots_x_col, spots_y_col
+    )
+    grid_coords = _convert_range_and_bins_to_grid_coordinates(region_range, bins)
+    
+    # Compute metrics
+    out_dict = {}
+    if "ARI_spot_clusters" in metrics:
+        raise NotImplementedError("ARI_spot_clusters is not yet implemented.")
+    if "annotation_similarity" in metrics:
+        raise NotImplementedError("annotation_similarity is not yet implemented.")
+    
+    return out_dict, grid_coords
 
 
 def metrics(
@@ -263,4 +344,3 @@ def metrics(
 # - tx.local.image_features(image, adata_sp=None) # adata_sp needs to be given if grid_region is None
 # - tx.local.quality_metrics(adata_sp)
 # - tx.local.metrics(adata_sp, adata_sc)
-# - tx.local.self_consistency_metrics(adata_sp1, adata_sp2)
