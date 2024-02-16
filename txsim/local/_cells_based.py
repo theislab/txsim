@@ -39,40 +39,34 @@ def _get_cell_density_grid(
     return H
 
 
-def get_summed_cell_area(adata_sp: AnnData, x_min: int, x_max: int, y_min: int, y_max: int, bins: Tuple[int,int]):
+def get_summed_cell_area(adata_sp: AnnData, region_range: Tuple[Tuple[float, float], Tuple[float, float]], bins: Tuple[int,int]):
     """Get summed cell area.
-    
+
     Parameters
     ----------
     adata_sp: AnnData
         Annotated ``AnnData`` object with counts from spatial data
-    x_min : int, x_max : int, y_min : int, y_max : int 
-        crop coordinates
-    image : NDArray
-        read from image of dapi stained cell-nuclei
-    bins : [int,int]
-        the number of bins in each dimension
+    region_range: Tuple[Tuple[float,float],Tuple[float,float]]
+        Crop coordinates
+    bins : Tuple[int,int]
+        The number of bins in each dimension
+        
     Returns
     -------
-    H : array of floats
-        summed cell area
-    range : range of binning 
+    summed_cell_area : array
+        Summed cell area
     """
     df = adata_sp.obs
-    range = (x_min,x_max,y_min,y_max)
-    x_min, x_max, y_min, y_max = np.ravel(range).tolist()
+    x_min = region_range[0][0]
+    x_max = region_range[0][1]
+    y_min = region_range[1][0]
+    y_max = region_range[1][1]
+    range = (x_min, x_max, y_min, y_max)
 
-    #filter spots
-    df = df.loc[(df['x']>= x_min) & (df['x']<=x_max) & (df['y']>=y_min) & (df['y']<=y_max)]
+    # Filter spots within region range
+    df = df.loc[(df['x'] >= x_min) & (df['x'] <= x_max) & (df['y'] >= y_min) & (df['y'] <= y_max)]
 
-    bins_x = np.digitize(df['x'], np.linspace(x_min, x_max, bins[0] + 1)) -1        
-    bins_y = np.digitize(df['y'], np.linspace(y_min, y_max, bins[1] + 1)) -1
+    # Calculate histogram
+    summed_cell_area = np.histogram2d(df['x'], df['y'], bins=bins, range=[[x_min, x_max], [y_min, y_max]])[0]
 
-    groups = df.groupby([bins_x, bins_y])
-    sums = groups['area'].sum()
-    summed_cell_area = np.zeros((bins[0],bins[1]))
-
-    for (i,j), value in sums.items():
-        summed_cell_area[i,j] = value
-    
-    return summed_cell_area.T, range
+    return summed_cell_area.T
