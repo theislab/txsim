@@ -163,6 +163,7 @@ def self_consistency_metrics(
         grid_region: Optional[List[Union[float, List[float]]]] = None,
         bin_width: Optional[float] = None,
         n_bins: Optional[List[int]] = None,
+        obs_key: str = "celltype",
         cells_x_col: str = "x",
         cells_y_col: str = "y",
         spots_x_col: str = "x",
@@ -195,6 +196,8 @@ def self_consistency_metrics(
     n_bins : List[int], optional    
         The number of bins along the y and x axes, formatted as [ny, nx].
         Use either `bin_width` or `n_bins` to define grid cells.
+    obs_key : str, default "celltype"
+        The column name in adata.obs for the cell type annotations. Must be the same for both datasets.
     cells_x_col : str, default "x"
         The column name in adata.obs for the x-coordinates of cells. Must be the same for both datasets.
     cells_y_col : str, default "y"
@@ -215,7 +218,7 @@ def self_consistency_metrics(
     """
 
     # Set metrics
-    metrics = _convert_metrics_input_to_list(metrics, SUPPORTED_CELL_AND_SPOT_STATISTICS)
+    metrics = _convert_metrics_input_to_list(metrics, SUPPORTED_SELF_CONSISTENCY_METRICS)
 
     # Set grid region using the first spatial dataset, but the same grid is used for both datasets
     spots = adata_sp1.uns["spots"] if "spots" in adata_sp1.uns else None  # Some metrics can be run without spots
@@ -227,9 +230,9 @@ def self_consistency_metrics(
     # Compute metrics
     out_dict = {}
     if "ARI_spot_clusters" in metrics:
-        out_dict["ARI_spot_clusters"] = None #TODO: Implement this
+        raise NotImplementedError("ARI_spot_clusters is not yet implemented.")
     if "annotation_similarity" in metrics:
-        out_dict["annotation_similarity"] = None #TODO: Implement this
+        raise NotImplementedError("annotation_similarity is not yet implemented.")
     
     return out_dict, grid_coords
 
