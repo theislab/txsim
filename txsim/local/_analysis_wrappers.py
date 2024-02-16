@@ -5,6 +5,7 @@ from typing import List, Dict, Tuple, Optional, Union
 
 from ._cells_based import _get_cell_density_grid
 
+from ._cells_based import _get_spot_uniformity_within_cells_grid
 
 SUPPORTED_CELL_AND_SPOT_STATISTICS = [
     "cell_density", "spot_density", "celltype_density", "number_of_celltypes", "major_celltype_perc", 
@@ -150,6 +151,11 @@ def cell_and_spot_statistics(
     out_dict = {}
     if "cell_density" in metrics:
         out_dict["cell_density"] = _get_cell_density_grid(adata_sp, region_range, bins, cells_x_col, cells_y_col)
+
+    if "spot_uniformity_within_cells" in metrics and "spots" in adata_sp.uns:
+        out_dict["spot_uniformity_within_cells"] = _get_spot_uniformity_within_cells_grid(adata_sp, region_range, bins,
+                                                                                          cells_x_col, cells_y_col,
+                                                                                          spots_x_col, spots_y_col)
            
     return out_dict, grid_coords
         
