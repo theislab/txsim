@@ -9,7 +9,7 @@ def _get_spot_density_grid(
     spots_x_col: str = "x",
     spots_y_col: str = "y"
 ) -> np.ndarray:
-    """Get density of specified spot types ("spot in wrong celltype", "spot in correct celltype", "unassigned", "no negative marker").
+    """Get the density of spots (RNA molecules) within each grid bin.
 
     Parameters
     ----------
