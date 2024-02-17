@@ -38,8 +38,8 @@ def _get_cell_density_grid(
     H = np.histogram2d(df_cells[cells_y_col], df_cells[cells_x_col], bins=bins, range=region_range)[0]
     return H
 
-def get_celltype_density(adata_sp: ad, region_range: Tuple[Tuple[float, float], Tuple[float, float]], bins: Tuple[int, int], celltype, obs_key: str = "celltype",cells_x_col: str = "x",
-    cells_y_col: str = "y",)-> np.ndarray:
+def get_celltype_density(adata_sp: ad, region_range: Tuple[Tuple[float, float], Tuple[float, float]], bins: Tuple[int, int], obs_key: str = "celltype",cells_x_col: str = "x",
+    cells_y_col: str = "y",):
     """Get celltype density.
 
     Parameters
@@ -58,20 +58,23 @@ def get_celltype_density(adata_sp: ad, region_range: Tuple[Tuple[float, float], 
         The column name in adata_sp.obs for the y-coordinates of cells.
     Returns
     -------
-    H : array of floats
-        density of celltype per bin
+    H_dict :  dictionary with celltyp as key
+              array with density per bin as value
     range : range of binning
     """
     df =  adata_sp.obs
 
+    celltypes = df[obs_key].unique()
+
     H_total = np.histogram2d(df[cells_y_col],df[cells_x_col], bins=bins, range=region_range)[0]
 
-    df = df.loc[df[obs_key]==celltype]
+    H_dict = {}
+    for celltype in celltypes:
+      df_filtered = df.loc[df[obs_key]==celltype]
+      H_celltype = np.histogram2d(df_filtered[cells_y_col], df_filtered[cells_x_col], bins=bins, range=region_range)[0]
+      H = H_celltype/H_total
+      H[np.isnan(H)] = 0
+      H_dict[celltype] = H
 
-    H_celltype = np.histogram2d(df[cells_y_col], df[cells_x_col], bins=bins, range=region_range)[0]
 
-    H = H_celltype/H_total
-    H[np.isnan(H)] = 0
-    H = H.T
-
-    return H, range
+    return H_dict, range
