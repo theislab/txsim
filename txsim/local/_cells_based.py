@@ -39,7 +39,6 @@ def _get_cell_density_grid(
     H = np.histogram2d(df_cells[cells_y_col], df_cells[cells_x_col], bins=bins, range=region_range)[0]
     return H
 
-
 def major_celltype_perc(
     adata_sp: ad.AnnData,
     region_range: Tuple[Tuple[float, float], Tuple[float, float]],
@@ -47,7 +46,7 @@ def major_celltype_perc(
     obs_key: str= "celltype",
     cells_x_col: str = "x",
     cells_y_col: str = "y"
-): #-> np.ndarray:
+):
     """calculates most common celltype (percentage) for each grid bin.
     Parameters
     ----------
@@ -61,21 +60,9 @@ def major_celltype_perc(
         The column name in adata_sp.obs and adata_sc.obs for the cell type annotations.
     Returns
     -------
-    np.ndarray
-        A 2D numpy array representing the percentage of the most common  cell type in each grid bin.
+    List
+        A 2D list representing the percentage of the most common cell type in each grid bin.
     """
-    """  df_adata =  adata_sp.obs
-
-    celltypes = df_adata[obs_key].unique()
-    print(celltypes)
-
-    Hist2d_total = np.histogram2d(df_adata[cells_y_col],df_adata[cells_x_col], bins=bins, range=region_range)[0]
-    #df = df.loc[df[obs_key]=="celltype"]
-    print(Hist2d_total) """
-    
-    
-    
-
     H_out = get_celltype_density(adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col)
    
     L_maxpercentage = []
@@ -129,6 +116,4 @@ def get_celltype_density(adata_sp: ad, region_range: Tuple[Tuple[float, float], 
       H = H_celltype/H_total
       H[np.isnan(H)] = 0
       H_dict[celltype] = H
-
-
     return H_dict, range
