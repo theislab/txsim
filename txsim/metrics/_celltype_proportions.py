@@ -1,8 +1,5 @@
-import scanpy as sc
-import numpy as np
 import pandas as pd
 from anndata import AnnData
-
 from typing import Union, Tuple
 
 
@@ -33,7 +30,7 @@ def mean_proportion_deviation(
     -------
     proportion_metric : float
         If ``ct_how`` is set to "union" (default) or "intersection":
-            Mean difference between the cell type proportions from both data sets.
+            Score as 1 - mean absolute difference between the cell type proportions from both data sets.
             Values close to 1 indicate good consistency in cell type proportions.
             Values close to 0 indicate inconsistency between cell type proportions.
         If ``ct_how`` is set to "sp_specific" or "sc_specific":
