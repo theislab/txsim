@@ -64,20 +64,9 @@ def major_celltype_perc(
         A 2D list representing the percentage of the most common cell type in each grid bin.
     """
     H_out = get_celltype_density(adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col)
-   
-    L_maxpercentage = []
-    arrays = [H_out[0][key] for key in H_out[0].keys()]
-   
-    for row in range(0, len(arrays[0])):
-        L_maxpercentage.append([])
-        for index in range(0, len(arrays[0][0])):
-            l = []
-            for array in range(0, len(arrays)):
-                l.append(arrays[array][row][index])
-            L_maxpercentage[row].append(max(l))
-
-    return L_maxpercentage
-
+    values_stacked = np.stack(H_out[0].values(), axis=2)
+    max_percentage = values_stacked.max(axis = 2)
+    return max_percentage
 
 def get_celltype_density(adata_sp: ad, region_range: Tuple[Tuple[float, float], Tuple[float, float]], bins: Tuple[int, int], obs_key: str = "celltype",cells_x_col: str = "x",
     cells_y_col: str = "y",):
