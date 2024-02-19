@@ -60,21 +60,10 @@ def _get_number_of_celltypes(
         
     Returns
     -------
-    A : np.ndarray of floats
-        number of celltypes per bin
-        one array per cell type, one array per x coordinate
-        A[celltype][x coordinate][y coordinate]
+    H :  np.ndarray
+        A 2D numpy array representing the number of celltypes in each grid bin.
     """
-    
-    #necessary to check if region is valid?
-    # name of celltypes in adata all the same?
-    
-    celltypes = pd.Index(adata.obs["louvain"].unique())
-    print(bins)
-    A = np.zeros((len(celltypes),bins[0]+1,bins[1]+1)) # one dataframe for each celltype, with |x| lists of |y| variables. variables number of cell type(specific to
-        #dataframe and bin
-    
-    for index, row in adata_sp.obs.iterrows():
-        A[celltypes.get_loc(row['louvain']),row[cells_x_col],row[cells_y_col]] += 1
-    
-    return A
+    df_cells = adata_sp.obs[[cells_x_col, cells_y_col, obs_key]].drop_duplicates()
+    H = np.histogram2d(df_cells[cells_y_col], df_cells[cells_x_col], bins=bins, range=region_range)[0]
+            
+    return H
