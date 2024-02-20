@@ -156,10 +156,76 @@ def cell_and_spot_statistics(
     return out_dict, grid_coords
         
 
+def image_features(
+    image: np.ndarray,
+    adata_sp: Optional[ad.AnnData] = None,
+    metrics: Union[str, List[str]] = "all",
+    grid_region: Optional[List[Union[float, List[float]]]] = None,
+    bin_width: Optional[float] = None,
+    n_bins: Optional[List[int]] = None,
+    spots_x_col: str = "x",
+    spots_y_col: str = "y"
+) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+    """Compute image features over a spatial grid.
 
+    Parameters
+    ----------
+    image : NDArray
+        read from image of dapi stained cell-nuclei
+    adata_sp : AnnData, optional
+        Annotated AnnData object containing spatial transcriptomics data. 
+        The spots' coordinates should be in adata.uns["spots"][[spots_x_col, spots_y_col]]
+    metrics : str or List[str], default "all"
+        The metrics to compute. Specify "all" to compute all available metrics or provide a list of specific metrics. 
+        Supported metrics include: [TODO]. #NOTE: Add supported metrics
+    grid_region : List[Union[float, List[float]]], optional
+        The spatial domain over which to set the grid. Options include:
+        1. [y_max, x_max] (e.g., the shape of the associated DAPI image).
+        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy <= xy_max).
+        3. None (if None and adata_sp given, the grid is inferred from the min and max spots' coordinates, if adata_sp not given, the grid is inferred from the shape of image).
+    bin_width : float, optional
+        The width of each grid field. Use either `bin_width` or `n_bins` to define grid cells.
+    n_bins : List[int], optional
+        The number of bins along the y and x axes, formatted as [ny, nx]. 
+        Use either `bin_width` or `n_bins` to define grid cells.
+    spots_x_col : str, default "x"
+        The column name in adata.uns["spots"] for the x-coordinates of spots.
+    spots_y_col : str, default "y"
+        The column name in adata.uns["spots"] for the y-coordinates of spots.
+
+    Returns
+    -------
+    Dict[str, np.ndarray] 
+        A tuple containing the calculated statistics. The first element is a dictionary with each metric's name as keys 
+        (note that some metrics might be converted to multiple keys, e.g. celltype_density -> celltype_density_Tcells,
+        celltype_density_Bcells, ...) and their corresponding numpy arrays as values. 
+    np.ndarray
+        The second element is a numpy array representing the coordinates of the grid used for calculations.
+
+    """
+    # set grid_region
+    if (grid_region is None) and (adata_sp is None):
+        grid_region = list(image.shape)
+        
+    # Set metrics
+    metrics = _convert_metrics_input_to_list(metrics, SUPPORTED_IMAGE_FEATURES)
+
+    # Set grid region
+    spots = adata_sp.uns["spots"] if "spots" in adata_sp.uns else None # Some metrics can be run without spots
+    region_range, bins = _convert_grid_specification_to_range_and_bins(
+        spots, grid_region, bin_width, n_bins, spots_x_col, spots_y_col
+    )
+    grid_coords = _convert_range_and_bins_to_grid_coordinates(region_range, bins)
+    
+    # Compute metrics
+    out_dict = {}
+    # if "metric1" in metrics:
+    #    out_dict["metric2"] = _get_metric_1(image, region_range, bins)
+           
+    return out_dict, grid_coords
+    
 
 #TODO: Implement the following wrapper functions    
-# - tx.local.image_features(image, adata_sp=None) # adata_sp needs to be given if grid_region is None
 # - tx.local.quality_metrics(adata_sp)
 # - tx.local.metrics(adata_sp, adata_sc)
 # - tx.local.self_consistency_metrics(adata_sp1, adata_sp2)
