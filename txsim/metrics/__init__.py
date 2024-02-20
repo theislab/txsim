@@ -9,3 +9,4 @@ from ._gene_set_coexpression import *# gene_set_coexpression
 from ._rand_index import *# calc_rand_index, aggregate_rand_index
 from ._relative_pairwise_celltype_expression import *#relative_pairwise_celltype_expression, mean_similarity_gene_expression_across_clusters, median_similarity_gene_expression_across_clusters, percentile95_similarity_gene_expression_across_clusters
 from ._relative_pairwise_gene_expression import *#relative_pairwise_gene_expression
+from ._cell_statistics import calculate_ratio_reads_per_cell, calculate_ratio_genes_per_cell
