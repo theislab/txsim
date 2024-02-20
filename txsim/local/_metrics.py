@@ -70,7 +70,7 @@ def _get_celltype_proportions_grid(
     region_range: Tuple[Tuple[float, float], Tuple[float, float]],
     bins: Tuple[int, int],
     abs_score: bool = True,
-    ct_how: str = "union",
+    ct_set: str = "union",
     obs_key: str = "celltype",
     cells_x_col: str = "x",
     cells_y_col: str = "y"
@@ -92,7 +92,7 @@ def _get_celltype_proportions_grid(
         or a relative score between -1 and +1
         (negative score means cell types that are less abundant in spatial than sc data are more common per grid field,
         positive score cell types that are more abundant in spatial than sc data are more common).
-    ct_how : str, default "union"
+    ct_set : str, default "union"
         How to combine the different cell types from both data sets.
         Supported: ["union", "intersection"]
     obs_key : str, default "celltype"
@@ -109,7 +109,7 @@ def _get_celltype_proportions_grid(
     """
 
     # use global metrics to determine reference values
-    _, df_props = mean_proportion_deviation(adata_sp, adata_sc, ct_how=ct_how, obs_key=obs_key, pipeline_output=False)
+    _, df_props = mean_proportion_deviation(adata_sp, adata_sc, ct_set=ct_set, obs_key=obs_key, pipeline_output=False)
 
     # map each cell's cell type to its corresponding proportion deviation
     df_cells = adata_sp.obs[[cells_x_col, cells_y_col, obs_key]]

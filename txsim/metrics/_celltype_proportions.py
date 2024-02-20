@@ -6,7 +6,7 @@ from typing import Union, Tuple
 def mean_proportion_deviation(
         adata_sp: AnnData,
         adata_sc: AnnData,
-        ct_how: str = "union",
+        ct_set: str = "union",
         obs_key: str = "celltype",
         pipeline_output: bool = True
 ) -> Union[float, Tuple[float, pd.DataFrame]]:
@@ -18,7 +18,7 @@ def mean_proportion_deviation(
         Annotated ``AnnData`` object with counts from spatial data.
     adata_sc : AnnData
         Annotated ``AnnData`` object with counts from scRNAseq data.
-    ct_how : str, default "union"
+    ct_set : str, default "union"
         Text string to determine which (sub)set of cell types to compare.
         Supported: ["union", "intersection", "sp_specific", "sc_specific"]
     obs_key : str, default "celltype"
@@ -47,7 +47,7 @@ def mean_proportion_deviation(
     # merge cell type proportions from modalities together based on ct_how parameter
     merge_how = {"union": "outer", "intersection": "inner", "sp_specific": "left", "sc_specific": "right"}
     df_props = pd.merge(ct_props_sp, ct_props_sc,
-                        how=merge_how[ct_how], left_index=True, right_index=True, indicator="ct_in")
+                        how=merge_how[ct_set], left_index=True, right_index=True, indicator="ct_in")
     df_props["ct_in"] = df_props["ct_in"].cat.rename_categories({"left_only": "sp", "right_only": "sc"})
 
     # calculate difference (sp - sc), with NaN from merging assumed to be 0
@@ -56,7 +56,7 @@ def mean_proportion_deviation(
     df_props.loc[df_props["ct_in"] == "sc", "sp_minus_sc"] = -df_props[df_props["ct_in"] == "sc"]["proportion_sc"]
 
     proportion_metric = 0
-    match ct_how:
+    match ct_set:
         case "union" | "intersection":
             if df_props.shape[0] > 0:
                 proportion_metric = 1 - df_props["sp_minus_sc"].abs().mean()
