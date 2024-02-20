@@ -272,7 +272,7 @@ class Simulation:
         )
         plt.show()
 
-    def spatial_heatmap_gene(self, gene, adata_sp=None, celltypes=None, flavor="mean"):
+    def spatial_heatmap_gene(self, gene, adata_sp=None, celltypes=None, flavor="mean", **kwargs):
         """ Plot a heatmap of the mean expression of a gene in each grid field.
         ----------
         gene: str
@@ -283,6 +283,8 @@ class Simulation:
             List of cell types to include in the plot. If None, will include all cell types.
         flavor: str
             Flavor of the heatmap, either "mean" or "sum". Whether to plot the mean or sum expression of the gene in each grid field.
+        **kwargs: dict
+            Additional arguments to pass to plt.pcolormesh.
 
         Returns
         -------
@@ -304,7 +306,7 @@ class Simulation:
             hist = np.histogram2d(adata_sp.obs["x"].values, adata_sp.obs["y"].values,
                                   weights=adata_sp[:, gene].X.toarray().flatten(),
                                   bins=(adata_sp.obs["x"].nunique(), adata_sp.obs["y"].nunique()))[0].T
-            plt.pcolormesh(hist)
+            plt.pcolormesh(hist, **kwargs)
 
         else:
             plot_data = pd.DataFrame(data={
@@ -322,26 +324,28 @@ class Simulation:
                 for j, x in enumerate(x_values):
                     grid[i, j] = plot_data[(plot_data['x'] == x) & (plot_data['y'] == y)]['expr'].mean()
 
-            plt.pcolormesh(x_values, y_values, grid)
+            plt.pcolormesh(x_values, y_values, grid, **kwargs)
 
         plt.colorbar(label=f'Mean {gene} expression' if flavor == "mean" else f'Sum {gene} expression')
         plt.title(f'{gene} expression in each grid field')
         plt.show()
 
-    def spatial_heatmap_metric(self, metric_matrix, metric_name="Metric"):
+    def spatial_heatmap_metric(self, metric_matrix, metric_name="Metric", **kwargs):
         """Plot a heatmap of a metric in each grid field.
         ----------
         metric_matrix: np.array
             Matrix of the metric to plot.
         metric_name: str
             Name of the metric to plot.
+        **kwargs: dict
+            Additional arguments to pass to plt.pcolormesh.
 
         Returns
         -------
         None
         """
         plt.figure(figsize=(8, 2.5))
-        plt.pcolormesh(metric_matrix)
+        plt.pcolormesh(metric_matrix, **kwargs)
         plt.colorbar(label=metric_name)
         plt.title(f'{metric_name} in each grid field')
         plt.show()
