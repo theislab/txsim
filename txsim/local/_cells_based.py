@@ -60,8 +60,8 @@ def major_celltype_perc(
         The column name in adata_sp.obs and adata_sc.obs for the cell type annotations.
     Returns
     -------
-    List
-        A 2D list representing the percentage of the most common cell type in each grid bin.
+    Array
+        A 2D array representing the percentage of the most common cell type in each grid bin.
     """
     H_out = get_celltype_density(adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col)
     values_stacked = np.stack(H_out[0].values(), axis=2)
