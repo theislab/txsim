@@ -17,8 +17,8 @@ class Simulation:
         ----------
         n_celltypes: int
             Number of cell types to simulate spatial data for. The simulation will use the n_celltypes most frequent cell types in the PBMC3k dataset.
-        genes: list
-            List of genes to keep in the simulation.
+        genes: str | list
+            List of genes to keep in the simulation. Specify "all" to keep all genes in the PBMC3k dataset.
 
         Returns
         -------
@@ -30,8 +30,12 @@ class Simulation:
         sc.settings.datasetdir = data_dir
 
         self.n_celltypes = n_celltypes
-        self.genes = genes
         self.adata_sc, self.celltypes = self._prepare_sc_data()
+
+        if genes == "all":
+            self.genes = self.adata_sc.var_names
+        else:
+            self.genes = genes
 
     def simulate_spatial_data(self, gene_to_simulate, n_groups=10):
         """
