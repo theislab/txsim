@@ -39,7 +39,7 @@ def _get_cell_density_grid(
     return H
 
 
-def get_summed_cell_area(adata_sp: AnnData, region_range: Tuple[Tuple[float, float], Tuple[float, float]], bins: Tuple[int,int]):
+def get_summed_cell_area(adata_sp: AnnData, region_range: Tuple[Tuple[float, float], Tuple[float, float]], bins: Tuple[int,int], cells_x_col: str = "x", cells_y_col: str = "y"):
     """Get summed cell area.
 
     Parameters
@@ -50,23 +50,30 @@ def get_summed_cell_area(adata_sp: AnnData, region_range: Tuple[Tuple[float, flo
         Crop coordinates
     bins : Tuple[int,int]
         The number of bins in each dimension
-        
+    str x : cells_x_col:
+        Colums of x values
+    sry y : cells_y_col:
+        Colums of y values
+
     Returns
     -------
     summed_cell_area : array
         Summed cell area
     """
     df = adata_sp.obs
-    x_min = region_range[0][0]
-    x_max = region_range[0][1]
-    y_min = region_range[1][0]
-    y_max = region_range[1][1]
-    range = (x_min, x_max, y_min, y_max)
-
-    # Filter spots within region range
+    x_min = df[cells_x_col].min()
+    x_max = df[cells_x_col].max()
+    y_min = df[cells_y_col].min()
+    y_max = df[cells_y_col].max()
     df = df.loc[(df['x'] >= x_min) & (df['x'] <= x_max) & (df['y'] >= y_min) & (df['y'] <= y_max)]
 
-    # Calculate histogram
-    summed_cell_area = np.histogram2d(df['x'], df['y'], bins=bins, range=[[x_min, x_max], [y_min, y_max]])[0]
+    H, x_edges, y_edges = np.histogram2d(df['x'], df['y'], bins=bins)
+
+    bin_indices_x = np.digitize(df['x'], x_edges) - 1
+    bin_indices_y = np.digitize(df['y'], y_edges) - 1
+
+    summed_cell_area = np.zeros((len(x_edges) , len(y_edges) ))
+
+    np.add.at(summed_cell_area, (bin_indices_x, bin_indices_y), df['area'])
 
     return summed_cell_area.T
