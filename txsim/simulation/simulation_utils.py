@@ -108,7 +108,12 @@ class Simulation:
         adata_sp.obs["x"] = pos1[:, 0]
         adata_sp.obs["y"] = pos1[:, 1]
 
-        self._simulate_spots(adata_sp)
+        adata_sp = self._simulate_spots(adata_sp)
+
+        # filter out cells with no spots
+        adata_sp.obs["n_spots"] = [len(adata_sp[adata_sp.obs_names == cell_id].uns["spots"]) for cell_id in adata_sp.obs_names]
+        adata_sp = adata_sp[adata_sp.obs["n_spots"] > 0]
+
         self.adata_sp = adata_sp
 
         return adata_sp
@@ -140,13 +145,6 @@ class Simulation:
             raise ValueError("No spatial data provided. Either provide adata_sp or run simulate_spatial_data first.")
         elif adata_sp is None:
             adata_sp = self.adata_sp
-
-        # filter out cells with no spots TODO: discuss: Filter them out earlier?
-        n_spots = []
-        for cell_id in adata_sp.obs_names:
-            n_spots.append(len(adata_sp[adata_sp.obs_names == cell_id].uns["spots"]))
-        adata_sp.obs["n_spots"] = n_spots
-        adata_sp = adata_sp[adata_sp.obs["n_spots"] > 0]
 
         def sample_cell_pos(sampling_type, radius):
             if sampling_type == 'uniform':
@@ -207,21 +205,19 @@ class Simulation:
                 spot_y = np.random.normal(np.repeat(y_cells, spots_df.groupby('cell_id').size()), spot_spread, len(spots_df))
 
             new_spot_pos_list.append(
-                pd.DataFrame({"Gene": spots_df["Gene"], "x": spot_x, "y": spot_y, "cell_id": spots_df["cell_id"]}))
+                pd.DataFrame({"Gene": spots_df["Gene"], "x": spot_x, "y": spot_y, "cell_id": spots_df["cell_id"], "celltype": spots_df["celltype"]}))
 
-        new_cell_pos = pd.concat(new_cell_pos_list)
-        new_spot_pos = pd.concat(new_spot_pos_list)
 
         # Update adata_sp
         adata_sp.obs["grid_x"] = adata_sp.obs["x"]
         adata_sp.obs["grid_y"] = adata_sp.obs["y"]
 
         # Add x position in order of cell_id and adata_sp.obs_names
-        new_cell_pos = new_cell_pos.set_index('cell_id').loc[adata_sp.obs_names].reset_index()
+        new_cell_pos = pd.concat(new_cell_pos_list).set_index('cell_id').loc[adata_sp.obs_names].reset_index()
         adata_sp.obs["x"] = new_cell_pos["x"].tolist()
         adata_sp.obs["y"] = new_cell_pos["y"].tolist()
 
-        adata_sp.uns["spots"] = new_spot_pos
+        adata_sp.uns["spots"] = pd.concat(new_spot_pos_list)
 
         self.adata_sp = adata_sp
         return adata_sp
@@ -388,10 +384,7 @@ class Simulation:
         elif adata_sp is None:
             adata_sp = self.adata_sp
 
-        # scatterplot colored by cell type (map cell id to cell type)
-        cell_id_celltype = pd.DataFrame({"cell_id": adata_sp.obs_names, "celltype": adata_sp.obs["louvain"]}).drop_duplicates()
-        plot_df = adata_sp.uns["spots"].merge(cell_id_celltype, on="cell_id")
-        sns.scatterplot(data=plot_df, x="x", y="y", hue="celltype", **kwargs)
+        sns.scatterplot(data=adata_sp.uns["spots"], x="x", y="y", hue="celltype", **kwargs)
         plt.title("Spot positions")
         plt.show()
 
@@ -479,7 +472,8 @@ class Simulation:
 
         Returns
         -------
-        None
+        adata_sp: AnnData
+            Annotated ``AnnData`` object with simulated spot positions in adata_sp.uns.
         """
         raw_counts = sc.datasets.pbmc3k()
         adata_sp.layers["raw"] = raw_counts[adata_sp.obs_names, adata_sp.var_names].X
@@ -507,9 +501,12 @@ class Simulation:
                     "x": np.repeat(adata_sp.obs.loc[obs_name, "x"], [sum(gene_counts) / nr_cells] * nr_cells),
                     "y": np.repeat(adata_sp.obs.loc[obs_name, "y"], [sum(gene_counts) / nr_cells] * nr_cells),
                     "cell_id": np.repeat(obs_name, sum(gene_counts)),
+                    "celltype": np.repeat(adata_sp.obs.loc[obs_name, "louvain"], sum(gene_counts))
                 })
 
         adata_sp.uns["spots"] = pd.concat(pd.DataFrame(s) for s in spots)
 
         # sanity check
         assert adata_sp.layers["raw"].sum() == adata_sp.uns["spots"].shape[0]
+
+        return adata_sp
