@@ -36,8 +36,8 @@ def relative_pairwise_gene_expression(adata_sp: AnnData, adata_sc: AnnData, key:
     intersect = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
     
     # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
-    adata_sc=adata_sc[:,intersect]
-    adata_sp=adata_sp[:,intersect]
+    adata_sc=adata_sc[:,intersect].copy()
+    adata_sp=adata_sp[:,intersect].copy()
     
     # sparse matrix support
     for a in [adata_sc, adata_sp]:
