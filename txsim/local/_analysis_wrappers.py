@@ -3,14 +3,14 @@ import pandas as pd
 import anndata as ad
 from typing import List, Dict, Tuple, Optional, Union
 
-from ._cells_based import _get_cell_density_grid
+from ._cells_based import _get_cell_density_grid, _get_cell_density_grid_per_celltype, _get_celltype_ratio_grid
 from ._spots_based import _get_spot_density_grid
 from ._metrics import _get_knn_mixing_grid
 
 
 SUPPORTED_CELL_AND_SPOT_STATISTICS = [
-    "cell_density", "spot_density", "celltype_density", "number_of_celltypes", "major_celltype_perc", 
-    "summed_cell_area", "spot_uniformity_within_cells"
+    "cell_density", "spot_density", "cell_density_per_celltype", "celltype_percentage", "number_of_celltypes", 
+    "major_celltype_perc", "summed_cell_area", "spot_uniformity_within_cells"
 ]
 SUPPORTED_IMAGE_FEATURES = []
 SUPPORTED_QUALITY_METRICS = []
@@ -89,6 +89,7 @@ def cell_and_spot_statistics(
     grid_region: Optional[List[Union[float, List[float]]]] = None,
     bin_width: Optional[float] = None,
     n_bins: Optional[List[int]] = None,
+    obs_key: str = "celltype",
     cells_x_col: str = "x",
     cells_y_col: str = "y",
     spots_x_col: str = "x",
@@ -119,6 +120,8 @@ def cell_and_spot_statistics(
     n_bins : List[int], optional
         The number of bins along the y and x axes, formatted as [ny, nx]. 
         Use either `bin_width` or `n_bins` to define grid cells.
+    obs_key : str, default "celltype"
+        The column name in adata_sp.obs for the cell type annotations.
     cells_x_col : str, default "x"
         The column name in adata.obs for the x-coordinates of cells.
     cells_y_col : str, default "y"
@@ -153,6 +156,18 @@ def cell_and_spot_statistics(
     out_dict = {}
     if "cell_density" in metrics:
         out_dict["cell_density"] = _get_cell_density_grid(adata_sp, region_range, bins, cells_x_col, cells_y_col)
+    if "cell_density_per_celltype" in metrics:
+        density_grid_dict = _get_cell_density_grid_per_celltype(
+            adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col
+        )
+        for ct, density_grid in density_grid_dict.items():
+            out_dict[f"cell_density_{ct}"] = density_grid
+    if "celltype_percentage" in metrics:
+        density_grid_dict = _get_celltype_ratio_grid(
+            adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col
+        )
+        for ct, density_grid in density_grid_dict.items():
+            out_dict[f"celltype_percentage_{ct}"] = density_grid
     if "spot_density" in metrics:
         out_dict["spot_density"] = _get_spot_density_grid(adata_sp, region_range, bins, spots_x_col, spots_y_col)
            
