@@ -12,20 +12,22 @@ import itertools
 
 
 class Simulation:
-    def __init__(self, n_celltypes=3, genes=["IL32", "CYBA", "UBB", "AKR1C3"]):
+    def __init__(self, n_celltypes=3, genes=["IL32", "CYBA", "UBB", "AKR1C3"], data_dir: str = "../data"):
         """Create a simulation object for spatial transcriptomics data.
         ----------
         n_celltypes: int
             Number of cell types to simulate spatial data for. The simulation will use the n_celltypes most frequent cell types in the PBMC3k dataset.
         genes: str | list
             List of genes to keep in the simulation. Specify "all" to keep all genes in the PBMC3k dataset.
+        data_dir: str
+            Path to data directory.
 
         Returns
         -------
         Simulation object
         """
         # Set up data directory
-        data_dir = Path("../data")
+        data_dir = Path(data_dir)
         data_dir.mkdir(parents=True, exist_ok=True)
         sc.settings.datasetdir = data_dir
 
