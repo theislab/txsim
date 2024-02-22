@@ -42,7 +42,7 @@ def _get_cell_density_grid(
 def _get_number_of_celltypes(
         adata_sp: ad.AnnData,
         region_range: Tuple[Tuple[float, float], Tuple[float, float]],
-        bins: Tuple[int],
+        bins: Tuple[int,int],
         cells_x_col: str = "x",
         cells_y_col: str = "y",
         obs_key: str = "celltype",
