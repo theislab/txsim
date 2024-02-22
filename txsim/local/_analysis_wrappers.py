@@ -3,11 +3,10 @@ import pandas as pd
 import anndata as ad
 from typing import List, Dict, Tuple, Optional, Union
 
-from ._cells_based import _get_cell_density_grid, _get_cell_density_grid_per_celltype, _get_celltype_ratio_grid
+from ._cells_based import _get_cell_density_grid, _get_cell_density_grid_per_celltype, _get_celltype_ratio_grid, _get_spot_uniformity_within_cells_grid
 from ._spots_based import _get_spot_density_grid
-from ._metrics import _get_knn_mixing_grid, _get_relative_expression_similarity_across_genes_grid
+from ._metrics import _get_knn_mixing_grid, _get_celltype_proportions_grid, _get_relative_expression_similarity_across_genes_grid
 
-from ._cells_based import _get_spot_uniformity_within_cells_grid
 
 SUPPORTED_CELL_AND_SPOT_STATISTICS = [
     "cell_density", "spot_density", "cell_density_per_celltype", "celltype_percentage", "number_of_celltypes", 
@@ -18,6 +17,7 @@ SUPPORTED_QUALITY_METRICS = []
 SUPPORTED_METRICS = [
     "negative_marker_purity_reads", "negative_marker_purity_cells", "knn_mixing", "coexpression_similarity", 
     "relative_expression_similarity_across_genes", "relative_expression_similarity_across_celltypes",
+    "celltype_proportions"
 ]
 SUPPORTED_SELF_CONSISTENCY_METRICS = [
     "ARI_spot_clusters", "annotation_similarity" 
@@ -368,6 +368,13 @@ def metrics(
         #out_dict["relative_expression_similarity_across_celltypes"] = _get_relative_expression_similarity_across_celltypes_grid(
         #    adata_sp, adata_sc, ct_key, region_range, bins, cells_x_col, cells_y_col
         #)
+    if "celltype_proportions" in metrics:
+        out_dict["celltype_proportions_abs_diff"] = _get_celltype_proportions_grid(
+            adata_sp.copy(), adata_sc.copy(), region_range, bins, abs_score=True,
+            obs_key=obs_key, cells_x_col=cells_x_col, cells_y_col=cells_y_col)
+        out_dict["celltype_proportions_diff"] = _get_celltype_proportions_grid(
+            adata_sp.copy(), adata_sc.copy(), region_range, bins, abs_score=False,
+            obs_key=obs_key, cells_x_col=cells_x_col, cells_y_col=cells_y_col)
            
     return out_dict, grid_coords
 
