@@ -299,7 +299,7 @@ def metrics(
         Can be either "global" or "local".
     contribution: bool (default: True)
         Applicable only for the relative_expression_similarity metrics.
-        Whether to calculate the contribution of each grid field to the overall metric (True) or the metric itself (False).
+        Set to True to calculate the contribution of each grid field to the overall metric, or False to calculate the metric itself.
 
     Returns
     -------

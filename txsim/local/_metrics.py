@@ -100,19 +100,13 @@ def _get_relative_expression_similarity_across_genes_grid(
         If set to 'local', only the local grid field is used to normalize the pairwise gene expression differences.
         Can be either 'global' or 'local'.
     contribution: bool (default: True)
-        Whether to calculate the contribution of each grid field to the overall metric or the metric itself.
+        Set to True to calculate the contribution of each grid field to the overall metric, or False to calculate the metric itself.
 
     Returns
     -------
     overall_metric: np.ndarray
         Matrix containing the local overall similarity of relative pairwise gene expression for all pairs of genes in the panel,
-        b/t the scRNAseq and spatial data
-    per_gene_metric: Dict[str, np.ndarray]
-        Similarity of relative pairwise gene expression per gene, b/t the scRNAseq and spatial data.
-        Provided as a dictionary with gene names as keys and 2D numpy arrays as values.
-    per_celltype_metric: Dict[str, np.ndarray]
-        Similarity of relative pairwise gene expression per celltype, b/t the scRNAseq and spatial data.
-        Provided as a dictionary with celltype names as keys and 2D numpy arrays as values.
+        b/t the scRNAseq and spatial data.
     """
     assert normalization in ["global", "local"], "normalization must be either 'global' or 'local'"
 
@@ -143,11 +137,8 @@ def _get_relative_expression_similarity_across_genes_grid(
     adata_sp_region_range.obs["bin_y"] = pd.cut(adata_sp_region_range.obs[cells_y_col], bins=bins[0], labels=False)
     adata_sp_region_range.obs["bin_x"] = pd.cut(adata_sp_region_range.obs[cells_x_col], bins=bins[1], labels=False)
 
-    # create empty matrices to store the overall, per-celltype and per-gene metrics
+    # create an empty matrix to store the computed metric for each grid field
     overall_metric_matrix = np.zeros((bins[0], bins[1]))
-    celltype_order = adata_sp_region_range.obs[obs_key].unique()
-    per_celltype_metric_matrix_dict = {celltype: np.zeros((bins[0], bins[1])) for celltype in celltype_order}
-    per_gene_metric_matrix_dict = {gene: np.zeros((bins[0], bins[1])) for gene in adata_sp_region_range.var_names}
 
     for y_bin in adata_sp_region_range.obs["bin_y"].unique():
         for x_bin in adata_sp_region_range.obs["bin_x"].unique():
@@ -235,7 +226,7 @@ def _get_relative_expression_similarity_across_genes_grid(
             norm_pairwise_distances_sc = pairwise_distances_sc
             norm_pairwise_distances_sp_local = pairwise_distances_sp_local
 
-            ##### CALCULATE OVERALL SCORE,PER-GENE SCORES, PER-CELLTYPE SCORES
+            ##### CALCULATE OVERALL SCORE MATRIX
             # First, sum over the differences between modalities in relative pairwise gene expression distances
             # The overall metric is then bounded at a maximum of 1, representing perfect similarity of relative gene expression between modalities.
             ## Furthermore, the metric is constructed such that, when its value is 0, this represents perfect dissimilarity of
@@ -244,52 +235,24 @@ def _get_relative_expression_similarity_across_genes_grid(
             overall_metric = 1 - (overall_score / (2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=None)))
             overall_metric_matrix[y_bin, x_bin] = overall_metric
 
-            # We can further compute the metric on a per-gene and per-celltype basis
-            per_gene_score = np.sum(np.absolute(norm_pairwise_distances_sp_local - norm_pairwise_distances_sc), axis=(1, 2))
-            per_gene_metric = 1 - (per_gene_score / (2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(1, 2))))
-            per_gene_metric = pd.DataFrame(per_gene_metric, index=mean_celltype_sc.columns,
-                                           columns=['score'])  # add back the gene labels
-            per_gene_metric = per_gene_metric.reindex(adata_sp_region_range.var_names)
-            for gene in adata_sp_region_range.var_names:
-                per_gene_metric_matrix_dict[gene][y_bin, x_bin] = np.squeeze(per_gene_metric.loc[gene])
+    # calculate the contribution of each grid field to the overall metric, if contribution is set to True
+    if contribution:
+        # calculate global metric for the entire spatial dataset (not just in the region range)
+        overall_metric = relative_pairwise_gene_expression(adata_sp, adata_sc, key=obs_key, pipeline_output=True)
 
-            per_celltype_score = np.sum(np.absolute(norm_pairwise_distances_sp_local - norm_pairwise_distances_sc), axis=(0, 1))
-            per_celltype_metric = 1 - (per_celltype_score / (2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(0, 1))))
-            per_celltype_metric = pd.DataFrame(per_celltype_metric, index=mean_celltype_sc.index,
-                                               columns=['score'])  # add back the celltype labels
-            # bring in order of celltype_order and fill missing celltypes with np.nan
-            per_celltype_metric = per_celltype_metric.reindex(celltype_order)
-            for celltype in celltype_order:
-                per_celltype_metric_matrix_dict[celltype][y_bin, x_bin] = np.squeeze(per_celltype_metric.loc[celltype])
-
-    def local_metric_contribution(local_metric_matrix, global_metric):
-        nr_grid_fields = np.sum(~np.isnan(local_metric_matrix)) #bins[0] * bins[1]
+        nr_grid_fields = np.sum(~np.isnan(overall_metric_matrix))
         metric_contribution_matrix = np.zeros((bins[0], bins[1]))
         for y_bin in adata_sp_region_range.obs["bin_y"].unique():
             for x_bin in adata_sp_region_range.obs["bin_x"].unique():
                 # calculate the difference in the local metric matrix explained by the grid field
-                diff_explained_by_grid_field = (nr_grid_fields * (1 - local_metric_matrix[y_bin, x_bin])
-                                                / (nr_grid_fields - np.nansum(local_metric_matrix)))
+                diff_explained_by_grid_field = (nr_grid_fields * (1 - overall_metric_matrix[y_bin, x_bin])
+                                                / (nr_grid_fields - np.nansum(overall_metric_matrix)))
 
                 # calculate the proportion of the global metric that is explained by the grid field
-                diff_to_explain = 1 - global_metric
+                diff_to_explain = 1 - overall_metric
                 metric_contribution_matrix[y_bin, x_bin] = 1 - (diff_explained_by_grid_field * diff_to_explain)
 
         return metric_contribution_matrix
 
-
-    # calculate the contribution of each grid field to the overall metric, if contribution is set to True
-    if contribution:
-        # calculate global metrics (overall, per-gene, and per-celltype)
-        overall_metric, per_gene_metric, per_celltype_metric = relative_pairwise_gene_expression(adata_sp_region_range, adata_sc, key=obs_key, pipeline_output=False)
-
-        overall_metric_matrix = local_metric_contribution(overall_metric_matrix, overall_metric)
-
-        for gene in per_gene_metric_matrix_dict.keys():
-            per_gene_metric_matrix_dict[gene] = local_metric_contribution(per_gene_metric_matrix_dict[gene], per_gene_metric.loc[gene])
-
-        for celltype in per_celltype_metric_matrix_dict.keys():
-            per_celltype_metric_matrix_dict[celltype] = local_metric_contribution(per_celltype_metric_matrix_dict[celltype], per_celltype_metric.loc[celltype])
-
-    return overall_metric_matrix, per_gene_metric_matrix_dict, per_celltype_metric_matrix_dict
+    return overall_metric_matrix
 
