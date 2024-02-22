@@ -4,7 +4,7 @@ from ._celltype_proportions import *# mean_proportion_deviation,proportion_cells
 from ._efficiency import *# efficiency_deviation,efficiency_mean
 from ._negative_marker_purity import *# negative_marker_purity_cells, negative_marker_purity_reads
 from ._cell_statistics import *# ratio_median_readsXcells,ratio_mean_readsXcells,ratio_number_of_cells,ratio_mean_genesXcells,ratio_median_genesXcells
-from ._coembedding import *# knn_mixing
+from ._coembedding import *# knn_mixing, knn_mixing_per_cell_score
 from ._gene_set_coexpression import *# gene_set_coexpression
 from ._rand_index import *# calc_rand_index, aggregate_rand_index
 from ._relative_pairwise_celltype_expression import *#relative_pairwise_celltype_expression, mean_similarity_gene_expression_across_clusters, median_similarity_gene_expression_across_clusters, percentile95_similarity_gene_expression_across_clusters
