@@ -7,6 +7,7 @@ from ._cells_based import _get_cell_density_grid, _get_cell_density_grid_per_cel
 from ._spots_based import _get_spot_density_grid
 from ._metrics import _get_knn_mixing_grid
 
+from ._cells_based import _get_spot_uniformity_within_cells_grid
 
 SUPPORTED_CELL_AND_SPOT_STATISTICS = [
     "cell_density", "spot_density", "cell_density_per_celltype", "celltype_percentage", "number_of_celltypes", 
@@ -170,6 +171,10 @@ def cell_and_spot_statistics(
             out_dict[f"celltype_percentage_{ct}"] = density_grid
     if "spot_density" in metrics:
         out_dict["spot_density"] = _get_spot_density_grid(adata_sp, region_range, bins, spots_x_col, spots_y_col)
+    if "spot_uniformity_within_cells" in metrics:
+        out_dict["spot_uniformity_within_cells"] = _get_spot_uniformity_within_cells_grid(
+            adata_sp, region_range, bins, cells_x_col, cells_y_col, spots_x_col, spots_y_col
+        )
            
     return out_dict, grid_coords
 
