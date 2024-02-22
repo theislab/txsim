@@ -5,7 +5,7 @@ from typing import List, Dict, Tuple, Optional, Union
 
 from ._cells_based import _get_cell_density_grid
 from ._spots_based import _get_spot_density_grid
-from ._metrics import _get_knn_mixing_grid
+from ._metrics import _get_knn_mixing_grid, _get_relative_expression_similarity_across_genes_grid
 
 
 SUPPORTED_CELL_AND_SPOT_STATISTICS = [
@@ -252,6 +252,9 @@ def metrics(
     cells_y_col: str = "y",
     spots_x_col: str = "x",
     spots_y_col: str = "y",
+    layer: str = 'lognorm',
+    normalization: str = "global",
+    contribution: bool = True,
 ) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
     """Compute similarity metrics between spatial and dissociated data over a spatial grid.
 
@@ -286,6 +289,17 @@ def metrics(
         The column name in adata.uns["spots"] for the x-coordinates of spots.
     spots_y_col : str, default "y"
         The column name in adata.uns["spots"] for the y-coordinates of spots.
+    layer: str (default: 'lognorm')
+        Applicable only for the relative_expression_similarity metrics.
+        Layer of ``AnnData`` to use to compute the metric.
+    normalization: str (default: "global")
+        Applicable only for the relative_expression_similarity metrics.
+        The type of normalization to use for computing the metric. If set to "global"'", the entire spatial dataset is used
+        for normalization; if set to "local", only the local grid field is used to calculate the normalization factor.
+        Can be either "global" or "local".
+    contribution: bool (default: True)
+        Applicable only for the relative_expression_similarity metrics.
+        Whether to calculate the contribution of each grid field to the overall metric (True) or the metric itself (False).
 
     Returns
     -------
@@ -327,10 +341,8 @@ def metrics(
         raise NotImplementedError("coexpression_similarity is not yet implemented.")
         #out_dict["coexpression_similarity"] = _get_coexpression_similarity_grid(adata_sp, adata_sc, ct_key, region_range, bins, cells_x_col, cells_y_col)
     if "relative_expression_similarity_across_genes" in metrics:
-        raise NotImplementedError("relative_expression_similarity_across_genes is not yet implemented.")
-        #out_dict["relative_expression_similarity_across_genes"] = _get_relative_expression_similarity_across_genes_grid(
-        #    adata_sp, adata_sc, ct_key, region_range, bins, cells_x_col, cells_y_col
-        #)
+        out_dict["relative_expression_similarity_across_genes"] = _get_relative_expression_similarity_across_genes_grid(
+            adata_sp, adata_sc, region_range, bins, obs_key, layer, cells_x_col, cells_y_col, normalization, contribution)
     if "relative_expression_similarity_across_celltypes" in metrics:
         raise NotImplementedError("relative_expression_similarity_across_celltypes is not yet implemented.")
         #out_dict["relative_expression_similarity_across_celltypes"] = _get_relative_expression_similarity_across_celltypes_grid(

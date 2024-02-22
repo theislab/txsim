@@ -7,7 +7,7 @@ from ..metrics import knn_mixing_per_cell_score
 from ..metrics import relative_pairwise_gene_expression
 
 #TODO: "negative_marker_purity_reads", "negative_marker_purity_cells", "coexpression_similarity", 
-#    "relative_expression_similarity_across_genes", "relative_expression_similarity_across_celltypes",
+#    "relative_expression_similarity_across_celltypes",
 
 
 def _get_knn_mixing_grid(
@@ -75,28 +75,45 @@ def _get_relative_expression_similarity_across_genes_grid(
     normalization: str = "global",
     contribution: bool = True,
 ):
-    """Calculate the similarity of pairwise gene expression differences for all pairs of genes in the panel, between the two modalities 
+    """Calculate the similarity of pairwise gene expression differences for all pairs of genes in the panel, between the
+    two modalities, within each grid bin.
     ----------
     adata_sp : AnnData
         annotated ``AnnData`` object with counts from spatial data
     adata_sc : AnnData
         annotated ``AnnData`` object with counts from scRNAseq data
-    key: str (default: 'celltype')
-        .obs column of ``AnnData`` that contains celltype information
+    region_range : Tuple[Tuple[float, float], Tuple[float, float]]
+        The range of the grid specified as ((y_min, y_max), (x_min, x_max)).
+    bins : Tuple[int, int]
+        The number of bins along the y and x axes, formatted as (ny, nx).
+    obs_key : str, default "celltype"
+        The column name in adata_sp.obs and adata_sc.obs for the cell type annotations.
     layer: str (default: 'lognorm')
-        layer of ```AnnData`` to use to compute the metric
-    pipeline_output: bool (default: True)
-        whether to return only the overall metric (if False, will return the overall metric, per-gene metric and per-celltype metric)
+        Layer of ``AnnData`` to use to compute the metric.
+    cells_x_col : str, default "x"
+        The column name in adata_sp.obs for the x-coordinates of cells.
+    cells_y_col : str, default "y"
+        The column name in adata_sp.obs for the y-coordinates of cells.
+    normalization: str (default: 'global')
+        The type of normalization to use for computing the metric. If set to 'global', the entire spatial dataset is used
+        to normalize the pairwise gene expression differences for the spatial modality.
+        If set to 'local', only the local grid field is used to normalize the pairwise gene expression differences.
+        Can be either 'global' or 'local'.
+    contribution: bool (default: True)
+        Whether to calculate the contribution of each grid field to the overall metric or the metric itself.
+
     Returns
     -------
     overall_metric: np.ndarray
-        overall similarity of relative pairwise gene expression for all pairs of genes in the panel, b/t the scRNAseq and spatial data
-    per_gene_metric: np.ndarray
-        similarity of relative pairwise gene expression per gene, b/t the scRNAseq and spatial data
-    per_celltype_metric: np.ndarray
-        similarity of relative pairwise gene expression per celltype, b/t the scRNAseq and spatial data
-
-    """   #TODO: Correct the docstring
+        Matrix containing the local overall similarity of relative pairwise gene expression for all pairs of genes in the panel,
+        b/t the scRNAseq and spatial data
+    per_gene_metric: Dict[str, np.ndarray]
+        Similarity of relative pairwise gene expression per gene, b/t the scRNAseq and spatial data.
+        Provided as a dictionary with gene names as keys and 2D numpy arrays as values.
+    per_celltype_metric: Dict[str, np.ndarray]
+        Similarity of relative pairwise gene expression per celltype, b/t the scRNAseq and spatial data.
+        Provided as a dictionary with celltype names as keys and 2D numpy arrays as values.
+    """
     assert normalization in ["global", "local"], "normalization must be either 'global' or 'local'"
 
     ### SET UP
@@ -129,8 +146,8 @@ def _get_relative_expression_similarity_across_genes_grid(
     # create empty matrices to store the overall, per-celltype and per-gene metrics
     overall_metric_matrix = np.zeros((bins[0], bins[1]))
     celltype_order = adata_sp.obs[obs_key].unique()
-    per_celltype_metric_matrix = np.zeros((bins[0], bins[1], len(celltype_order)))
-    per_gene_metric_matrix = np.zeros((bins[0], bins[1], adata_sp.shape[1]))
+    per_celltype_metric_matrix_dict = {celltype: np.zeros((bins[0], bins[1])) for celltype in celltype_order}
+    per_gene_metric_matrix_dict = {gene: np.zeros((bins[0], bins[1])) for gene in adata_sp.var_names}
 
     for y_bin in adata_sp.obs["bin_y"].unique():
         for x_bin in adata_sp.obs["bin_x"].unique():
@@ -233,7 +250,9 @@ def _get_relative_expression_similarity_across_genes_grid(
             per_gene_metric = 1 - (per_gene_score / (2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(1, 2))))
             per_gene_metric = pd.DataFrame(per_gene_metric, index=mean_celltype_sc.columns,
                                            columns=['score'])  # add back the gene labels
-            per_gene_metric_matrix[y_bin, x_bin] = np.squeeze(per_gene_metric)
+            per_gene_metric = per_gene_metric.reindex(adata_sp.var_names)
+            for gene in adata_sp.var_names:
+                per_gene_metric_matrix_dict[gene][y_bin, x_bin] = np.squeeze(per_gene_metric.loc[gene])
 
             per_celltype_score = np.sum(np.absolute(norm_pairwise_distances_sp_local - norm_pairwise_distances_sc), axis=(0, 1))
             per_celltype_metric = 1 - (per_celltype_score / (2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(0, 1))))
@@ -241,16 +260,17 @@ def _get_relative_expression_similarity_across_genes_grid(
                                                columns=['score'])  # add back the celltype labels
             # bring in order of celltype_order and fill missing celltypes with np.nan
             per_celltype_metric = per_celltype_metric.reindex(celltype_order)
-            per_celltype_metric_matrix[y_bin, x_bin] = np.squeeze(per_celltype_metric)
+            for celltype in celltype_order:
+                per_celltype_metric_matrix_dict[celltype][y_bin, x_bin] = np.squeeze(per_celltype_metric.loc[celltype])
 
     def local_metric_contribution(local_metric_matrix, global_metric):
-        nr_grid_fields = bins[0] * bins[1]
+        nr_grid_fields = np.sum(~np.isnan(local_metric_matrix)) #bins[0] * bins[1]
         metric_contribution_matrix = np.zeros((bins[0], bins[1]))
         for y_bin in adata_sp.obs["bin_y"].unique():
             for x_bin in adata_sp.obs["bin_x"].unique():
                 # calculate the difference in the local metric matrix explained by the grid field
                 diff_explained_by_grid_field = (nr_grid_fields * (1 - local_metric_matrix[y_bin, x_bin])
-                                                / (nr_grid_fields - local_metric_matrix.sum()))
+                                                / (nr_grid_fields - np.nansum(local_metric_matrix)))
 
                 # calculate the proportion of the global metric that is explained by the grid field
                 diff_to_explain = 1 - global_metric
@@ -266,15 +286,15 @@ def _get_relative_expression_similarity_across_genes_grid(
 
         overall_metric_matrix = local_metric_contribution(overall_metric_matrix, overall_metric)
 
-        for gene in per_gene_metric_matrix.index:
-            per_gene_metric_matrix.loc[gene] = local_metric_contribution(per_gene_metric_matrix.loc[gene], per_gene_metric.loc[gene])
+        for gene in per_gene_metric_matrix_dict.keys():
+            per_gene_metric_matrix_dict[gene] = local_metric_contribution(per_gene_metric_matrix_dict[gene], per_gene_metric.loc[gene])
 
-        for celltype in per_celltype_metric_matrix.index:
-            per_celltype_metric_matrix.loc[celltype] = local_metric_contribution(per_celltype_metric_matrix.loc[celltype], per_celltype_metric.loc[celltype])
+        for celltype in per_celltype_metric_matrix_dict.keys():
+            per_celltype_metric_matrix_dict[celltype] = local_metric_contribution(per_celltype_metric_matrix_dict[celltype], per_celltype_metric.loc[celltype])
 
 
     # remove the bin columns from adata_sp.obs
     adata_sp.obs = adata_sp.obs.drop(columns=["bin_y", "bin_x"])
 
-    return overall_metric_matrix, per_gene_metric_matrix, per_celltype_metric_matrix
+    return overall_metric_matrix, per_gene_metric_matrix_dict, per_celltype_metric_matrix_dict
 
