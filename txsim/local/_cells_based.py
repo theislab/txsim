@@ -39,7 +39,7 @@ def _get_cell_density_grid(
     return H
 
 
-def _get_number_of_celltypes(
+def _get_number_of_celltypes_grid(
         adata_sp: ad.AnnData,
         region_range: Tuple[Tuple[float, float], Tuple[float, float]],
         bins: Tuple[int],
@@ -63,7 +63,7 @@ def _get_number_of_celltypes(
     cells_y_col : str, default "y"
         The column name in adata.obs for the y-coordinates of cells.
     obs_key : str, default "celltype"
-        The column name in adata_sp.obs and adata_sc.obs for the cell type annotations.
+        The column name in adata_sp.obs for the cell type annotations.
     Returns
     -------
     H :  np.ndarray
