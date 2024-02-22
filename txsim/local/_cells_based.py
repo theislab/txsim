@@ -95,15 +95,16 @@ def _get_spot_uniformity_within_cells_grid(
     return H
 
 
-def spot_uniformity_per_cell_score(
+def spot_uniformity_per_cell_score( #TODO: move to some other place? Also add to some __init__
     adata_sp: AnnData,
     spots_x_col: str = "x",
     spots_y_col: str = "y",
     key_added: str = "uniform_cell"
 ) -> None:
-    """Compute how uniform spots are distributed over cells.
+    """Compute how uniform spots are distributed within each cell.
 
-    Therefore, we compare the observed and expected counts using the chi-quadrat-statistic.
+    We compare the observed spatial count distribution and expected counts of a uniform distribution using the 
+    chi-square-statistic.
 
     Parameters
     ----------
@@ -122,13 +123,13 @@ def spot_uniformity_per_cell_score(
     """
 
     df = adata_sp.uns["spots"]
-    unique_cell_ids = adata_sp.obs.index.unique()
     adata_sp.obs[key_added] = np.nan
 
-    for i in unique_cell_ids:
+    for i in adata_sp.obs_names:
         spots = df.loc[df["cell_id"] == i].copy()
-        spots[spots_x_col], spots[spots_y_col] = [spots[spots_x_col].round().astype(int),
-                                                  spots[spots_y_col].round().astype(int)]
+        spots[spots_x_col], spots[spots_y_col] = [
+            spots[spots_x_col].round().astype(int), spots[spots_y_col].round().astype(int)
+        ]
 
         if len(spots[spots_x_col]) or len(spots[spots_y_col]):
             [x_min, x_max, y_min, y_max] = [np.nanmin(spots[spots_x_col]), np.nanmax(spots[spots_x_col]),
