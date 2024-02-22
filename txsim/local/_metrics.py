@@ -194,7 +194,7 @@ def _get_relative_expression_similarity_across_genes_grid(
             if normalization == "local":
                 abs_diff_sp = np.absolute(pairwise_distances_sp_local)
             elif normalization == "global":
-                # prepare the entire spatial dataset (not just in the region range) for the global normalization
+                # prepare entire spatial dataset (not just in the region range) to compute the global normalization factor
                 exp_sp_global = pd.DataFrame(adata_sp.layers[layer], columns=adata_sp.var.index)
                 exp_sp_global[obs_key] = list(adata_sp.obs[obs_key])
                 exp_sp_global = exp_sp_global.loc[exp_sp_global[obs_key].isin(unique_celltypes), :]
