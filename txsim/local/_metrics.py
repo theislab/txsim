@@ -108,50 +108,24 @@ def _get_celltype_proportions_grid(
         A 2D numpy array representing the average difference in cell type proportions in each grid bin.
     """
 
-    # use global metrics to determine reference values
+    # Get cell type proportion deviation scores per cell type
     _, df_props = mean_proportion_deviation(adata_sp, adata_sc, ct_set=ct_set, obs_key=obs_key, pipeline_output=False)
 
-    # map each cell's cell type to its corresponding proportion deviation
+    # Map each cell's cell type to its corresponding proportion deviation
     df_cells = adata_sp.obs[[cells_x_col, cells_y_col, obs_key]]
-    with pd.option_context("mode.chained_assignment", None):
-        df_cells["sp_minus_sc"] = df_cells[obs_key].map(df_props["sp_minus_sc"]).astype(float)
+    df_cells["sp_minus_sc"] = df_cells[obs_key].map(df_props["sp_minus_sc"]).astype(float)
 
-    # count number of cells per grid field for further analyses
+    # Count number of cells per grid field for mean calculation
     ct_grid_counts = np.histogram2d(df_cells[cells_y_col], df_cells[cells_x_col], bins=bins, range=region_range)[0]
-    # track the score for the output
+
+    # Sum cell scores per grid field
     ct_score_hist = np.full_like(ct_grid_counts, 0)
+    ct_score_hist = np.histogram2d(
+        df_cells[cells_y_col], df_cells[cells_x_col], bins=bins, range=region_range, 
+        weights=df_cells["sp_minus_sc"].abs() if abs_score else df_cells["sp_minus_sc"]
+    )[0]
 
-    if abs_score:
-        # loop over each cell type
-        for ct in df_props.index.values:
-            ct_hist = np.full_like(ct_grid_counts, 0)
-
-            # determine observed proportion of cell type in grid field if it occurs
-            if ct in df_cells[obs_key].values:
-                df_cells_ct = df_cells[df_cells[obs_key] == ct]
-                ct_hist = np.histogram2d(df_cells_ct[cells_y_col], df_cells_ct[cells_x_col],
-                                         bins=bins, range=region_range)[0]
-                ct_hist = ct_hist / ct_grid_counts
-
-            # get absolute difference between observed proportion in grid field and expected sc proportion
-            if np.isfinite(df_props.at[ct, "proportion_sc"]):
-                ct_hist = ct_hist - df_props.at[ct, "proportion_sc"]
-                ct_hist = np.abs(ct_hist)
-
-            # add absolute difference to score tracker
-            ct_score_hist = ct_score_hist + ct_hist
-
-        # normalize by number of cell types in total
-        ct_score_hist = ct_score_hist / df_props.shape[0]
-        # use (1 - normalized summary absolute difference) as local metric
-        ct_score_hist = 1 - ct_score_hist
-
-    else:
-        # use global (sp - sc) values for relative scores
-        ct_score_hist = np.histogram2d(df_cells[cells_y_col], df_cells[cells_x_col],
-                                       bins=bins, range=region_range, weights=df_cells["sp_minus_sc"])[0]
-
-        # normalize with number of cells per grid field
-        ct_score_hist = ct_score_hist / ct_grid_counts
+    # Get mean scores by normalizing with number of cells per grid field
+    ct_score_hist = ct_score_hist / ct_grid_counts
 
     return ct_score_hist

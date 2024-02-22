@@ -18,7 +18,7 @@ SUPPORTED_QUALITY_METRICS = []
 SUPPORTED_METRICS = [
     "negative_marker_purity_reads", "negative_marker_purity_cells", "knn_mixing", "coexpression_similarity", 
     "relative_expression_similarity_across_genes", "relative_expression_similarity_across_celltypes",
-    "celltype_proportions_abs", "celltype_proportions_rel"
+    "celltype_proportions"
 ]
 SUPPORTED_SELF_CONSISTENCY_METRICS = [
     "ARI_spot_clusters", "annotation_similarity" 
@@ -338,12 +338,11 @@ def metrics(
         #out_dict["relative_expression_similarity_across_celltypes"] = _get_relative_expression_similarity_across_celltypes_grid(
         #    adata_sp, adata_sc, ct_key, region_range, bins, cells_x_col, cells_y_col
         #)
-    if "celltype_proportions_abs" in metrics:
-        out_dict["celltype_proportions_abs"] = _get_celltype_proportions_grid(
+    if "celltype_proportions" in metrics:
+        out_dict["celltype_proportions_abs_diff"] = _get_celltype_proportions_grid(
             adata_sp.copy(), adata_sc.copy(), region_range, bins, abs_score=True,
             obs_key=obs_key, cells_x_col=cells_x_col, cells_y_col=cells_y_col)
-    if "celltype_proportions_rel" in metrics:
-        out_dict["celltype_proportions_rel"] = _get_celltype_proportions_grid(
+        out_dict["celltype_proportions_diff"] = _get_celltype_proportions_grid(
             adata_sp.copy(), adata_sc.copy(), region_range, bins, abs_score=False,
             obs_key=obs_key, cells_x_col=cells_x_col, cells_y_col=cells_y_col)
            
