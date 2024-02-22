@@ -134,25 +134,25 @@ def _get_relative_expression_similarity_across_genes_grid(
             a.layers[layer] = a.layers[layer].toarray()
 
     # only consider cells within the specified region
-    adata_sp = adata_sp[(adata_sp.obs[cells_y_col] >= region_range[0][0]) &
-                        (adata_sp.obs[cells_y_col] < region_range[0][1]) &
-                        (adata_sp.obs[cells_x_col] >= region_range[1][0]) &
-                        (adata_sp.obs[cells_x_col] < region_range[1][1])]
+    adata_sp_region_range = adata_sp[(adata_sp.obs[cells_y_col] >= region_range[0][0]) &
+                                     (adata_sp.obs[cells_y_col] < region_range[0][1]) &
+                                     (adata_sp.obs[cells_x_col] >= region_range[1][0]) &
+                                     (adata_sp.obs[cells_x_col] < region_range[1][1])]
 
     # add "bin" label columns to adata_sp
-    adata_sp.obs["bin_y"] = pd.cut(adata_sp.obs[cells_y_col], bins=bins[0], labels=False)
-    adata_sp.obs["bin_x"] = pd.cut(adata_sp.obs[cells_x_col], bins=bins[1], labels=False)
+    adata_sp_region_range.obs["bin_y"] = pd.cut(adata_sp_region_range.obs[cells_y_col], bins=bins[0], labels=False)
+    adata_sp_region_range.obs["bin_x"] = pd.cut(adata_sp_region_range.obs[cells_x_col], bins=bins[1], labels=False)
 
     # create empty matrices to store the overall, per-celltype and per-gene metrics
     overall_metric_matrix = np.zeros((bins[0], bins[1]))
-    celltype_order = adata_sp.obs[obs_key].unique()
+    celltype_order = adata_sp_region_range.obs[obs_key].unique()
     per_celltype_metric_matrix_dict = {celltype: np.zeros((bins[0], bins[1])) for celltype in celltype_order}
-    per_gene_metric_matrix_dict = {gene: np.zeros((bins[0], bins[1])) for gene in adata_sp.var_names}
+    per_gene_metric_matrix_dict = {gene: np.zeros((bins[0], bins[1])) for gene in adata_sp_region_range.var_names}
 
-    for y_bin in adata_sp.obs["bin_y"].unique():
-        for x_bin in adata_sp.obs["bin_x"].unique():
+    for y_bin in adata_sp_region_range.obs["bin_y"].unique():
+        for x_bin in adata_sp_region_range.obs["bin_x"].unique():
             # subset the spatial data to only include cells in the current grid field
-            adata_sp_local = adata_sp[(adata_sp.obs["bin_y"] == y_bin) & (adata_sp.obs["bin_x"] == x_bin)]
+            adata_sp_local = adata_sp_region_range[(adata_sp_region_range.obs["bin_y"] == y_bin) & (adata_sp_region_range.obs["bin_x"] == x_bin)]
 
             # find the unique celltypes in the grid field, that are both in the adata_sc and in the adata_sp
             unique_celltypes=adata_sc.obs.loc[adata_sc.obs[obs_key].isin(adata_sp_local.obs[obs_key]),obs_key].unique()
@@ -163,32 +163,22 @@ def _get_relative_expression_similarity_across_genes_grid(
 
             # get the adata_sp cell x gene matrix as a pandas dataframe, once for the local grid field and once for the entire dataset
             exp_sp_local = pd.DataFrame(adata_sp_local.layers[layer], columns=adata_sp_local.var.index)
-            if normalization == "global":
-                exp_sp_global = pd.DataFrame(adata_sp.layers[layer], columns=adata_sp.var.index)
 
             # add "celltype" label column to exp_sc & exp_sp cell x gene matrices
             exp_sc[obs_key] = list(adata_sc.obs[obs_key])
             exp_sp_local[obs_key] = list(adata_sp_local.obs[obs_key])
-            if normalization == "global":
-                exp_sp_global[obs_key] = list(adata_sp.obs[obs_key])
 
             # delete all cells from the exp matrices if they aren't in the set of intersecting celltypes b/t sc & sp data
             exp_sc = exp_sc.loc[exp_sc[obs_key].isin(unique_celltypes), :]
             exp_sp_local = exp_sp_local.loc[exp_sp_local[obs_key].isin(unique_celltypes), :]
-            if normalization == "global":
-                exp_sp_global = exp_sp_global.loc[exp_sp_global[obs_key].isin(unique_celltypes), :]
 
             # find the mean expression for each gene for each celltype in sc and sp data
             mean_celltype_sc = exp_sc.groupby(obs_key).mean()
             mean_celltype_sp_local = exp_sp_local.groupby(obs_key).mean()
-            if normalization == "global":
-                mean_celltype_sp_global = exp_sp_global.groupby(obs_key).mean()
 
             # sort genes in alphabetical order
             mean_celltype_sc = mean_celltype_sc.loc[:, mean_celltype_sc.columns.sort_values()]
             mean_celltype_sp_local = mean_celltype_sp_local.loc[:, mean_celltype_sp_local.columns.sort_values()]
-            if normalization == "global":
-                mean_celltype_sp_global = mean_celltype_sp_global.loc[:, mean_celltype_sp_global.columns.sort_values()]
 
             #### CALCULATE EXPRESSION DIFFERENCES BETWEEN ALL PAIRS OF GENES FOR EACH CELLTYPE
             mean_celltype_sc_np = mean_celltype_sc.to_numpy()
@@ -201,11 +191,6 @@ def _get_relative_expression_similarity_across_genes_grid(
             pairwise_distances_sp_local = pairwise_distances_sp_local.transpose(
                 (1, 2, 0))  # results in np.array of dimensions (num_genes, num_genes, num_celltypes)
 
-            if normalization == "global":
-                mean_celltype_sp_np_global = mean_celltype_sp_global.to_numpy()
-                pairwise_distances_sp_global = mean_celltype_sp_np_global[:, :, np.newaxis] - mean_celltype_sp_np_global[:, np.newaxis, :]
-                pairwise_distances_sp_global = pairwise_distances_sp_global.transpose(
-                    (1, 2, 0))  # results in np.array of dimensions (num_genes, num_genes, num_celltypes)
 
             #### NORMALIZE PAIRWISE EXPRESSION DIFFERENCES
             ## normalization is performed by dividing by the sum of the absolute values of all differences between pairs of genes
@@ -218,7 +203,21 @@ def _get_relative_expression_similarity_across_genes_grid(
             if normalization == "local":
                 abs_diff_sp = np.absolute(pairwise_distances_sp_local)
             elif normalization == "global":
+                # prepare the entire spatial dataset (not just in the region range) for the global normalization
+                exp_sp_global = pd.DataFrame(adata_sp.layers[layer], columns=adata_sp.var.index)
+                exp_sp_global[obs_key] = list(adata_sp.obs[obs_key])
+                exp_sp_global = exp_sp_global.loc[exp_sp_global[obs_key].isin(unique_celltypes), :]
+                mean_celltype_sp_global = exp_sp_global.groupby(obs_key).mean()
+                mean_celltype_sp_global = mean_celltype_sp_global.loc[:, mean_celltype_sp_global.columns.sort_values()]
+
+                mean_celltype_sp_np_global = mean_celltype_sp_global.to_numpy()
+                pairwise_distances_sp_global = mean_celltype_sp_np_global[:, :,
+                                               np.newaxis] - mean_celltype_sp_np_global[:, np.newaxis, :]
+                pairwise_distances_sp_global = pairwise_distances_sp_global.transpose(
+                    (1, 2, 0))  # results in np.array of dimensions (num_genes, num_genes, num_celltypes)
+
                 abs_diff_sp = np.absolute(pairwise_distances_sp_global)
+
             abs_diff_sum_sp = np.sum(abs_diff_sp, axis=(0, 1))
 
             # calculate normalization factor
@@ -250,8 +249,8 @@ def _get_relative_expression_similarity_across_genes_grid(
             per_gene_metric = 1 - (per_gene_score / (2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(1, 2))))
             per_gene_metric = pd.DataFrame(per_gene_metric, index=mean_celltype_sc.columns,
                                            columns=['score'])  # add back the gene labels
-            per_gene_metric = per_gene_metric.reindex(adata_sp.var_names)
-            for gene in adata_sp.var_names:
+            per_gene_metric = per_gene_metric.reindex(adata_sp_region_range.var_names)
+            for gene in adata_sp_region_range.var_names:
                 per_gene_metric_matrix_dict[gene][y_bin, x_bin] = np.squeeze(per_gene_metric.loc[gene])
 
             per_celltype_score = np.sum(np.absolute(norm_pairwise_distances_sp_local - norm_pairwise_distances_sc), axis=(0, 1))
@@ -266,8 +265,8 @@ def _get_relative_expression_similarity_across_genes_grid(
     def local_metric_contribution(local_metric_matrix, global_metric):
         nr_grid_fields = np.sum(~np.isnan(local_metric_matrix)) #bins[0] * bins[1]
         metric_contribution_matrix = np.zeros((bins[0], bins[1]))
-        for y_bin in adata_sp.obs["bin_y"].unique():
-            for x_bin in adata_sp.obs["bin_x"].unique():
+        for y_bin in adata_sp_region_range.obs["bin_y"].unique():
+            for x_bin in adata_sp_region_range.obs["bin_x"].unique():
                 # calculate the difference in the local metric matrix explained by the grid field
                 diff_explained_by_grid_field = (nr_grid_fields * (1 - local_metric_matrix[y_bin, x_bin])
                                                 / (nr_grid_fields - np.nansum(local_metric_matrix)))
@@ -282,7 +281,7 @@ def _get_relative_expression_similarity_across_genes_grid(
     # calculate the contribution of each grid field to the overall metric, if contribution is set to True
     if contribution:
         # calculate global metrics (overall, per-gene, and per-celltype)
-        overall_metric, per_gene_metric, per_celltype_metric = relative_pairwise_gene_expression(adata_sp, adata_sc, key=obs_key, pipeline_output=False)
+        overall_metric, per_gene_metric, per_celltype_metric = relative_pairwise_gene_expression(adata_sp_region_range, adata_sc, key=obs_key, pipeline_output=False)
 
         overall_metric_matrix = local_metric_contribution(overall_metric_matrix, overall_metric)
 
@@ -291,10 +290,6 @@ def _get_relative_expression_similarity_across_genes_grid(
 
         for celltype in per_celltype_metric_matrix_dict.keys():
             per_celltype_metric_matrix_dict[celltype] = local_metric_contribution(per_celltype_metric_matrix_dict[celltype], per_celltype_metric.loc[celltype])
-
-
-    # remove the bin columns from adata_sp.obs
-    adata_sp.obs = adata_sp.obs.drop(columns=["bin_y", "bin_x"])
 
     return overall_metric_matrix, per_gene_metric_matrix_dict, per_celltype_metric_matrix_dict
 
