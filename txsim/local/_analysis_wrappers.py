@@ -151,7 +151,7 @@ def cell_and_spot_statistics(
     if "cell_density" in metrics:
         out_dict["cell_density"] = _get_cell_density_grid(adata_sp, region_range, bins, cells_x_col, cells_y_col)
     if "number_of_celltypes" in metrics:
-        out_dict["number_of_celltypes"] = _get_number_of_celltypes(adata_sp, region_range, bins, obs_key)
+        out_dict["number_of_celltypes"] = _get_number_of_celltypes(adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col)
            
     return out_dict, grid_coords
         
