@@ -55,7 +55,7 @@ def _get_ARI_spot_clusters(
         df1 = df1.groupby(["bin_y", "bin_x"])[ann_key]
         df2 = df2.groupby(["bin_y", "bin_x"])[ann_key]
         # new Dataframe, size as bins
-        ARI_per_bins = np.zeros(bins, float)
+        ARI_per_bins = np.full(bins, np.nan)
 
         # calculate ARI for every bin
         for (y, x), group1 in df1:
