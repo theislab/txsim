@@ -75,10 +75,7 @@ def _get_number_of_celltypes(
     histograms = list(density_per_celltype.values())
     histograms_3d = np.dstack(histograms)
     # check for every celltype if their density >0
-    for i in range(len(histograms)):
-        mask = histograms_3d[:, :, i] > 0
-        histograms_3d[:, :, i][mask] = 1
-
+    mask = histograms_3d > 0
     # sum up vectors of 3rd Dimension
-    array2d = np.sum(histograms_3d, axis=2)
+    array2d = np.sum(mask, axis=2)
     return array2d
