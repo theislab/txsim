@@ -278,9 +278,9 @@ def self_consistency_metrics(
     cells_y_col : str, default "y"
         The column name in adata.obs for the y-coordinates of cells. Must be the same for both datasets.
     spots_x_col : str, default "x"
-        The column name in adata.uns["spots"] for the x-coordinates of spots. Must be the same for both datasets.
+        The column name in adata.uns[uns_key] for the x-coordinates of spots. Must be the same for both datasets.
     spots_y_col : str, default "y"
-        The column name in adata.uns["spots"] for the y-coordinates of spots. Must be the same for both datasets.
+        The column name in adata.uns[uns_key] for the y-coordinates of spots. Must be the same for both datasets.
 
     Returns
     -------
