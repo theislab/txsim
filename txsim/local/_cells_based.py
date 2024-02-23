@@ -44,6 +44,8 @@ def _get_number_of_celltypes(
         region_range: Tuple[Tuple[float, float], Tuple[float, float]],
         bins: Tuple[int, int],
         obs_key: str = "celltype",
+        cells_x_col: str = "x",
+        cells_y_col: str = "y"
 ):
     """Get number of celltypes
 
@@ -58,13 +60,17 @@ def _get_number_of_celltypes(
         Use either `bin_width` or `n_bins` to define grid cells.
     obs_key : str, default "celltype"
         The column name in adata_sp.obs and adata_sc.obs for the cell type annotations.
+    cells_x_col : str, default "x"
+        The column name in adata_sp.obs for the x-coordinates of cells.
+    cells_y_col : str, default "y"
+        The column name in adata_sp.obs for the y-coordinates of cells.
     Returns
     -------
     array2d :  np.ndarray
         A 2D numpy array representing the number of celltypes in each grid bin.
     """
     # calculate the cell density for every celltype
-    density_per_celltype = _get_cell_density_grid_per_celltype(adata_sp, region_range, bins, obs_key)
+    density_per_celltype = _get_cell_density_grid_per_celltype(adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col)
     # stack density per celltype to a 3D array, 1st D: y bins, 2nd D: x bins, 3rd D: vector of length = number of celltypes
     histograms = list(density_per_celltype.values())
     histograms_3d = np.dstack(histograms)
