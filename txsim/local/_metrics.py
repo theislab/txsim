@@ -477,24 +477,14 @@ def _get_relative_expression_between_celltypes_grid(
 
             abs_diff_sum_sp = np.sum(abs_diff_sp, axis=(0, 1))
             
-
-            print(mean_celltype_sc.T.shape)
-            print(mean_celltype_sp_local.T.shape)
-            print(abs_diff_sum_sc)
-            print(abs_diff_sum_sp)
             # calculate normalization factor
             norm_factor_sc = (1/(mean_celltype_sc.T.shape[1]**2)) * abs_diff_sum_sc
             norm_factor_sp = (1/(mean_celltype_sc.T.shape[1]**2)) * abs_diff_sum_sp
 
-            print(norm_factor_sc)
-            print(norm_factor_sp)
             epsilon = 1e-10
             norm_factor_sc += epsilon
             norm_factor_sp += epsilon
-            print(norm_factor_sc)
-            print(norm_factor_sp)
-
-
+            
             # perform normalization
             # exclude the ones with norm_factor_sc, norm_factor_sp with zero
             pairwise_distances_sc[:, :, norm_factor_sc != 0] = np.divide(pairwise_distances_sc[:, :, norm_factor_sc != 0],
