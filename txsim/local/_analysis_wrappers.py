@@ -3,7 +3,7 @@ import pandas as pd
 import anndata as ad
 from typing import List, Dict, Tuple, Optional, Union
 
-from ._cells_based import _get_cell_density_grid
+from ._cells_based import _get_cell_density_grid, _get_summed_cell_area_grid
 
 
 SUPPORTED_CELL_AND_SPOT_STATISTICS = [
@@ -150,6 +150,10 @@ def cell_and_spot_statistics(
     out_dict = {}
     if "cell_density" in metrics:
         out_dict["cell_density"] = _get_cell_density_grid(adata_sp, region_range, bins, cells_x_col, cells_y_col)
+    if "summed_cell_area" in metrics:
+        out_dict["summed_cell_area"] = _get_summed_cell_area_grid(
+            adata_sp, region_range, bins, area_key="area", cells_x_col=cells_x_col, cells_y_col=cells_y_col
+        )
            
     return out_dict, grid_coords
         
