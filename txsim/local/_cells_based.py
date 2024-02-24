@@ -1,14 +1,10 @@
 import numpy as np
 import anndata as ad
 from typing import Tuple, Dict
-
-from anndata import AnnData
-
 from skimage.morphology import convex_hull_image
 
-#TODO (fcts: _get_<...>_grid):
+#TODO (fcts: _get_<...>_grid): 
 # "celltype_density", "number_of_celltypes", "major_celltype_perc", "summed_cell_area", "spot_uniformity_within_cells"
-
 
 def _get_cell_density_grid(
     adata_sp: ad.AnnData,
@@ -41,6 +37,7 @@ def _get_cell_density_grid(
     df_cells = adata_sp.obs[[cells_y_col, cells_x_col]]
     H = np.histogram2d(df_cells[cells_y_col], df_cells[cells_x_col], bins=bins, range=region_range)[0]
     return H
+
 
 def _get_cell_density_grid_per_celltype(
     adata_sp: ad.AnnData, 
@@ -136,8 +133,38 @@ def _get_celltype_ratio_grid(
     return H_dict
 
 
+def _get_major_celltype_perc_grid(
+    adata_sp: ad.AnnData,
+    region_range: Tuple[Tuple[float, float], Tuple[float, float]],
+    bins: Tuple[int, int],
+    obs_key: str= "celltype",
+    cells_x_col: str = "x",
+    cells_y_col: str = "y"
+):
+    """calculates most common celltype (percentage) for each grid bin.
+    Parameters
+    ----------
+    adata_sp : AnnData
+        Annotated AnnData object containing spatial transcriptomics data.
+    region_range : Tuple[Tuple[float, float], Tuple[float, float]]
+        The range of the grid specified as ((y_min, y_max), (x_min, x_max)).
+    bins : Tuple[int, int]
+        The number of bins along the y and x axes, formatted as (ny, nx).
+        default "celltype"
+        The column name in adata_sp.obs and adata_sc.obs for the cell type annotations.
+    Returns
+    -------
+    Array
+        A 2D array representing the percentage of the most common cell type in each grid bin.
+    """
+    H_out = _get_celltype_ratio_grid(adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col)
+    values_stacked = np.stack(H_out.values(), axis=2)
+    max_percentage = values_stacked.max(axis = 2)
+    return max_percentage
+
+
 def _get_spot_uniformity_within_cells_grid(
-    adata_sp: AnnData,
+    adata_sp: ad.AnnData,
     region_range: Tuple[Tuple[float, float], Tuple[float, float]],
     bins: Tuple[int, int],
     cells_x_col: str = "x",
@@ -189,7 +216,7 @@ def _get_spot_uniformity_within_cells_grid(
 
 
 def spot_uniformity_per_cell_score( #TODO: move to some other place? Also add to some __init__
-    adata_sp: AnnData,
+    adata_sp: ad.AnnData,
     spots_x_col: str = "x",
     spots_y_col: str = "y",
     key_added: str = "uniform_cell"

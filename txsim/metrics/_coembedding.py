@@ -1,7 +1,6 @@
 import numpy as np
 import networkx as nx
 import anndata as ad
-import pandas as pd
 import scanpy as sc
 from typing import Union, Tuple
 
