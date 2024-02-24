@@ -32,14 +32,14 @@ def reads_per_cell_ratio(adata_sp: ad.AnnData, adata_sc: ad.AnnData, statistic: 
          median_reads_sp = float(median_reads_sp.flatten())
          median_reads_sc=np.median(np.sum(adata_sc.layers['raw'],axis=1), axis= 0)
          median_reads_sc = float(median_reads_sc.flatten())
-         ratio_median_reads_cell = round(median_reads_sp/median_reads_sc, 3)
+         ratio_median_reads_cell = median_reads_sp/median_reads_sc
          return ratio_median_reads_cell
     elif statistic == "mean":
         mean_reads_sp=np.mean(np.sum(adata_sp.layers['raw'],axis=1), axis= 0)
         mean_reads_sp = float(mean_reads_sp.flatten())
         mean_reads_sc=np.mean(np.sum(adata_sc.layers['raw'],axis=1), axis= 0)
         mean_reads_sc = float(mean_reads_sc.flatten())
-        ratio_mean_reads_cell= round(mean_reads_sp/mean_reads_sc, 3)
+        ratio_mean_reads_cell= mean_reads_sp/mean_reads_sc
         return ratio_mean_reads_cell
 
 
@@ -71,7 +71,7 @@ def genes_per_cell_ratio(adata_sp: ad.AnnData,adata_sc: ad.AnnData, statistic: s
         median_genes_sp = float(median_genes_sp.flatten())
         median_genes_sc=np.median(np.sum((adata_sc.layers['raw']>0)*1,axis=1), axis=0)
         median_genes_sc = float(median_genes_sc.flatten())
-        ratio_median_genes_cell = round(median_genes_sp/median_genes_sc, 3)
+        ratio_median_genes_cell = median_genes_sp/median_genes_sc
         return ratio_median_genes_cell
 
     elif statistic == "mean":
@@ -79,5 +79,5 @@ def genes_per_cell_ratio(adata_sp: ad.AnnData,adata_sc: ad.AnnData, statistic: s
         mean_genes_sp = float(mean_genes_sp.flatten())
         mean_genes_sc=np.mean(np.sum((adata_sc.layers['raw']>0)*1,axis=1), axis= 0)
         mean_genes_sc = float(mean_genes_sc.flatten())
-        ratio_mean_genes_cell = round(mean_genes_sp/mean_genes_sc, 3)
+        ratio_mean_genes_cell = mean_genes_sp/mean_genes_sc
         return ratio_mean_genes_cell
