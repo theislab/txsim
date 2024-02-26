@@ -4,7 +4,7 @@ import anndata as ad
 from typing import List, Dict, Tuple, Optional, Union
 
 from ._cells_based import _get_cell_density_grid
-from ._self_consistency_metrics import _get_ARI_spot_clusters
+from ._self_consistency_metrics import _get_ARI_between_cell_assignments_grid
 
 
 SUPPORTED_CELL_AND_SPOT_STATISTICS = [
@@ -18,7 +18,7 @@ SUPPORTED_METRICS = [
     "relative_expression_similarity_across_genes", "relative_expression_similarity_across_celltypes",
 ]
 SUPPORTED_SELF_CONSISTENCY_METRICS = [
-    "ARI_spot_clusters", "annotation_similarity"
+    "ARI_cell_assignments", "annotation_similarity"
 ]
 
 
@@ -305,8 +305,8 @@ def self_consistency_metrics(
     
     # Compute metrics
     out_dict = {}
-    if "ARI_spot_clusters" in metrics:
-        out_dict["ARI_spot_clusters"] = _get_ARI_spot_clusters(
+    if "ARI_cell_assignments" in metrics:
+        out_dict["ARI_cell_assignments"] = _get_ARI_between_cell_assignments_grid(
             adata_sp1, adata_sp2, region_range, bins, uns_key, ann_key, spots_x_col, spots_y_col
         )
     if "annotation_similarity" in metrics:
