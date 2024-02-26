@@ -3,10 +3,11 @@ import pandas as pd
 import anndata as ad
 from typing import List, Dict, Tuple, Optional, Union
 
-from ._cells_based import _get_cell_density_grid, _get_cell_density_grid_per_celltype, _get_celltype_ratio_grid, _get_spot_uniformity_within_cells_grid
+from ._cells_based import _get_cell_density_grid, _get_number_of_celltypes_grid, _get_cell_density_grid_per_celltype
+from ._cells_based import _get_celltype_ratio_grid, _get_spot_uniformity_within_cells_grid
 from ._spots_based import _get_spot_density_grid
 from ._metrics import _get_knn_mixing_grid, _get_celltype_proportions_grid, _get_relative_expression_similarity_across_genes_grid
-
+from ._self_consistency_metrics import _get_ARI_between_cell_assignments_grid
 
 SUPPORTED_CELL_AND_SPOT_STATISTICS = [
     "cell_density", "spot_density", "cell_density_per_celltype", "celltype_percentage", "number_of_celltypes", 
@@ -20,7 +21,7 @@ SUPPORTED_METRICS = [
     "celltype_proportions"
 ]
 SUPPORTED_SELF_CONSISTENCY_METRICS = [
-    "ARI_spot_clusters", "annotation_similarity" 
+    "ARI_cell_assignments", "annotation_similarity"
 ]
 
 
@@ -155,26 +156,102 @@ def cell_and_spot_statistics(
     
     # Compute metrics
     out_dict = {}
+    
     if "cell_density" in metrics:
         out_dict["cell_density"] = _get_cell_density_grid(adata_sp, region_range, bins, cells_x_col, cells_y_col)
+        
+    if "number_of_celltypes" in metrics:
+        out_dict["number_of_celltypes"] = _get_number_of_celltypes_grid(adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col)
+        
     if "cell_density_per_celltype" in metrics:
         density_grid_dict = _get_cell_density_grid_per_celltype(
             adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col
         )
         for ct, density_grid in density_grid_dict.items():
             out_dict[f"cell_density_{ct}"] = density_grid
+            
     if "celltype_percentage" in metrics:
         density_grid_dict = _get_celltype_ratio_grid(
             adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col
         )
         for ct, density_grid in density_grid_dict.items():
             out_dict[f"celltype_percentage_{ct}"] = density_grid
+            
     if "spot_density" in metrics:
         out_dict["spot_density"] = _get_spot_density_grid(adata_sp, region_range, bins, spots_x_col, spots_y_col)
+        
     if "spot_uniformity_within_cells" in metrics:
         out_dict["spot_uniformity_within_cells"] = _get_spot_uniformity_within_cells_grid(
             adata_sp, region_range, bins, cells_x_col, cells_y_col, spots_x_col, spots_y_col
         )
+           
+    return out_dict, grid_coords
+
+def image_features(
+    image: np.ndarray,
+    adata_sp: Optional[ad.AnnData] = None,
+    metrics: Union[str, List[str]] = "all",
+    grid_region: Optional[List[Union[float, List[float]]]] = None,
+    bin_width: Optional[float] = None,
+    n_bins: Optional[List[int]] = None,
+    spots_x_col: str = "x",
+    spots_y_col: str = "y"
+) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+    """Compute image features over a spatial grid.
+
+    Parameters
+    ----------
+    image : NDArray
+        read from image of dapi stained cell-nuclei
+    adata_sp : AnnData, optional
+        Annotated AnnData object containing spatial transcriptomics data. 
+        The spots' coordinates should be in adata.uns["spots"][[spots_x_col, spots_y_col]]
+    metrics : str or List[str], default "all"
+        The metrics to compute. Specify "all" to compute all available metrics or provide a list of specific metrics. 
+        Supported metrics include: [TODO]. #NOTE: Add supported metrics
+    grid_region : List[Union[float, List[float]]], optional
+        The spatial domain over which to set the grid. Options include:
+        1. [y_max, x_max] (e.g., the shape of the associated DAPI image).
+        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy <= xy_max).
+        3. None (if None and adata_sp given, the grid is inferred from the min and max spots' coordinates, if adata_sp not given, the grid is inferred from the shape of image).
+    bin_width : float, optional
+        The width of each grid field. Use either `bin_width` or `n_bins` to define grid cells.
+    n_bins : List[int], optional
+        The number of bins along the y and x axes, formatted as [ny, nx]. 
+        Use either `bin_width` or `n_bins` to define grid cells.
+    spots_x_col : str, default "x"
+        The column name in adata.uns["spots"] for the x-coordinates of spots.
+    spots_y_col : str, default "y"
+        The column name in adata.uns["spots"] for the y-coordinates of spots.
+
+    Returns
+    -------
+    Dict[str, np.ndarray] 
+        A tuple containing the calculated statistics. The first element is a dictionary with each metric's name as keys 
+        (note that some metrics might be converted to multiple keys, e.g. celltype_density -> celltype_density_Tcells,
+        celltype_density_Bcells, ...) and their corresponding numpy arrays as values. 
+    np.ndarray
+        The second element is a numpy array representing the coordinates of the grid used for calculations.
+
+    """
+    # set grid_region
+    if (grid_region is None) and (adata_sp is None):
+        grid_region = list(image.shape)
+        
+    # Set metrics
+    metrics = _convert_metrics_input_to_list(metrics, SUPPORTED_IMAGE_FEATURES)
+
+    # Set grid region
+    spots = adata_sp.uns["spots"] if "spots" in adata_sp.uns else None # Some metrics can be run without spots
+    region_range, bins = _convert_grid_specification_to_range_and_bins(
+        spots, grid_region, bin_width, n_bins, spots_x_col, spots_y_col
+    )
+    grid_coords = _convert_range_and_bins_to_grid_coordinates(region_range, bins)
+    
+    # Compute metrics
+    out_dict = {}
+    # if "metric1" in metrics:
+    #    out_dict["metric2"] = _get_metric_1(image, region_range, bins)
            
     return out_dict, grid_coords
 
@@ -187,6 +264,8 @@ def self_consistency_metrics(
         bin_width: Optional[float] = None,
         n_bins: Optional[List[int]] = None,
         obs_key: str = "celltype",
+        uns_key: str = "spots",
+        ann_key: str = "cell_id",
         cells_x_col: str = "x",
         cells_y_col: str = "y",
         spots_x_col: str = "x",
@@ -221,14 +300,18 @@ def self_consistency_metrics(
         Use either `bin_width` or `n_bins` to define grid cells.
     obs_key : str, default "celltype"
         The column name in adata.obs for the cell type annotations. Must be the same for both datasets.
+    uns_key : str
+        Key where to find the data containing the spots information in both adata.uns
+    ann_key : str
+        Key where the annotation for teh cell IDs are found in adata.uns[uns_key]
     cells_x_col : str, default "x"
         The column name in adata.obs for the x-coordinates of cells. Must be the same for both datasets.
     cells_y_col : str, default "y"
         The column name in adata.obs for the y-coordinates of cells. Must be the same for both datasets.
     spots_x_col : str, default "x"
-        The column name in adata.uns["spots"] for the x-coordinates of spots. Must be the same for both datasets.
+        The column name in adata.uns[uns_key] for the x-coordinates of spots. Must be the same for both datasets.
     spots_y_col : str, default "y"
-        The column name in adata.uns["spots"] for the y-coordinates of spots. Must be the same for both datasets.
+        The column name in adata.uns[uns_key] for the y-coordinates of spots. Must be the same for both datasets.
 
     Returns
     -------
@@ -252,8 +335,10 @@ def self_consistency_metrics(
     
     # Compute metrics
     out_dict = {}
-    if "ARI_spot_clusters" in metrics:
-        raise NotImplementedError("ARI_spot_clusters is not yet implemented.")
+    if "ARI_cell_assignments" in metrics:
+        out_dict["ARI_cell_assignments"] = _get_ARI_between_cell_assignments_grid(
+            adata_sp1, adata_sp2, region_range, bins, uns_key, ann_key, spots_x_col, spots_y_col
+        )
     if "annotation_similarity" in metrics:
         raise NotImplementedError("annotation_similarity is not yet implemented.")
     
@@ -380,6 +465,4 @@ def metrics(
 
 
 #TODO: Implement the following wrapper functions    
-# - tx.local.image_features(image, adata_sp=None) # adata_sp needs to be given if grid_region is None
 # - tx.local.quality_metrics(adata_sp)
-# - tx.local.metrics(adata_sp, adata_sc)
