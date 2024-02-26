@@ -6,7 +6,24 @@ from pandas import DataFrame
 import sklearn.metrics
 from anndata import AnnData
 
-def calc_rand_index(
+
+def calc_rand_index(assignments: DataFrame):
+     """TODO: Exchange with calc_rand_index_NEW"""
+     rand_matrix = np.zeros([len(assignments.columns), len(assignments.columns)])
+     rand_matrix = pd.DataFrame(rand_matrix)
+     for i in range(len(assignments.columns)):
+         for j in range(len(assignments.columns)):
+             c1 = assignments.iloc[:, i]
+             c2 = assignments.iloc[:, j]
+             rand_matrix.iloc[i, j] = sklearn.metrics.rand_score(c1,c2)
+
+     rand_matrix.columns = assignments.columns
+     rand_matrix.index = assignments.columns
+
+     return rand_matrix
+
+
+def calc_rand_index_NEW(
     adata_sp1: ad.AnnData,
     adata_sp2: ad.AnnData,
     uns_key: str = "spots",
@@ -30,11 +47,11 @@ def calc_rand_index(
     rand_index : float
        Increase in proportion of positive cells assigned in spatial data to pairs of genes-celltyes with no/very low expression in scRNAseq
     '''
-    assert (len(adata_sp1.uns[uns_key])== len(adata_sp2.uns[uns_key])) , "AnnData objects do not have the same number of genes"
+    assert (len(adata_sp1.uns[uns_key])== len(adata_sp2.uns[uns_key])) , "adatas do not have the same number of spots"
 
-    rand_index = sklearn.metrics.adjusted_rand_score(adata_sp1.uns[uns_key][ann_key].values,
-                                                     adata_sp2.uns[uns_key][ann_key].values)
-
+    rand_index = sklearn.metrics.adjusted_rand_score(
+        adata_sp1.uns[uns_key][ann_key].values, adata_sp2.uns[uns_key][ann_key].values
+    )
 
     return rand_index
 
