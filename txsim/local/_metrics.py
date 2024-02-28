@@ -216,7 +216,12 @@ def _get_relative_expression_similarity_across_genes_grid(
             adata_sp_local = adata_sp_region_range[(adata_sp_region_range.obs["bin_y"] == y_bin) & (adata_sp_region_range.obs["bin_x"] == x_bin)]
 
             # find the unique celltypes in the grid field, that are both in the adata_sc and in the adata_sp
-            unique_celltypes=adata_sc.obs.loc[adata_sc.obs[obs_key].isin(adata_sp_local.obs[obs_key]),obs_key].unique()
+            unique_celltypes = adata_sc.obs.loc[adata_sc.obs[obs_key].isin(adata_sp_local.obs[obs_key]),obs_key].unique()
+
+            # If there are no cells in the grid field or no overlap between cell types in sc and sp data, set the local metric to NaN
+            if len(unique_celltypes) == 0:
+                overall_metric_matrix[y_bin, x_bin] = np.nan
+                continue
 
             #### CALCULATE EACH GENE'S MEAN EXPRESSION PER CELL TYPE
             # get the adata_sc cell x gene matrix as a pandas dataframe (w gene names as column names)
