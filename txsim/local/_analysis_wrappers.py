@@ -6,7 +6,9 @@ from typing import List, Dict, Tuple, Optional, Union
 from ._cells_based import _get_cell_density_grid, _get_number_of_celltypes_grid, _get_cell_density_grid_per_celltype
 from ._cells_based import _get_celltype_ratio_grid, _get_spot_uniformity_within_cells_grid
 from ._spots_based import _get_spot_density_grid
-from ._metrics import _get_knn_mixing_grid, _get_celltype_proportions_grid, _get_relative_expression_similarity_across_genes_grid
+from ._metrics import _get_knn_mixing_grid, _get_celltype_proportions_grid
+from ._metrics import _get_relative_expression_similarity_across_genes_grid
+from ._metrics import _get_relative_expression_between_celltypes_grid
 from ._self_consistency_metrics import _get_ARI_between_cell_assignments_grid
 
 SUPPORTED_CELL_AND_SPOT_STATISTICS = [
@@ -447,12 +449,14 @@ def metrics(
         #out_dict["coexpression_similarity"] = _get_coexpression_similarity_grid(adata_sp, adata_sc, ct_key, region_range, bins, cells_x_col, cells_y_col)
     if "relative_expression_similarity_across_genes" in metrics:
         out_dict["relative_expression_similarity_across_genes"] = _get_relative_expression_similarity_across_genes_grid(
-            adata_sp, adata_sc, region_range, bins, obs_key, layer, cells_x_col, cells_y_col, normalization, contribution)
+            adata_sp, adata_sc, region_range, bins, obs_key, layer, cells_x_col, cells_y_col, normalization,
+            contribution
+        )
     if "relative_expression_similarity_across_celltypes" in metrics:
-        raise NotImplementedError("relative_expression_similarity_across_celltypes is not yet implemented.")
-        #out_dict["relative_expression_similarity_across_celltypes"] = _get_relative_expression_similarity_across_celltypes_grid(
-        #    adata_sp, adata_sc, ct_key, region_range, bins, cells_x_col, cells_y_col
-        #)
+        out_dict["relative_expression_similarity_across_celltypes"] = _get_relative_expression_between_celltypes_grid(
+            adata_sp, adata_sc, region_range, bins, obs_key, layer, cells_x_col, cells_y_col, normalization, 
+            contribution
+        )
     if "celltype_proportions" in metrics:
         out_dict["celltype_proportions_abs_diff"] = _get_celltype_proportions_grid(
             adata_sp.copy(), adata_sc.copy(), region_range, bins, abs_score=True,
