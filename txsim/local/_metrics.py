@@ -7,6 +7,7 @@ from scipy.sparse import issparse
 from ..metrics import knn_mixing_per_cell_score
 from ..metrics import mean_proportion_deviation
 from ..metrics import relative_pairwise_gene_expression
+from ._utils import _get_bin_ids
 
 #TODO: "negative_marker_purity_reads", "negative_marker_purity_cells", "coexpression_similarity", 
 #    "relative_expression_similarity_across_celltypes",
@@ -197,23 +198,27 @@ def _get_relative_expression_similarity_across_genes_grid(
         if issparse(a.X):
             a.layers[layer] = a.layers[layer].toarray()
 
+    # get bin ids
+    adata_sp.obs = _get_bin_ids(adata_sp.obs, region_range, bins, cells_x_col, cells_y_col)
+
     # only consider cells within the specified region
-    adata_sp_region_range = adata_sp[(adata_sp.obs[cells_y_col] >= region_range[0][0]) &
-                                     (adata_sp.obs[cells_y_col] <= region_range[0][1]) &
-                                     (adata_sp.obs[cells_x_col] >= region_range[1][0]) &
-                                     (adata_sp.obs[cells_x_col] <= region_range[1][1])]
+    adata_sp_region_range = adata_sp[(adata_sp.obs["y_bin"] != -1) & (adata_sp.obs["x_bin"] != -1)]
+    #adata_sp_region_range = adata_sp[(adata_sp.obs[cells_y_col] >= region_range[0][0]) &
+                                    # (adata_sp.obs[cells_y_col] <= region_range[0][1]) &
+                                    # (adata_sp.obs[cells_x_col] >= region_range[1][0]) &
+                                     #(adata_sp.obs[cells_x_col] <= region_range[1][1])]
 
     # add "bin" label columns to adata_sp
-    adata_sp_region_range.obs["bin_y"] = pd.cut(adata_sp_region_range.obs[cells_y_col], bins=bins[0], labels=False)
-    adata_sp_region_range.obs["bin_x"] = pd.cut(adata_sp_region_range.obs[cells_x_col], bins=bins[1], labels=False)
+    #adata_sp_region_range.obs["bin_y"] = pd.cut(adata_sp_region_range.obs[cells_y_col], bins=bins[0], labels=False)
+    #adata_sp_region_range.obs["bin_x"] = pd.cut(adata_sp_region_range.obs[cells_x_col], bins=bins[1], labels=False)
 
     # create an empty matrix to store the computed metric for each grid field
     overall_metric_matrix = np.zeros((bins[0], bins[1]))
 
-    for y_bin in adata_sp_region_range.obs["bin_y"].unique():
-        for x_bin in adata_sp_region_range.obs["bin_x"].unique():
+    for y_bin in adata_sp_region_range.obs["y_bin"].unique():
+        for x_bin in adata_sp_region_range.obs["x_bin"].unique():
             # subset the spatial data to only include cells in the current grid field
-            adata_sp_local = adata_sp_region_range[(adata_sp_region_range.obs["bin_y"] == y_bin) & (adata_sp_region_range.obs["bin_x"] == x_bin)]
+            adata_sp_local = adata_sp_region_range[(adata_sp_region_range.obs["y_bin"] == y_bin) & (adata_sp_region_range.obs["x_bin"] == x_bin)]
 
             # find the unique celltypes in the grid field, that are both in the adata_sc and in the adata_sp
             unique_celltypes=adata_sc.obs.loc[adata_sc.obs[obs_key].isin(adata_sp_local.obs[obs_key]),obs_key].unique()
@@ -312,8 +317,8 @@ def _get_relative_expression_similarity_across_genes_grid(
 
         nr_grid_fields = np.sum(~np.isnan(overall_metric_matrix))
         metric_contribution_matrix = np.zeros((bins[0], bins[1]))
-        for y_bin in adata_sp_region_range.obs["bin_y"].unique():
-            for x_bin in adata_sp_region_range.obs["bin_x"].unique():
+        for y_bin in adata_sp_region_range.obs["y_bin"].unique():
+            for x_bin in adata_sp_region_range.obs["x_bin"].unique():
                 # calculate the difference in the local metric matrix explained by the grid field
                 diff_explained_by_grid_field = (nr_grid_fields * (1 - overall_metric_matrix[y_bin, x_bin])
                                                 / (nr_grid_fields - np.nansum(overall_metric_matrix)))
