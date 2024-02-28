@@ -61,3 +61,64 @@ def calc_annotation_matrix(adata_list: list, name_list: list):
     ann_matrix.index = name_list
     
     return ann_matrix
+    
+def _get_annotation_similarity_per_grid(
+    adata_sp1: ad.AnnData,
+    adata_sp2: ad.AnnData,
+    region_range: Tuple[Tuple[float, float], Tuple[float, float]],
+    bins: Tuple[int, int],
+    spots_x_col: str = "x",
+    spots_y_col: str = "y",
+):
+    ''' Calculate ...(?)
+    Parameters
+    ----------
+    adata_sp1 : AnnData
+        Annotated ``AnnData`` object with counts from spatial data and spots from clustering1
+    adata_sp2 : AnnData
+        Annotated ``AnnData`` object with counts from spatial data and spots from clustering2
+    region_range : Tuple[Tuple[float, float], Tuple[float, float]]
+        The range of the grid is specified as ((y_min, y_max), (x_min, x_max)).
+    bins : Tuple[int, int]
+        The number of bins along the y and x axes, formatted as (ny, nx).
+    uns_key : str
+        Key where to find the data containing the spots information in both adata.uns
+    ann_key : str
+        Key where the annotation for the cell IDs are found in adata.uns[uns_key]
+    spots_x_col : str, default "x"
+        The column name in adata.uns[uns_key] for the x-coordinates of spots. Must be the same for both datasets.
+    spots_y_col : str, default "y"
+        The column name in adata.uns[uns_key] for the y-coordinates of spots. Must be the same for both datasets.
+    pipeline_output : float, optional
+        Boolean for whether to use the function in the pipeline or not
+    Returns
+    -------
+    grouped_mean : list
+    contains a list where x-axis is the bins and y-axis the annotation_similarity in this grid
+    '''
+    # dataframes of uns restricted to region_range
+    df1 = adata_sp1.uns['spots'][((adata_sp1.uns['spots'][spots_y_col] >= region_range[0][0])&(adata_sp1.uns['spots'][spots_y_col] <= region_range[0][1]))&
+                                 ((adata_sp1.uns['spots'][spots_x_col] >= region_range[1][0])&(adata_sp1.uns['spots'][spots_x_col] <= region_range[1][1]))]
+    df2 = adata_sp2.uns['spots'][((adata_sp1.uns['spots'][spots_y_col] >= region_range[0][0])&(adata_sp1.uns['spots'][spots_y_col] <= region_range[0][1]))&
+                                 ((adata_sp1.uns['spots'][spots_x_col] >= region_range[1][0])&(adata_sp1.uns['spots'][spots_x_col] <= region_range[1][1]))]
+    
+    # assign bin to each xy coordinate and save in adata.uns
+    adata_sp1.uns['spots']["bin_y"] = pd.cut(adata_sp1.uns['spots'][spots_y_col], bins=bins[0], labels=False)
+    adata_sp1.uns['spots']["bin_x"] = pd.cut(adata_sp1.uns['spots'][spots_x_col], bins=bins[1], labels=False)
+    adata_sp2.uns['spots']["bin_y"] = pd.cut(adata_sp2.uns['spots'][spots_y_col], bins=bins[0], labels=False)
+    adata_sp2.uns['spots']["bin_x"] = pd.cut(adata_sp2.uns['spots'][spots_x_col], bins=bins[1], labels=False)
+    df1 = adata_sp1.uns['spots']
+    df2 = adata_sp2.uns['spots']
+
+    # new Dataframe, size as bins
+    df1 = get_bin_ids(df1,region_range, bins)
+    df2 = get_bin_ids(df2,region_range, bins)
+
+    # calc annotation similarity mean
+    
+    celltype_comparison = (df1['celltype'] == df2['celltype'])
+    df1['annotations_present'] = celltype_comparison
+
+    grouped_mean = df1.groupby(['bin_y', 'bin_x'])['annotations_present'].mean()
+
+    return grouped_mean
