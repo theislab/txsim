@@ -416,8 +416,12 @@ def _get_relative_expression_between_celltypes_grid(
             adata_sp_local = adata_sp_region_range[(adata_sp_region_range.obs["bin_y"] == y_bin) & (adata_sp_region_range.obs["bin_x"] == x_bin)]
 
             # find the unique celltypes in the grid field, that are both in the adata_sc and in the adata_sp
-            unique_celltypes=adata_sc.obs.loc[adata_sc.obs[obs_key].isin(adata_sp_local.obs[obs_key]),obs_key].unique()
+            unique_celltypes = adata_sc.obs.loc[adata_sc.obs[obs_key].isin(adata_sp_local.obs[obs_key]),obs_key].unique()
 
+            # If there are not at least two shared cell types in the grid field set the local metric to NaN
+            if len(unique_celltypes) <= 1:
+                overall_metric_matrix[y_bin, x_bin] = np.nan
+                continue
 
             #### CALCULATE EACH GENE'S MEAN EXPRESSION PER CELL TYPE
             # get the adata_sc cell x gene matrix as a pandas dataframe (w gene names as column names)
@@ -442,7 +446,6 @@ def _get_relative_expression_between_celltypes_grid(
             mean_celltype_sc = mean_celltype_sc.loc[:, mean_celltype_sc.columns.sort_values()]
             mean_celltype_sp_local = mean_celltype_sp_local.loc[:, mean_celltype_sp_local.columns.sort_values()]
             
-            print(mean_celltype_sc)
             #### CALCULATE EXPRESSION DIFFERENCES BETWEEN ALL PAIRS OF GENES FOR EACH CELLTYPE
             mean_celltype_sc_np = mean_celltype_sc.T.to_numpy()
             pairwise_distances_sc = mean_celltype_sc_np[:, :, np.newaxis] - mean_celltype_sc_np[:, np.newaxis, :]
@@ -512,7 +515,7 @@ def _get_relative_expression_between_celltypes_grid(
 
 
 
-      # calculate the contribution of each grid field to the overall metric, if contribution is set to True
+    # calculate the contribution of each grid field to the overall metric, if contribution is set to True
     if contribution:
         # calculate global metric for the entire spatial dataset (not just in the region range)
         overall_metric = relative_pairwise_celltype_expression(adata_sp, adata_sc, key=obs_key, pipeline_output=True)
