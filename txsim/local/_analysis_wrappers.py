@@ -4,12 +4,13 @@ import anndata as ad
 from typing import List, Dict, Tuple, Optional, Union
 
 from ._cells_based import _get_cell_density_grid, _get_number_of_celltypes_grid, _get_cell_density_grid_per_celltype
-from ._cells_based import _get_celltype_ratio_grid, _get_spot_uniformity_within_cells_grid
+from ._cells_based import _get_celltype_ratio_grid, _get_spot_uniformity_within_cells_grid, _get_summed_cell_area_grid
 from ._spots_based import _get_spot_density_grid
 from ._metrics import _get_knn_mixing_grid, _get_celltype_proportions_grid
 from ._metrics import _get_relative_expression_similarity_across_genes_grid
 from ._metrics import _get_relative_expression_between_celltypes_grid
 from ._self_consistency_metrics import _get_ARI_between_cell_assignments_grid
+from ._self_consistency_metrics import _get_spots_based_annotation_similarity_grid
 
 SUPPORTED_CELL_AND_SPOT_STATISTICS = [
     "cell_density", "spot_density", "cell_density_per_celltype", "celltype_percentage", "number_of_celltypes", 
@@ -162,8 +163,15 @@ def cell_and_spot_statistics(
     if "cell_density" in metrics:
         out_dict["cell_density"] = _get_cell_density_grid(adata_sp, region_range, bins, cells_x_col, cells_y_col)
         
+    if "summed_cell_area" in metrics:
+        out_dict["summed_cell_area"] = _get_summed_cell_area_grid(
+            adata_sp, region_range, bins, area_key="area", cells_x_col=cells_x_col, cells_y_col=cells_y_col
+        )
+        
     if "number_of_celltypes" in metrics:
-        out_dict["number_of_celltypes"] = _get_number_of_celltypes_grid(adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col)
+        out_dict["number_of_celltypes"] = _get_number_of_celltypes_grid(
+            adata_sp, region_range, bins, obs_key, cells_x_col, cells_y_col
+        )
         
     if "cell_density_per_celltype" in metrics:
         density_grid_dict = _get_cell_density_grid_per_celltype(
@@ -268,6 +276,7 @@ def self_consistency_metrics(
         obs_key: str = "celltype",
         uns_key: str = "spots",
         ann_key: str = "cell_id",
+        spots_ct_key: str = "celltype",
         cells_x_col: str = "x",
         cells_y_col: str = "y",
         spots_x_col: str = "x",
@@ -306,6 +315,8 @@ def self_consistency_metrics(
         Key where to find the data containing the spots information in both adata.uns
     ann_key : str
         Key where the annotation for teh cell IDs are found in adata.uns[uns_key]
+    spots_ct_key : str
+        The column name in adata.uns[uns_key] for the cell type annotations. Must be the same for both datasets.
     cells_x_col : str, default "x"
         The column name in adata.obs for the x-coordinates of cells. Must be the same for both datasets.
     cells_y_col : str, default "y"
@@ -342,7 +353,9 @@ def self_consistency_metrics(
             adata_sp1, adata_sp2, region_range, bins, uns_key, ann_key, spots_x_col, spots_y_col
         )
     if "annotation_similarity" in metrics:
-        raise NotImplementedError("annotation_similarity is not yet implemented.")
+        out_dict["annotation_similarity"] = _get_spots_based_annotation_similarity_grid(
+            adata_sp1, adata_sp2, region_range, bins, uns_key, spots_ct_key, spots_x_col, spots_y_col
+        )
     
     return out_dict, grid_coords
 

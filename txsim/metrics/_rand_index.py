@@ -96,3 +96,20 @@ def calc_annotation_matrix(adata_list: list, name_list: list):
     ann_matrix.index = name_list
     
     return ann_matrix
+    
+    
+def calc_annotation_similarity_spots_based(adata_sp1: ad.AnnData, adata_sp2: ad.AnnData, ct_key: str = "celltype"):
+    """ Calculate the similarity of cell type annotations between two spatial datasets.
+    
+    """
+    # Convert AnnData object to DataFrame
+    adata1_spots = adata_sp1.uns['spots'].copy()
+    adata2_spots = adata_sp2.uns['spots'].copy()
+
+    assert (len(adata1_spots)==len(adata2_spots)), "AnnData Objects do not have the same number of spots."
+
+    # Calculate similarity
+    similarity = np.mean(adata1_spots[ct_key] == adata2_spots[ct_key])
+    
+    return similarity
+
