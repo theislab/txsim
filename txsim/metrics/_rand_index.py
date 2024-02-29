@@ -6,19 +6,54 @@ from pandas import DataFrame
 import sklearn.metrics
 from anndata import AnnData
 
-def calc_rand_index(assignments: DataFrame):
-    rand_matrix = np.zeros([len(assignments.columns), len(assignments.columns)])
-    rand_matrix = pd.DataFrame(rand_matrix)
-    for i in range(len(assignments.columns)):
-        for j in range(len(assignments.columns)):
-            c1 = assignments.iloc[:, i]
-            c2 = assignments.iloc[:, j]
-            rand_matrix.iloc[i, j] = sklearn.metrics.rand_score(c1,c2)
 
-    rand_matrix.columns = assignments.columns
-    rand_matrix.index = assignments.columns
-    
-    return rand_matrix
+def calc_rand_index(assignments: DataFrame):
+     """TODO: Exchange with calc_rand_index_NEW"""
+     rand_matrix = np.zeros([len(assignments.columns), len(assignments.columns)])
+     rand_matrix = pd.DataFrame(rand_matrix)
+     for i in range(len(assignments.columns)):
+         for j in range(len(assignments.columns)):
+             c1 = assignments.iloc[:, i]
+             c2 = assignments.iloc[:, j]
+             rand_matrix.iloc[i, j] = sklearn.metrics.rand_score(c1,c2)
+
+     rand_matrix.columns = assignments.columns
+     rand_matrix.index = assignments.columns
+
+     return rand_matrix
+
+
+def calc_rand_index_NEW(
+    adata_sp1: ad.AnnData,
+    adata_sp2: ad.AnnData,
+    uns_key: str = "spots",
+    ann_key: str = "cell_id",
+    pipeline_output: bool=True):
+    '''
+     Parameters
+    ----------
+    adata_sp1 : AnnData
+        Annotated ``AnnData`` object with counts from spatial data and spots from clustering1
+    adata_sp2 : AnnData
+        Annotated ``AnnData`` object with counts from spatial data and spots from clustering2
+    uns_key : str
+        Key where to find the data containing the spots information in both adata.uns
+    ann_key : str
+        Key where the annotation for teh cell IDs are found in adata.uns[uns_key]
+    pipeline_output : float, optional
+        Boolean for whether to use the function in the pipeline or not
+    Returns
+    -------
+    rand_index : float
+       Increase in proportion of positive cells assigned in spatial data to pairs of genes-celltyes with no/very low expression in scRNAseq
+    '''
+    assert (len(adata_sp1.uns[uns_key])== len(adata_sp2.uns[uns_key])) , "adatas do not have the same number of spots"
+
+    rand_index = sklearn.metrics.adjusted_rand_score(
+        adata_sp1.uns[uns_key][ann_key].values, adata_sp2.uns[uns_key][ann_key].values
+    )
+
+    return rand_index
 
 def aggregate_rand_index(matrices: list):
     df_mean = matrices[0].copy()
@@ -62,63 +97,19 @@ def calc_annotation_matrix(adata_list: list, name_list: list):
     
     return ann_matrix
     
-def _get_annotation_similarity_per_grid(
-    adata_sp1: ad.AnnData,
-    adata_sp2: ad.AnnData,
-    region_range: Tuple[Tuple[float, float], Tuple[float, float]],
-    bins: Tuple[int, int],
-    spots_x_col: str = "x",
-    spots_y_col: str = "y",
-):
-    ''' Calculate ...(?)
-    Parameters
-    ----------
-    adata_sp1 : AnnData
-        Annotated ``AnnData`` object with counts from spatial data and spots from clustering1
-    adata_sp2 : AnnData
-        Annotated ``AnnData`` object with counts from spatial data and spots from clustering2
-    region_range : Tuple[Tuple[float, float], Tuple[float, float]]
-        The range of the grid is specified as ((y_min, y_max), (x_min, x_max)).
-    bins : Tuple[int, int]
-        The number of bins along the y and x axes, formatted as (ny, nx).
-    uns_key : str
-        Key where to find the data containing the spots information in both adata.uns
-    ann_key : str
-        Key where the annotation for the cell IDs are found in adata.uns[uns_key]
-    spots_x_col : str, default "x"
-        The column name in adata.uns[uns_key] for the x-coordinates of spots. Must be the same for both datasets.
-    spots_y_col : str, default "y"
-        The column name in adata.uns[uns_key] for the y-coordinates of spots. Must be the same for both datasets.
-    pipeline_output : float, optional
-        Boolean for whether to use the function in the pipeline or not
-    Returns
-    -------
-    grouped_mean : list
-    contains a list where x-axis is the bins and y-axis the annotation_similarity in this grid
-    '''
-    # dataframes of uns restricted to region_range
-    df1 = adata_sp1.uns['spots'][((adata_sp1.uns['spots'][spots_y_col] >= region_range[0][0])&(adata_sp1.uns['spots'][spots_y_col] <= region_range[0][1]))&
-                                 ((adata_sp1.uns['spots'][spots_x_col] >= region_range[1][0])&(adata_sp1.uns['spots'][spots_x_col] <= region_range[1][1]))]
-    df2 = adata_sp2.uns['spots'][((adata_sp1.uns['spots'][spots_y_col] >= region_range[0][0])&(adata_sp1.uns['spots'][spots_y_col] <= region_range[0][1]))&
-                                 ((adata_sp1.uns['spots'][spots_x_col] >= region_range[1][0])&(adata_sp1.uns['spots'][spots_x_col] <= region_range[1][1]))]
     
-    # assign bin to each xy coordinate and save in adata.uns
-    adata_sp1.uns['spots']["bin_y"] = pd.cut(adata_sp1.uns['spots'][spots_y_col], bins=bins[0], labels=False)
-    adata_sp1.uns['spots']["bin_x"] = pd.cut(adata_sp1.uns['spots'][spots_x_col], bins=bins[1], labels=False)
-    adata_sp2.uns['spots']["bin_y"] = pd.cut(adata_sp2.uns['spots'][spots_y_col], bins=bins[0], labels=False)
-    adata_sp2.uns['spots']["bin_x"] = pd.cut(adata_sp2.uns['spots'][spots_x_col], bins=bins[1], labels=False)
-    df1 = adata_sp1.uns['spots']
-    df2 = adata_sp2.uns['spots']
-
-    # new Dataframe, size as bins
-    df1 = get_bin_ids(df1,region_range, bins)
-    df2 = get_bin_ids(df2,region_range, bins)
-
-    # calc annotation similarity mean
+def calc_annotation_similarity_spots_based(adata_sp1: ad.AnnData, adata_sp2: ad.AnnData, ct_key: str = "celltype"):
+    """ Calculate the similarity of cell type annotations between two spatial datasets.
     
-    celltype_comparison = (df1['celltype'] == df2['celltype'])
-    df1['annotations_present'] = celltype_comparison
+    """
+    # Convert AnnData object to DataFrame
+    adata1_spots = adata_sp1.uns['spots'].copy()
+    adata2_spots = adata_sp2.uns['spots'].copy()
 
-    grouped_mean = df1.groupby(['bin_y', 'bin_x'])['annotations_present'].mean()
+    assert (len(adata1_spots)==len(adata2_spots)), "AnnData Objects do not have the same number of spots."
 
-    return grouped_mean
+    # Calculate similarity
+    similarity = np.mean(adata1_spots[ct_key] == adata2_spots[ct_key])
+    
+    return similarity
+
