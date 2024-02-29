@@ -9,7 +9,8 @@ def _get_bin_ids(df, region_range, bins, x_col='x', y_col='y'):
     df : pd.DataFrame
         Dataframe containing the x and y coordinates.
     region_range : Tuple[Tuple[float, float], Tuple[float, float]]
-        The range of the grid specified as ((y_min, y_max), (x_min, x_max)).
+        The range of the grid specified as ((y_min, y_max), (x_min, x_max)). Points of df are within bins if they are
+        within the interval y_min <= y < y_max and x_min <= x < x_max otherwise bin ids are set to -1.
     bins : Tuple[int, int]
         The number of bins along the y and x axes, formatted as (ny, nx).
         
@@ -27,8 +28,8 @@ def _get_bin_ids(df, region_range, bins, x_col='x', y_col='y'):
     mask = (df[y_col] < y_min) | (df[y_col] > y_max) | (df[x_col] < x_min) | (df[x_col] > x_max)
 
     # Create bin edges
-    y_bins = np.linspace(y_min, y_max, ny)
-    x_bins = np.linspace(x_min, x_max, nx)
+    y_bins = np.linspace(y_min, y_max, ny + 1)
+    x_bins = np.linspace(x_min, x_max, nx + 1)
 
     # Assign bins to y and x coordinates (-1 to start indexing from 0)
     df['y_bin'] = np.digitize(df[y_col], y_bins) - 1  
@@ -37,5 +38,9 @@ def _get_bin_ids(df, region_range, bins, x_col='x', y_col='y'):
     # Set bins outside of region_range to -1
     df.loc[mask, 'y_bin'] = -1
     df.loc[mask, 'x_bin'] = -1
+    
+    # if coordinates are exactly on the upper edge of the region, digitize sets the bin id to ny/nx --> set to -1
+    df.loc[df['y_bin'] == ny, 'y_bin'] = -1
+    df.loc[df['x_bin'] == nx, 'x_bin'] = -1
 
     return df

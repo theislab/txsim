@@ -57,8 +57,9 @@ def _convert_grid_specification_to_range_and_bins(
     assert (bin_width is None) != (n_bins is None), "Either bin_width or n_bins must be provided."
     
     if grid_region is None:
-        y_min, y_max = spots[spots_y_col].min(), spots[spots_y_col].max()
-        x_min, x_max = spots[spots_x_col].min(), spots[spots_x_col].max()
+        eps = 1e-6
+        y_min, y_max = spots[spots_y_col].min(), spots[spots_y_col].max() + eps
+        x_min, x_max = spots[spots_x_col].min(), spots[spots_x_col].max() + eps
     elif isinstance(grid_region, list) and (len(grid_region) == 2):
         if isinstance(grid_region[0], list) and isinstance(grid_region[1], list):
             y_min, y_max = grid_region[0]
@@ -118,7 +119,7 @@ def cell_and_spot_statistics(
     grid_region : List[Union[float, List[float]]], optional
         The spatial domain over which to set the grid. Options include:
         1. [y_max, x_max] (e.g., the shape of the associated DAPI image).
-        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy <= xy_max).
+        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy < xy_max).
         3. None (if None, the grid is inferred from the min and max spots' coordinates).
     bin_width : float, optional
         The width of each grid field. Use either `bin_width` or `n_bins` to define grid cells.
@@ -222,7 +223,7 @@ def image_features(
     grid_region : List[Union[float, List[float]]], optional
         The spatial domain over which to set the grid. Options include:
         1. [y_max, x_max] (e.g., the shape of the associated DAPI image).
-        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy <= xy_max).
+        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy < xy_max).
         3. None (if None and adata_sp given, the grid is inferred from the min and max spots' coordinates, if adata_sp not given, the grid is inferred from the shape of image).
     bin_width : float, optional
         The width of each grid field. Use either `bin_width` or `n_bins` to define grid cells.
@@ -302,7 +303,7 @@ def self_consistency_metrics(
     grid_region : List[Union[float, List[float]]], optional
         The spatial domain over which to set the grid. The same grid is used for both spatial datasets. Options include:
         1. [y_max, x_max] (e.g., the shape of the associated DAPI image).
-        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy <= xy_max).
+        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy < xy_max).
         3. None (if None, the grid is inferred from the min and max spots' coordinates).
     bin_width : float, optional
         The width of each grid field. Use either `bin_width` or `n_bins` to define grid cells.
@@ -392,7 +393,7 @@ def metrics(
     grid_region : List[Union[float, List[float]]], optional
         The spatial domain over which to set the grid. Options include:
         1. [y_max, x_max] (e.g., the shape of the associated DAPI image).
-        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy <= xy_max).
+        2. [[y_min, y_max], [x_min, x_max]] (e.g., coordinates of a cropped area -> grid: xy_min <= xy < xy_max).
         3. None (if None, the grid is inferred from the min and max spots' coordinates).
     bin_width : float, optional
         The width of each grid field. Use either `bin_width` or `n_bins` to define grid cells.
