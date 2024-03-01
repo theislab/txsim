@@ -204,14 +204,6 @@ def _get_relative_expression_similarity_across_genes_grid(
 
     # only consider cells within the specified region
     adata_sp_region_range = adata_sp[(adata_sp.obs["y_bin"] != -1) & (adata_sp.obs["x_bin"] != -1)]
-    #adata_sp_region_range = adata_sp[(adata_sp.obs[cells_y_col] >= region_range[0][0]) &
-                                    # (adata_sp.obs[cells_y_col] <= region_range[0][1]) &
-                                    # (adata_sp.obs[cells_x_col] >= region_range[1][0]) &
-                                     #(adata_sp.obs[cells_x_col] <= region_range[1][1])]
-
-    # add "bin" label columns to adata_sp
-    #adata_sp_region_range.obs["bin_y"] = pd.cut(adata_sp_region_range.obs[cells_y_col], bins=bins[0], labels=False)
-    #adata_sp_region_range.obs["bin_x"] = pd.cut(adata_sp_region_range.obs[cells_x_col], bins=bins[1], labels=False)
 
     # create an empty matrix to store the computed metric for each grid field
     overall_metric_matrix = np.zeros((bins[0], bins[1]))
