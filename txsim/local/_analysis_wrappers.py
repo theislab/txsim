@@ -8,7 +8,7 @@ from ._cells_based import _get_celltype_ratio_grid, _get_spot_uniformity_within_
 from ._spots_based import _get_spot_density_grid
 from ._metrics import _get_knn_mixing_grid, _get_celltype_proportions_grid
 from ._metrics import _get_relative_expression_similarity_across_genes_grid
-from ._metrics import _get_relative_expression_between_celltypes_grid
+from ._metrics import _get_relative_expression_similarity_across_celltypes_grid
 from ._self_consistency_metrics import _get_ARI_between_cell_assignments_grid
 from ._self_consistency_metrics import _get_spots_based_annotation_similarity_grid
 
@@ -467,7 +467,7 @@ def metrics(
             contribution
         )
     if "relative_expression_similarity_across_celltypes" in metrics:
-        out_dict["relative_expression_similarity_across_celltypes"] = _get_relative_expression_between_celltypes_grid(
+        out_dict["relative_expression_similarity_across_celltypes"] = _get_relative_expression_similarity_across_celltypes_grid(
             adata_sp, adata_sc, region_range, bins, obs_key, layer, cells_x_col, cells_y_col, normalization, 
             contribution
         )
