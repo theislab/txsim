@@ -74,3 +74,66 @@ def _get_ARI_between_cell_assignments_grid(
         ARI_per_bin[y, x] = sklearn.metrics.adjusted_rand_score(c1, c2)
 
     return ARI_per_bin
+
+
+def _get_spots_based_annotation_similarity_grid(
+    adata_sp1: ad.AnnData,
+    adata_sp2: ad.AnnData,
+    region_range: Tuple[Tuple[float, float], Tuple[float, float]],
+    bins: Tuple[int, int],
+    uns_key: str = "spots",
+    ct_key: str = "celltype",
+    spots_x_col: str = "x",
+    spots_y_col: str = "y",
+) -> np.ndarray:
+    ''' Calculate for every bin the similarity of cell type annotations on spots level
+    
+    Parameters
+    ----------
+    adata_sp1 : AnnData
+        Annotated ``AnnData`` object with counts from spatial data and spots from clustering1
+    adata_sp2 : AnnData
+        Annotated ``AnnData`` object with counts from spatial data and spots from clustering2
+    region_range : Tuple[Tuple[float, float], Tuple[float, float]]
+        The range of the grid is specified as ((y_min, y_max), (x_min, x_max)).
+    bins : Tuple[int, int]
+        The number of bins along the y and x axes, formatted as (ny, nx).
+    uns_key : str
+        Key of adata.uns for the spots table.
+    ct_key : str
+        Column in adata.uns[uns_key] containing the cell type annotations.
+    spots_x_col : str, default "x"
+        The column name in adata.uns[uns_key] for the x-coordinates of spots. Must be the same for both datasets.
+    spots_y_col : str, default "y"
+        The column name in adata.uns[uns_key] for the y-coordinates of spots. Must be the same for both datasets.
+    pipeline_output : float, optional
+        Boolean for whether to use the function in the pipeline or not
+        
+    Returns
+    -------
+    ann_sim_per_bin : np.ndarray
+        Annotation similarity for every bin
+    '''
+    
+    df1 = adata_sp1.uns[uns_key].copy()
+    df2 = adata_sp2.uns[uns_key].copy()
+    assert (len(df1)==len(df2)), "AnnData Objects do not have the same number of spots."
+    
+    # get bin ids
+    df1 = _get_bin_ids(df1, region_range, bins, x_col=spots_x_col, y_col=spots_y_col)
+    df2 = _get_bin_ids(df2, region_range, bins, x_col=spots_x_col, y_col=spots_y_col)
+
+    # calc annotation similarity mean
+    df1['equal_annotation'] = (df1[ct_key] == df2[ct_key])
+    grouped_mean = df1.groupby(['y_bin', 'x_bin'])['equal_annotation'].mean()
+
+    ann_sim_per_bin = np.full(bins, np.nan)
+    for (y, x), mean in grouped_mean.items():
+        if y == -1 or x == -1:
+            continue
+        ann_sim_per_bin[y, x] = mean
+
+    return ann_sim_per_bin
+
+
+
