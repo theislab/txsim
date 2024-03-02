@@ -166,6 +166,7 @@ class Simulation:
 
             # Simulate cell positions
             cell_radii = np.random.uniform(*radius_range, len(cells_in_grid))
+            cell_areas = np.pi * cell_radii ** 2
             x_cells, y_cells = zip(*[sample_cell_pos(cell_sampling_type, r) for r in cell_radii])
             x_cells, y_cells = list(x_cells), list(y_cells)
 
@@ -174,7 +175,7 @@ class Simulation:
             overlapping_counter = 0
             while overlapping:
                 overlapping = False
-                assert overlapping_counter < 100, "Could not find non-overlapping cell positions. Please decrease the possible cell radii."
+                assert overlapping_counter < 250, "Could not find non-overlapping cell positions. Please decrease the possible cell radii."
                 for i in range(len(x_cells)):
                     for j in range(i + 1, len(x_cells)):
                         distance = np.sqrt((x_cells[i] - x_cells[j]) ** 2 + (y_cells[i] - y_cells[j]) ** 2)
@@ -184,7 +185,7 @@ class Simulation:
                             # If there is an overlap, sample new positions for one of the overlapping cells
                             x_cells[j], y_cells[j] = sample_cell_pos(cell_sampling_type, cell_radii[j])
 
-            new_cell_pos_list.append(pd.DataFrame({"cell_id": cells_in_grid, "x": x_cells, "y": y_cells}))
+            new_cell_pos_list.append(pd.DataFrame({"cell_id": cells_in_grid, "x": x_cells, "y": y_cells, "area": cell_areas}))
 
             # Simulate spot positions
             spots_df = adata_sp.uns["spots"][adata_sp.uns["spots"]["cell_id"].isin(cells_in_grid)]
@@ -218,6 +219,7 @@ class Simulation:
         new_cell_pos = pd.concat(new_cell_pos_list).set_index('cell_id').loc[adata_sp.obs_names].reset_index()
         adata_sp.obs["x"] = new_cell_pos["x"].tolist()
         adata_sp.obs["y"] = new_cell_pos["y"].tolist()
+        adata_sp.obs["area"] = new_cell_pos["area"].tolist()
 
         adata_sp.uns["spots"] = pd.concat(new_spot_pos_list)
 
