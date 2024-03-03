@@ -434,7 +434,6 @@ class Simulation:
         if x_grid is not None and y_grid is not None:
             adata_sp = adata_sp[(adata_sp.obs[x_grid_col] == x_grid) & (adata_sp.obs[y_grid_col] == y_grid)]
 
-        expr_name = f"Expression in all cell types" if cell_type == "all" else f"Expression in {cell_type}"
         if cell_type == "all":
             cell_type = adata_sc.obs.loc[adata_sc.obs[cell_type_key].isin(adata_sp.obs[cell_type_key]),cell_type_key].unique()
         adata_sp = adata_sp[adata_sp.obs[cell_type_key].isin(cell_type)]
@@ -446,18 +445,21 @@ class Simulation:
         # get gene pairs
         gene_pairs = list(itertools.combinations(genes, 2))
 
-        fig, axs = plt.subplots(1, len(gene_pairs), figsize=(5*len(gene_pairs), 5))
-        for i, (gene1, gene2) in enumerate(gene_pairs):
-            plot_df = pd.DataFrame({
-                "Gene": np.concatenate([np.repeat(gene1, (adata_sp.n_obs+adata_sc.n_obs)), np.repeat(gene2, (adata_sp.n_obs+adata_sc.n_obs))]),
-                "Modality": np.concatenate([np.repeat("Spatial", adata_sp.n_obs), np.repeat("scRNA-seq", adata_sc.n_obs),
-                                            np.repeat("Spatial", adata_sp.n_obs), np.repeat("scRNA-seq", adata_sc.n_obs)]),
-                f"{expr_name}": np.concatenate([adata_sp[:, gene1].X.toarray().flatten(), adata_sc[:, gene1].X.toarray().flatten(),
-                                                              adata_sp[:, gene2].X.toarray().flatten(), adata_sc[:, gene2].X.toarray().flatten()])
-            })
+        fig, axs = plt.subplots(len(cell_type), len(gene_pairs), figsize=(5*len(gene_pairs), 5*len(cell_type)))
+        for j, ct in enumerate(cell_type):
+            adata_sp_ct = adata_sp[adata_sp.obs[cell_type_key] == ct]
+            adata_sc_ct = adata_sc[adata_sc.obs[cell_type_key] == ct]
+            for i, (gene1, gene2) in enumerate(gene_pairs):
+                plot_df = pd.DataFrame({
+                    "Gene": np.concatenate([np.repeat(gene1, (adata_sp_ct.n_obs+adata_sc_ct.n_obs)), np.repeat(gene2, (adata_sp_ct.n_obs+adata_sc_ct.n_obs))]),
+                    "Modality": np.concatenate([np.repeat("Spatial", adata_sp_ct.n_obs), np.repeat("scRNA-seq", adata_sc_ct.n_obs),
+                                                np.repeat("Spatial", adata_sp_ct.n_obs), np.repeat("scRNA-seq", adata_sc_ct.n_obs)]),
+                    f"Expression in {ct}": np.concatenate([adata_sp_ct[:, gene1].X.toarray().flatten(), adata_sc_ct[:, gene1].X.toarray().flatten(),
+                                                                  adata_sp_ct[:, gene2].X.toarray().flatten(), adata_sc_ct[:, gene2].X.toarray().flatten()])
+                })
 
-            ax = axs[i] if len(gene_pairs) > 1 else axs
-            sns.violinplot(plot_df, x="Modality", y=f"{expr_name}", hue="Gene", split=True, inner="box", ax=ax)
+                ax = axs[j, i] if len(cell_type) > 1 and len(gene_pairs) > 1 else axs[i] if len(cell_type) == 1 else axs[j] if len(gene_pairs) == 1 else axs
+                sns.violinplot(plot_df, x="Modality", y=f"Expression in {ct}", hue="Gene", split=True, inner="box", ax=ax)
 
         plt.show()
 
