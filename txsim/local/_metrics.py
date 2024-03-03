@@ -482,10 +482,6 @@ def _get_relative_expression_similarity_across_celltypes_grid(
             norm_factor_sc = (1/(mean_celltype_sc.T.shape[1]**2)) * abs_diff_sum_sc
             norm_factor_sp = (1/(mean_celltype_sc.T.shape[1]**2)) * abs_diff_sum_sp
 
-            epsilon = 1e-10
-            norm_factor_sc += epsilon
-            norm_factor_sp += epsilon
-
             # perform normalization
             # exclude the ones with norm_factor_sc, norm_factor_sp with zero
             pairwise_distances_sc[:, :, norm_factor_sc != 0] = np.divide(pairwise_distances_sc[:, :, norm_factor_sc != 0],
@@ -494,15 +490,15 @@ def _get_relative_expression_similarity_across_celltypes_grid(
             # distances by the global or local normalization factor
             pairwise_distances_sp_local[:, :, norm_factor_sp != 0] = np.divide(pairwise_distances_sp_local[:, :, norm_factor_sp != 0],
                                                                          norm_factor_sp[norm_factor_sp != 0])
-            norm_pairwise_distances_sc = np.divide(pairwise_distances_sc, norm_factor_sc)
-            norm_pairwise_distances_sp = np.divide(pairwise_distances_sp_local, norm_factor_sp)
+            norm_pairwise_distances_sc = pairwise_distances_sc
+            norm_pairwise_distances_sp_local = pairwise_distances_sp_local
 
-            ##### CALCULATE OVERALL SCORE,PER-GENE SCORES, PER-CELLTYPE SCORES
+            ##### CALCULATE OVERALL SCORE MATRIX
             # First, sum over the differences between modalities in relative pairwise gene expression distances
             # The overall metric is then bounded at a maximum of 1, representing perfect similarity of relative gene expression between modalities.
             ## Furthermore, the metric is constructed such that, when its value is 0, this represents perfect dissimilarity of
             ## relative gene expression between modalities.
-            overall_score = np.sum(np.absolute(norm_pairwise_distances_sp - norm_pairwise_distances_sc), axis=None)
+            overall_score = np.sum(np.absolute(norm_pairwise_distances_sp_local - norm_pairwise_distances_sc), axis=None)
             overall_metric = 1 - (overall_score / (2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=None)))
             overall_metric_matrix[y_bin, x_bin] = overall_metric
 
