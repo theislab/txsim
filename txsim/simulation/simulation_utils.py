@@ -166,6 +166,7 @@ class Simulation:
 
             # Simulate cell positions
             cell_radii = np.random.uniform(*radius_range, len(cells_in_grid))
+            cell_areas = np.pi * cell_radii ** 2
             x_cells, y_cells = zip(*[sample_cell_pos(cell_sampling_type, r) for r in cell_radii])
             x_cells, y_cells = list(x_cells), list(y_cells)
 
@@ -174,7 +175,7 @@ class Simulation:
             overlapping_counter = 0
             while overlapping:
                 overlapping = False
-                assert overlapping_counter < 100, "Could not find non-overlapping cell positions. Please decrease the possible cell radii."
+                assert overlapping_counter < 250, "Could not find non-overlapping cell positions. Please decrease the possible cell radii."
                 for i in range(len(x_cells)):
                     for j in range(i + 1, len(x_cells)):
                         distance = np.sqrt((x_cells[i] - x_cells[j]) ** 2 + (y_cells[i] - y_cells[j]) ** 2)
@@ -184,7 +185,7 @@ class Simulation:
                             # If there is an overlap, sample new positions for one of the overlapping cells
                             x_cells[j], y_cells[j] = sample_cell_pos(cell_sampling_type, cell_radii[j])
 
-            new_cell_pos_list.append(pd.DataFrame({"cell_id": cells_in_grid, "x": x_cells, "y": y_cells}))
+            new_cell_pos_list.append(pd.DataFrame({"cell_id": cells_in_grid, "x": x_cells, "y": y_cells, "area": cell_areas}))
 
             # Simulate spot positions
             spots_df = adata_sp.uns["spots"][adata_sp.uns["spots"]["cell_id"].isin(cells_in_grid)]
@@ -218,6 +219,7 @@ class Simulation:
         new_cell_pos = pd.concat(new_cell_pos_list).set_index('cell_id').loc[adata_sp.obs_names].reset_index()
         adata_sp.obs["x"] = new_cell_pos["x"].tolist()
         adata_sp.obs["y"] = new_cell_pos["y"].tolist()
+        adata_sp.obs["area"] = new_cell_pos["area"].tolist()
 
         adata_sp.uns["spots"] = pd.concat(new_spot_pos_list)
 
@@ -392,6 +394,143 @@ class Simulation:
 
         sns.scatterplot(data=adata_sp.uns["spots"], x="x", y="y", hue="celltype", **kwargs)
         plt.title("Spot positions")
+        plt.show()
+
+    def plot_relative_expression_across_genes(self, adata_sp=None, adata_sc=None, cell_type="all", cell_type_key="louvain",
+                                              genes="all", x_grid=None, y_grid=None, x_grid_col="grid_x", y_grid_col="grid_y"):
+        """Plot the relative expression of each gene across all cell types in the scRNA-seq and spatial data.
+        ----------
+        adata_sp: AnnData
+            Annotated ``AnnData`` object with spatial data. Leave blank to use the spatial data stored in the simulation object.
+        adata_sc: AnnData
+            Annotated ``AnnData`` object with scRNA-seq data. Leave blank to use the scRNA-seq data stored in the simulation object.
+        cell_type: str
+            Cell type to plot. If "all", will plot the relative expression across all cell types.
+        cell_type_key: str
+            Key in adata.obs to use for cell type annotations.
+        genes: list
+            List of genes to include in the plot. If "all", will include all genes in the simulation object.
+        x_grid: int
+            x-coordinate of the grid field to plot. If None, will plot all grid fields.
+        y_grid: int
+            y-coordinate of the grid field to plot. If None, will plot all grid fields.
+        x_grid_col: str
+            Column in adata_sp.obs to use for x-coordinates of grid fields. Default is "grid_x".
+        y_grid_col: str
+            Column in adata_sp.obs to use for y-coordinates of grid fields. Default is "grid_y".
+
+        Returns
+        -------
+        None
+        """
+        if adata_sp is None and self.adata_sp is None:
+            raise ValueError("No spatial data provided. Either provide adata_sp or run simulate_spatial_data first.")
+        elif adata_sp is None:
+            adata_sp = self.adata_sp
+
+        if adata_sc is None:
+            adata_sc = self.adata_sc
+
+        if x_grid is not None and y_grid is not None:
+            adata_sp = adata_sp[(adata_sp.obs[x_grid_col] == x_grid) & (adata_sp.obs[y_grid_col] == y_grid)]
+
+        if cell_type == "all":
+            cell_type = adata_sc.obs.loc[adata_sc.obs[cell_type_key].isin(adata_sp.obs[cell_type_key]),cell_type_key].unique()
+        adata_sp = adata_sp[adata_sp.obs[cell_type_key].isin(cell_type)]
+        adata_sc = adata_sc[adata_sc.obs[cell_type_key].isin(cell_type)]
+
+        if genes == "all":
+            genes = self.genes
+
+        # get gene pairs
+        gene_pairs = list(itertools.combinations(genes, 2))
+
+        fig, axs = plt.subplots(len(cell_type), len(gene_pairs), figsize=(5*len(gene_pairs), 5*len(cell_type)))
+        for j, ct in enumerate(cell_type):
+            adata_sp_ct = adata_sp[adata_sp.obs[cell_type_key] == ct]
+            adata_sc_ct = adata_sc[adata_sc.obs[cell_type_key] == ct]
+            for i, (gene1, gene2) in enumerate(gene_pairs):
+                plot_df = pd.DataFrame({
+                    "Gene": np.concatenate([np.repeat(gene1, (adata_sp_ct.n_obs+adata_sc_ct.n_obs)), np.repeat(gene2, (adata_sp_ct.n_obs+adata_sc_ct.n_obs))]),
+                    "Modality": np.concatenate([np.repeat("Spatial", adata_sp_ct.n_obs), np.repeat("scRNA-seq", adata_sc_ct.n_obs),
+                                                np.repeat("Spatial", adata_sp_ct.n_obs), np.repeat("scRNA-seq", adata_sc_ct.n_obs)]),
+                    f"Expression in {ct}": np.concatenate([adata_sp_ct[:, gene1].X.toarray().flatten(), adata_sc_ct[:, gene1].X.toarray().flatten(),
+                                                                  adata_sp_ct[:, gene2].X.toarray().flatten(), adata_sc_ct[:, gene2].X.toarray().flatten()])
+                })
+
+                ax = axs[j, i] if len(cell_type) > 1 and len(gene_pairs) > 1 else axs[i] if len(cell_type) == 1 else axs[j] if len(gene_pairs) == 1 else axs
+                sns.violinplot(plot_df, x="Modality", y=f"Expression in {ct}", hue="Gene", split=True, inner="box", ax=ax)
+
+        plt.show()
+
+    def plot_relative_expression_across_celltypes(self, adata_sp=None, adata_sc=None, cell_type="all", cell_type_key="louvain", genes="all",
+                                               x_grid=None, y_grid=None, x_grid_col="grid_x", y_grid_col="grid_y"):
+        """Plot the relative expression of each gene across all cell types in the scRNA-seq and spatial data.
+        ----------
+        adata_sp: AnnData
+            Annotated ``AnnData`` object with spatial data. Leave blank to use the spatial data stored in the simulation object.
+        adata_sc: AnnData
+            Annotated ``AnnData`` object with scRNA-seq data. Leave blank to use the scRNA-seq data stored in the simulation object.
+        cell_type: str
+            Cell type to plot. If "all", will plot the relative expression across all cell types.
+        cell_type_key: str
+            Key in adata.obs to use for cell type annotations.
+        genes: list
+            List of genes to include in the plot. If "all", will include all genes in the simulation object.
+        x_grid: int
+            x-coordinate of the grid field to plot. If None, will plot all grid fields.
+        y_grid: int
+            y-coordinate of the grid field to plot. If None, will plot all grid fields.
+        x_grid_col: str
+            Column in adata_sp.obs to use for x-coordinates of grid fields. Default is "grid_x".
+        y_grid_col: str
+            Column in adata_sp.obs to use for y-coordinates of grid fields. Default is "grid_y".
+
+        Returns
+        -------
+        None
+        """
+        if adata_sp is None and self.adata_sp is None:
+            raise ValueError("No spatial data provided. Either provide adata_sp or run simulate_spatial_data first.")
+        elif adata_sp is None:
+            adata_sp = self.adata_sp
+
+        if adata_sc is None:
+            adata_sc = self.adata_sc
+
+        if x_grid is not None and y_grid is not None:
+            adata_sp = adata_sp[(adata_sp.obs[x_grid_col] == x_grid) & (adata_sp.obs[y_grid_col] == y_grid)]
+
+        if cell_type == "all":
+            cell_type = adata_sc.obs.loc[adata_sc.obs[cell_type_key].isin(adata_sp.obs[cell_type_key]),cell_type_key].unique()
+            print(cell_type)
+            if len(cell_type) <= 1:
+                raise ValueError("Only one cell type in the spatial data. At least two cell types are required to compare relative expression across cell types.")
+
+        if genes == "all":
+            genes = self.genes
+
+        # get gene pairs
+        cell_type_pairs = list(itertools.combinations(cell_type, 2))
+
+        fig, axs = plt.subplots(len(genes), len(cell_type_pairs), figsize=(5*len(cell_type_pairs), 5*len(genes)))
+        for j, gene in enumerate(genes):
+            for i, (ct1, ct2) in enumerate(cell_type_pairs):
+                adata_sp_ct = adata_sp[adata_sp.obs[cell_type_key].isin([ct1, ct2])]
+                adata_sc_ct = adata_sc[adata_sc.obs[cell_type_key].isin([ct1, ct2])]
+
+                plot_df = pd.DataFrame({
+                    "Cell Type": np.concatenate([adata_sp_ct.obs[cell_type_key].values, adata_sc_ct.obs[cell_type_key].values,
+                                                 adata_sp_ct.obs[cell_type_key].values, adata_sc_ct.obs[cell_type_key].values]),
+                    "Modality": np.concatenate([np.repeat("Spatial", adata_sp_ct.n_obs), np.repeat("scRNA-seq", adata_sc_ct.n_obs),
+                                                np.repeat("Spatial", adata_sp_ct.n_obs), np.repeat("scRNA-seq", adata_sc_ct.n_obs)]),
+                    f"{gene} expression": np.concatenate([adata_sp_ct[:, gene].X.toarray().flatten(), adata_sc_ct[:, gene].X.toarray().flatten(),
+                                                          adata_sp_ct[:, gene].X.toarray().flatten(), adata_sc_ct[:, gene].X.toarray().flatten()])
+                })
+
+                ax = axs[j, i] if len(genes) > 1 and len(cell_type_pairs) > 1 else axs[i] if len(genes) == 1 else axs[j] if len(cell_type_pairs) == 1 else axs
+                sns.violinplot(plot_df, x="Modality", y=f"{gene} expression", hue="Cell Type", split=True, inner="box", ax=ax)
+
         plt.show()
 
     def _prepare_sc_data(self):
