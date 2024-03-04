@@ -37,8 +37,8 @@ def relative_pairwise_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, 
     intersect = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
     
     # subset adata_sc and adata_sp to only include genes in the intersection of adata_sp and adata_sc 
-    adata_sc=adata_sc[:,intersect]
-    adata_sp=adata_sp[:,intersect]
+    adata_sc=adata_sc[:,intersect].copy()
+    adata_sp=adata_sp[:,intersect].copy()
     
     # sparse matrix support
     for a in [adata_sc, adata_sp]:
@@ -47,8 +47,8 @@ def relative_pairwise_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, 
             
     # find the unique celltypes in adata_sc that are also in adata_sp
     unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
-    
-    
+
+
     
     #### FIND MEAN GENE EXPRESSION PER CELL TYPE FOR EACH MODALITY
     # get the adata_sc cell x gene matrix as a pandas dataframe (w gene names as column names)
@@ -96,10 +96,6 @@ def relative_pairwise_celltype_expression(adata_sp: AnnData, adata_sc: AnnData, 
     
     
     #perform normalization
-    norm_pairwise_distances_sc = np.divide(pairwise_distances_sc, norm_factor_sc)
-    norm_pairwise_distances_sp = np.divide(pairwise_distances_sp, norm_factor_sp)
-    
-    
     pairwise_distances_sc[:,:,norm_factor_sc!=0] = np.divide(pairwise_distances_sc[:,:,norm_factor_sc!=0], 
                                                              norm_factor_sc[norm_factor_sc!=0])
     # exclude the ones with norm_factor_sc, norm_factor_sp with zero
