@@ -4,7 +4,8 @@ import warnings
 
 import geopandas as gpd
 from shapely.geometry import Polygon
-
+from rasterio import features
+from rasterio import Affine
 
 def create_polygon(x_str, y_str):
     '''
@@ -68,14 +69,62 @@ def assign_spots_to_cells(cell_df,df,n_z_planes):
 
 
 
-def convert_polygons_to_label_image(df, tech="Xenium") -> np.array:
-    """
+def convert_polygons_to_label_image(df, X_column, Y_column,complete_img_size_x,complete_img_size_y):
+    '''
+    Create label image from a dataframe with polygons
+    Note that polygon coordinates should not be negative, if so please shift the coordinates before applying the function 
+    Arguments
+    ---------
+    df:                     pandas.Dataframe
+                            Dataframe containing polygon coordinates
+    X_column:               str
+                            Name of the column with x coordinates of the polygons (coordinates are a string of comma separated values)
+    Y_column:               str
+                            Name of the column with y coordinates of the polygons (coordinates are a string of comma separated values)
+    complete_img_size_x:    int 
+                            image size in x
+    complete_img_size_y:    int  
+                            image size in y
+
+    Returns:
+    ----------
+    cell_id_image:          np.array 
+                            Array containing the label image where each polygon has a different integer label
+
+    '''
+    # Decode polygon coordinates and filter out NaN values
+    df = df.dropna(subset=[X_column])
+    df = df.dropna(subset=[Y_column])
+    df.loc[:, 'polygon_coordinates'] = df.apply(lambda row: create_polygon(row[X_column], row[Y_column]), axis=1)
+   
+
+    if df.empty:
+        print("No valid polygons found.")
+        return
     
-    #TODO: decide on arguments, instead of tech maybe sth else? And add some extra fct/wrapper for tech.
-    
-    """
-    
-    # TODO: Implement this function. (have it laying around somewhere.)
+   
+    cell_id_image = np.zeros((complete_img_size_y, complete_img_size_x), dtype=np.uint32)
+
+    cell_id = 1 
+    for polygon in df["polygon_coordinates"]:
+        try: 
+            minx, miny, maxx, maxy = polygon.bounds
+            if (int(maxx - minx)==0) or (int(maxy-miny)==0): # Skip polygons with zero width or height
+                print(f"Skipping invalid Polygon at cell_id = {cell_id}")
+                continue
+            minx, miny, maxx, maxy = int(minx), int(miny), int(maxx), int(maxy)
+            image = features.rasterize([(polygon, cell_id)],
+                              out_shape=(maxy-miny, maxx-minx),
+                              transform=Affine.translation(minx, miny),
+                              fill=0,
+                              dtype=np.uint32)
+        except AttributeError:
+            print(f"Invalid Polygon at cell_id = {cell_id}")
+            continue
+        cell_id_image[miny:maxy, minx:maxx] = np.where(
+                cell_id_image[miny:maxy,minx:maxx] == 0, image, cell_id_image[miny:maxy, minx:maxx])
+        cell_id = cell_id + 1
+    return cell_id_image
     
     
 def convert_coordinates_to_pixel_space(
