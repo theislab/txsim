@@ -94,8 +94,8 @@ def relative_pairwise_gene_expression(adata_sp: AnnData, adata_sc: AnnData, key:
     abs_diff_sum_sp = np.sum(abs_diff_sp, axis=(0,1))
     
     # calculate normalization factor
-    norm_factor_sc = mean_celltype_sc.shape[1]**2 * abs_diff_sum_sc
-    norm_factor_sp = mean_celltype_sc.shape[1]**2 * abs_diff_sum_sp
+    norm_factor_sc = (1/(mean_celltype_sc.shape[1]**2)) * abs_diff_sum_sc
+    norm_factor_sp = (1/(mean_celltype_sc.shape[1]**2)) * abs_diff_sum_sp
     
     #perform normalization
     # exclude the ones with norm_factor_sc, norm_factor_sp with zero
