@@ -5,6 +5,8 @@ import scanpy as sc
 import scipy
 from scipy import stats
 from typing import Tuple, Dict
+from scipy.sparse import issparse
+from local._utils import _get_bin_ids
 
 
 # TODO Change how normalization happens and consider using log1p
@@ -282,85 +284,3 @@ def compute_correlation_difference(sim_spt, sim_seq, common, thresh):
     mean = np.nanmean(np.absolute(diff)) / 2
     output = mean
     return output
-
-# TODO local implementation of coexpression similarity
-
-def calculate_weight(mat):
-    if scipy.sparse.issparse(mat):
-        pearson_r = np.corrcoef(mat.toarray(), rowvar=False)
-    else:
-        pearson_r = np.corrcoef(mat.astype(float), rowvar=False)
-    
-    weight = np.abs(pearson_r)
-    weight = weight[weight > 0.1]
-
-    return weight
-
-def calculate_error(mat):
-
-    return delta
-
-def calculate_score(weight, delta, pearsson_seq, pearson_sp):
-    m = weight * (1-delta) * np.sgn(pearsson_seq) * pearson_sp
-    m = m.sum()
-    return m
-
-def coexpression_similarity_grid(
-    adata_sp: AnnData,
-    adata_sc: AnnData,
-    region_range: Tuple[Tuple[float, float], Tuple[float, float]],
-    bins: Tuple[int, int],
-    obs_key: str = "celltype",
-    cells_x_col: str = "x",
-    cells_y_col: str = "y",
-) -> Dict[str, np.ndarray]:
-    """Calculates the coexpression similarity score for each grid bin.
-
-    Parameters
-    ----------
-    adata_sp : AnnData
-        Annotated AnnData object containing spatial transcriptomics data.
-    adata_sc : AnnData
-        Annotated AnnData object containing dissociated single cell transcriptomics data.
-    region_range : Tuple[Tuple[float, float], Tuple[float, float]]
-        The range of the grid specified as ((y_min, y_max), (x_min, x_max)).
-    bins : Tuple[int, int]
-        The number of bins along the y and x axes, formatted as (ny, nx).
-    obs_key : str, default "celltype"
-        The column name in adata_sp.obs and adata_sc.obs for the cell type annotations.
-    cells_x_col : str, default "x"
-        The column name in adata_sp.obs for the x-coordinates of cells.
-    cells_y_col : str, default "y"
-        The column name in adata_sp.obs for the y-coordinates of cells.
-    Returns
-    -------
-    Dictionary: 
-     keys: celltypes (str)
-     values: np.ndarray
-                A 2D numpy array representing coexpression similarity scores in each grid bin.
-    """
-    # only keep genes that are expressed in at least 20 cells
-    spatial_expressed = np.asarray(adata_sp.var_names[sc.pp.filter_genes(adata_sp, min_cells=20, inplace=False)[0]])
-    seq_expressed = np.asarray(adata_sc.var_names[sc.pp.filter_genes(adata_sc, min_cells=20, inplace=False)[0]])
-
-    # only keep genes that are in both data sets
-    common_genes = np.intersect1d(spatial_expressed, seq_expressed)
-    seq_adata = adata_sc[:, common_genes]
-    spt_adata = adata_sp[:, common_genes]
-
-    # only keep celltypes that are in both data sets
-    common_celltypes = np.asarray(np.intersect1d(adata_sc.obs[obs_key], adata_sp.obs[obs_key]))
-    seq_adata = seq_adata[:, common_celltypes]
-    spt_adata = spt_adata[:, common_celltypes]
-    seq_adata = seq_adata[seq_adata.obs[obs_key].isin(common_celltypes)]
-    spt_adata = spt_adata[spt_adata.obs[obs_key].isin(common_celltypes)]
-
- 
-    # calculate weight per celltype for each celltype
-
-    # calculate delta per celltype for each celltype
-
-    # calculate and return coexpression score per celltype for each celltype
-
-
-

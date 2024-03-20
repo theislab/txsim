@@ -3,6 +3,7 @@ import anndata as ad
 from typing import Tuple
 import pandas as pd
 from scipy.sparse import issparse
+import scipy
 
 from ..metrics import knn_mixing_per_cell_score
 from ..metrics import mean_proportion_deviation
@@ -502,8 +503,6 @@ def _get_relative_expression_similarity_across_celltypes_grid(
             overall_metric = 1 - (overall_score / (2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=None)))
             overall_metric_matrix[y_bin, x_bin] = overall_metric
 
-
-
     # calculate the contribution of each grid field to the overall metric, if contribution is set to True
     if contribution:
         # calculate global metric for the entire spatial dataset (not just in the region range)
@@ -524,3 +523,190 @@ def _get_relative_expression_similarity_across_celltypes_grid(
         return metric_contribution_matrix
 
     return overall_metric_matrix
+
+# TODO local implementation of coexpression similarity
+
+def calculate_weight(mat, thresh):
+    if scipy.sparse.issparse(mat):
+        pearson_r = np.corrcoef(mat.toarray(), rowvar=False)
+    else:
+        pearson_r = np.corrcoef(mat.astype(float), rowvar=False)
+    
+    weights = np.abs(pearson_r)
+    weight_mask = weights[weights > thresh]
+    filtered_weights = np.where(weights > thresh, weights, None)
+
+    return weight_mask, filtered_weights
+# check, whether correlation calculated on pairs!
+
+def calculate_error(mat):
+
+    return delta
+
+def calculate_score(weight, delta, pearsson_seq, pearson_sp):
+    m = weight * (1-delta) * np.sgn(pearsson_seq) * np.sgn(pearson_sp)
+    m = m.sum()
+    return m
+# consider input shape, mean after calculate_score
+
+def _coexpression_per_cell_score(
+    adata_sp: ad.AnnData, 
+    adata_sc: ad.AnnData, 
+    obs_key: str = "celltype", 
+    key_added: str = "coexpression_per_cell_score",
+) -> None:
+    """Compute coexpression scores per cell
+    Arguments
+    ----------
+    adata_sp:
+        Spatial data.
+    adata_sc:
+        Single cell data.
+    obs_key:
+        adata.obs key for cell type annotations.
+    key_added:
+        adata.obs key where coexpression scores are saved.
+
+    Returns
+    -------
+    nothing - just added scores to `adata.obs[key_added]`
+    """
+
+    adata_sp.obs["modality"] = "spatial"
+    sp_obs_names = adata_sp.obs_names.tolist()
+    adata_sp.obs_names = [f"sp_{i}" for i in adata_sp.obs_names] # just to make sure that the names are unique
+    adata_sc.obs["modality"] = "sc"
+    adata = ad.concat([adata_sp, adata_sc])
+ 
+    adata_sp.obs[key_added] = np.zeros(adata_sp.n_obs)  
+
+    # Set counts to log norm data
+    adata.X = adata.layers["lognorm"]
+
+def _coexpression_similarity_grid(
+    spt_adata: ad.AnnData,
+    seq_adata: ad.AnnData,
+    region_range: Tuple[Tuple[float, float], Tuple[float, float]],
+    bins: Tuple[int, int],
+    obs_key: str = "celltype",
+    cells_x_col: str = "x",
+    cells_y_col: str = "y",
+    layer: str = "lognorm",
+) -> dict[str, np.ndarray]:
+    """Calculates the coexpression similarity score for each grid bin.
+
+    Parameters
+    ----------
+    spt_adata : AnnData
+        Annotated AnnData object containing spatial transcriptomics data.
+    seq_adata : AnnData
+        Annotated AnnData object containing dissociated single cell transcriptomics data.
+    region_range : Tuple[Tuple[float, float], Tuple[float, float]]
+        The range of the grid specified as ((y_min, y_max), (x_min, x_max)).
+    bins : Tuple[int, int]
+        The number of bins along the y and x axes, formatted as (ny, nx).
+    obs_key : str, default "celltype"
+        The column name in adata_sp.obs and adata_sc.obs for the cell type annotations.
+    cells_x_col : str, default "x"
+        The column name in adata_sp.obs for the x-coordinates of cells.
+    cells_y_col : str, default "y"
+        The column name in adata_sp.obs for the y-coordinates of cells.
+    layer: str (default: 'lognorm')
+        Layer of ``AnnData`` to use to compute the metric.
+    Returns
+    -------
+    Dictionary: 
+     keys: celltypes (str)
+     values: np.ndarray
+                A 2D numpy array representing coexpression similarity scores in each grid bin.
+    """
+    # Set up
+    ## set the .X layer of each of the adatas to be log-normalized counts
+    spt_adata.X = spt_adata.layers[layer]
+    seq_adata.X = seq_adata.layers[layer]
+
+    ## only keep genes that are expressed in at least 20 cells
+    spatial_expressed = np.asarray(spt_adata.var_names[sc.pp.filter_genes(spt_adata, min_cells=20, inplace=False)[0]])
+    seq_expressed = np.asarray(seq_adata.var_names[sc.pp.filter_genes(seq_adata, min_cells=20, inplace=False)[0]])
+
+    ## only keep genes that are in both data sets
+    common_genes = np.intersect1d(spatial_expressed, seq_expressed)
+    seq_adata = seq_adata[:, common_genes]
+    spt_adata = spt_adata[:, common_genes]
+
+    ## only keep celltypes that are in both data sets
+    common_celltypes = np.asarray(np.intersect1d(seq_adata.obs[obs_key], spt_adata.obs[obs_key]))
+    seq_adata = seq_adata[:, common_celltypes]
+    spt_adata = spt_adata[:, common_celltypes]
+    seq_adata = seq_adata[seq_adata.obs[obs_key].isin(common_celltypes)]
+    spt_adata = spt_adata[spt_adata.obs[obs_key].isin(common_celltypes)]
+
+    ## sparse matrix support
+    for a in [seq_adata, spt_adata]:
+        if issparse(a.X):
+            a.layers[layer] = a.layers[layer].toarray()
+    
+    # sc data: calculate weight per celltype for each celltype
+    expression_per_celltype = {}
+    sc_weights_per_celltype = {}
+    for c in common_celltypes:
+      expression_per_celltype[c] = seq_adata[seq_adata.obs["cell_type"] == c, :].to_df()
+      sc_weights_per_celltype[c] = calculate_weight(expression_per_celltype[c])
+
+    # spatial data: calculate scores 
+    coexpression_per_cell_score(adata_sp, adata_sc, obs_key = obs_key, **kwargs)
+
+    coexpression_score_key = kwargs["key_added"] if ("key_added" in kwargs) else "coexpression_score"
+    
+    df_cells = adata_sp.obs[[cells_y_col, cells_x_col, coexpression_score_key]]
+    
+    H = np.histogram2d(
+        df_cells[cells_y_col], df_cells[cells_x_col], bins=bins, 
+        range=region_range, weights=df_cells[coexpression_score_key]
+    )[0]
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ## get bin ids
+    spt_adata.obs = _get_bin_ids(spt_adata.obs, region_range, bins, cells_x_col, cells_y_col)
+    # only consider cells within the specified region
+    adata_sp_region_range = spt_adata[(spt_adata.obs["y_bin"] != -1) & (spt_adata.obs["x_bin"] != -1)]
+
+    # create an empty matrix to store the computed metric for each grid field
+    overall_metric_matrix = np.zeros((bins[0], bins[1]))
+
+    for y_bin in adata_sp_region_range.obs["y_bin"].unique():
+        for x_bin in adata_sp_region_range.obs["x_bin"].unique():
+            # subset the spatial data to only include cells in the current grid field
+            adata_sp_local = adata_sp_region_range[(adata_sp_region_range.obs["y_bin"] == y_bin) & (adata_sp_region_range.obs["x_bin"] == x_bin)]
+
+            # find the unique celltypes in the grid field, that are both in the adata_sc and in the adata_sp
+            unique_celltypes = seq_adata.obs.loc[seq_adata.obs[obs_key].isin(adata_sp_local.obs[obs_key]),obs_key].unique()
+
+            # If there are no cells in the grid field or no overlap between cell types in sc and sp data, set the local metric to NaN
+            if len(unique_celltypes) == 0:
+                overall_metric_matrix[y_bin, x_bin] = np.nan
+                continue
+
+
+    # calculate delta per celltype for each celltype
+
+    # calculate and return coexpression score per celltype for each celltype
