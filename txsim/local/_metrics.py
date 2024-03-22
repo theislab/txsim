@@ -4,6 +4,8 @@ from typing import Tuple
 import pandas as pd
 from scipy.sparse import issparse
 import scipy
+from scipy.stats import linregress
+from sklearn.linear_model import LinearRegression
 
 from ..metrics import knn_mixing_per_cell_score
 from ..metrics import mean_proportion_deviation
@@ -526,28 +528,81 @@ def _get_relative_expression_similarity_across_celltypes_grid(
 
 # TODO local implementation of coexpression similarity
 
-def calculate_weight(mat, thresh):
+def calculate_pearson_coeff(mat, thresh):
     if scipy.sparse.issparse(mat):
         pearson_r = np.corrcoef(mat.toarray(), rowvar=False)
     else:
         pearson_r = np.corrcoef(mat.astype(float), rowvar=False)
     
-    weights = np.abs(pearson_r)
-    weight_mask = weights[weights > thresh]
-    filtered_weights = np.where(weights > thresh, weights, None)
+    pearson_r = np.triu(pearson_r, 1)
+    coeff_mask = pearson_r[pearson_r > thresh]
+    filtered_weights = np.where(pearson_r > thresh, pearson_r, 0)
 
-    return weight_mask, filtered_weights
-# check, whether correlation calculated on pairs!
+    return coeff_mask, filtered_weights
 
-def calculate_error(mat):
+""" def calculate_linear_regression(expression_data):
+    gene_pairs_checked = set()
+    regressions_results = {}
+    for col in expression_data:
+        for cols in expression_data:
+            if col != cols:
+                if (col, cols) not in gene_pairs_checked and (cols, col) not in gene_pairs_checked:
+                    regressions_results[(col, cols)] = linregress(expression_data[col], expression_data[cols])
+                    gene_pairs_checked.add((col, cols))
+    return regressions_results 
 
-    return delta
+def calculate_linear_regression_error(expression_data):
+    gene_pairs_checked = set()
+    regressions_results = {}
+    predictions = {}
+    for col in expression_data:
+        for cols in expression_data:
+            if col != cols:
+                if (col, cols) not in gene_pairs_checked and (cols, col) not in gene_pairs_checked:
+                    model = LinearRegression()
+                    regressions_results[(col, cols)] = model.fit(np.array(expression_data[col]).reshape((-1, 1)), expression_data[cols])
+                    gene_pairs_checked.add((col, cols))
+                    predictions[(col, cols)] = model.predict(np.array(expression_data[col]).reshape((-1, 1)))
+    predictions_df = pd.DataFrame(predictions)
+    error = np.square(np.abs(np.asarray(expression_data) - np.asarray(predictions_df)))
+    error = pd.DataFrame(error)
 
+    return error
+
+def calculate_error(sp_genepairs, sc_mask):
+    # comapare fields: mask = true: do LR in sp_genepairs, mask = false: insert 0/None. move to next field
+    genepairreg = np.where(sc_mask == True, linreg(sp_genepairs) , None)
+    genepairreg["cell"] = range(0,0+len(sp_genepairs))
+    # calculate row wise mean to get error per cell over all pairs
+    genepairreg["mean_error"] = round(np.mean(genepairreg, axis=1, dtype= np.float64), 3)
+    # return mean error for each cell
+    error = error[["cell", "mean_error"]]
+    return error
+"""
+def calculate_linear_regression_error(expression_data):
+    gene_pairs_checked = set()
+    predictions = {}
+    errors = {}
+    for col in expression_data:
+        for cols in expression_data:
+            if col != cols:
+                if (col, cols) not in gene_pairs_checked and (cols, col) not in gene_pairs_checked:
+                    model = LinearRegression()
+                    model.fit(np.array(expression_data[col]).reshape((-1, 1)), expression_data[cols])
+                    predictions[(col, cols)] = model.predict(np.array(expression_data[col]).reshape(-1, 1))
+                    errors[(col, cols)] = np.square(np.abs(np.asarray(expression_data[col]) - np.asarray(predictions[(col, cols)])))
+                    gene_pairs_checked.add((col, cols))
+    error = pd.DataFrame(errors)
+    mean_error = np.mean(error, axis=1)
+    return mean_error
+
+"""
 def calculate_score(weight, delta, pearsson_seq, pearson_sp):
     m = weight * (1-delta) * np.sgn(pearsson_seq) * np.sgn(pearson_sp)
     m = m.sum()
     return m
 # consider input shape, mean after calculate_score
+"""
 
 def _coexpression_per_cell_score(
     adata_sp: ad.AnnData, 
@@ -592,6 +647,7 @@ def _coexpression_similarity_grid(
     cells_x_col: str = "x",
     cells_y_col: str = "y",
     layer: str = "lognorm",
+    thresh: float = 0.1,
 ) -> dict[str, np.ndarray]:
     """Calculates the coexpression similarity score for each grid bin.
 
@@ -613,6 +669,8 @@ def _coexpression_similarity_grid(
         The column name in adata_sp.obs for the y-coordinates of cells.
     layer: str (default: 'lognorm')
         Layer of ``AnnData`` to use to compute the metric.
+    thresh: float (default: 0.1)
+        threshold for filtering weights 
     Returns
     -------
     Dictionary: 
@@ -646,15 +704,25 @@ def _coexpression_similarity_grid(
         if issparse(a.X):
             a.layers[layer] = a.layers[layer].toarray()
     
-    # sc data: calculate weight per celltype for each celltype
-    expression_per_celltype = {}
+    # sc data: calculate weight and r per celltype for each celltype and sp data: calculate r for spatial data per celltype 
+    sc_expression_per_celltype = {}
     sc_weights_per_celltype = {}
+    sc_mask_per_celltype = {}
+
+    sp_expression_per_celltype = {}
+    sp_weights_per_celltype = {}
+    sp_mask_per_celltype = {}
+
     for c in common_celltypes:
-      expression_per_celltype[c] = seq_adata[seq_adata.obs["cell_type"] == c, :].to_df()
-      sc_weights_per_celltype[c] = calculate_weight(expression_per_celltype[c])
+      sc_expression_per_celltype[c] = seq_adata[seq_adata.obs["cell_type"] == c, :].to_df()
+      sc_weights_per_celltype[c] = np.abs(calculate_pearson_coeff(sc_expression_per_celltype[c], thresh)[1])
+      sc_mask_per_celltype[c] = calculate_pearson_coeff(sc_expression_per_celltype[c], thresh)[0]
+      sp_expression_per_celltype[c] = spt_adata[spt_adata.obs["cell_type"] == c, :].to_df()
+      sp_weights_per_celltype[c] = np.abs(calculate_pearson_coeff(sp_expression_per_celltype[c], thresh)[1])
+      sp_mask_per_celltype[c] = calculate_pearson_coeff(sp_expression_per_celltype[c], thresh)[0]
 
     # spatial data: calculate scores 
-    coexpression_per_cell_score(adata_sp, adata_sc, obs_key = obs_key, **kwargs)
+    _coexpression_per_cell_score(spt_adata, seq_adata, obs_key = obs_key, **kwargs)
 
     coexpression_score_key = kwargs["key_added"] if ("key_added" in kwargs) else "coexpression_score"
     
@@ -664,49 +732,6 @@ def _coexpression_similarity_grid(
         df_cells[cells_y_col], df_cells[cells_x_col], bins=bins, 
         range=region_range, weights=df_cells[coexpression_score_key]
     )[0]
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    ## get bin ids
-    spt_adata.obs = _get_bin_ids(spt_adata.obs, region_range, bins, cells_x_col, cells_y_col)
-    # only consider cells within the specified region
-    adata_sp_region_range = spt_adata[(spt_adata.obs["y_bin"] != -1) & (spt_adata.obs["x_bin"] != -1)]
-
-    # create an empty matrix to store the computed metric for each grid field
-    overall_metric_matrix = np.zeros((bins[0], bins[1]))
-
-    for y_bin in adata_sp_region_range.obs["y_bin"].unique():
-        for x_bin in adata_sp_region_range.obs["x_bin"].unique():
-            # subset the spatial data to only include cells in the current grid field
-            adata_sp_local = adata_sp_region_range[(adata_sp_region_range.obs["y_bin"] == y_bin) & (adata_sp_region_range.obs["x_bin"] == x_bin)]
-
-            # find the unique celltypes in the grid field, that are both in the adata_sc and in the adata_sp
-            unique_celltypes = seq_adata.obs.loc[seq_adata.obs[obs_key].isin(adata_sp_local.obs[obs_key]),obs_key].unique()
-
-            # If there are no cells in the grid field or no overlap between cell types in sc and sp data, set the local metric to NaN
-            if len(unique_celltypes) == 0:
-                overall_metric_matrix[y_bin, x_bin] = np.nan
-                continue
-
-
-    # calculate delta per celltype for each celltype
 
     # calculate and return coexpression score per celltype for each celltype
+    return H
