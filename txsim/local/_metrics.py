@@ -528,7 +528,22 @@ def _get_relative_expression_similarity_across_celltypes_grid(
 
 # TODO local implementation of coexpression similarity
 
-def calculate_pearson_coeff(mat, thresh):
+def calculate_pearson_coeff(
+    mat: pd.DataFrame,
+    thresh: float
+) -> Tuple[np.ndarray]:
+    """Calculates the weight for each gene pair, based on pearson correlation coefficient
+    Arguments
+    ----------
+    mat:
+        log gene expression dataframe.
+    thresh:
+    threshold by which to filter abs(correlation coefficient) by.
+   
+    Returns
+    -------
+    Tupel with 3 ndarrays: mask where (abs(correlation coefficient) > thresh) == True, correlation coefficients, filtered weights
+    """
     if scipy.sparse.issparse(mat):
         pearson_r = np.corrcoef(mat.toarray(), rowvar=False)
     else:
@@ -540,18 +555,26 @@ def calculate_pearson_coeff(mat, thresh):
 
     return coeff_mask, pearson_r, filtered_weights
 
-""" 
-def calculate_error(sp_genepairs, sc_mask):
-    # comapare fields: mask = true: do LR in sp_genepairs, mask = false: insert 0/None. move to next field
-    genepairreg = np.where(sc_mask == True, linreg(sp_genepairs) , None)
-    genepairreg["cell"] = range(0,0+len(sp_genepairs))
-    # calculate row wise mean to get error per cell over all pairs
-    genepairreg["mean_error"] = round(np.mean(genepairreg, axis=1, dtype= np.float64), 3)
-    # return mean error for each cell
-    error = error[["cell", "mean_error"]]
-    return error
-"""
-def calculate_linear_regression_error(expression_data, mask):
+
+def calculate_linear_regression_error(
+    expression_data: pd.DataFrame, 
+    mask: np.ndarray,
+    njobs: int = -1,
+) -> np.ndarray[float]:
+    """Computes mean residuals per cell for all gene pairs
+    Arguments
+    ----------
+    expression_data:
+        log gene expression dataframe.
+    mask:
+        nparray with boolean mask for weights > threshold.
+    njobs:
+        int defining how many processors to use. default value = -1
+
+    Returns
+    -------
+    ndarray of mean residuals per cell
+    """
     colnames = expression_data.columns
     mask = pd.DataFrame(mask, columns= colnames)
     mask.index = colnames
@@ -561,8 +584,8 @@ def calculate_linear_regression_error(expression_data, mask):
     for col in expression_data:
         for cols in expression_data:
             if col != cols and mask.loc[col, cols]:
-                if (col, cols) not in gene_pairs_checked and (cols, col) not in gene_pairs_checked:
-                    model = LinearRegression(n_jobs=1) # default auf -1 setzen
+                if set(col, cols) not in gene_pairs_checked:
+                    model = LinearRegression(n_jobs= njobs)
                     model.fit(np.array(expression_data[col]).reshape((-1, 1)), expression_data[cols])
                     predictions[(col, cols)] = model.predict(np.array(expression_data[col]).reshape(-1, 1))
                     errors[(col, cols)] = np.square(np.abs(np.asarray(expression_data[col]) - np.asarray(predictions[(col, cols)])))
@@ -571,17 +594,10 @@ def calculate_linear_regression_error(expression_data, mask):
     mean_error = np.mean(error, axis=1)
     return mean_error
 
-"""
-def calculate_score(weight, delta, pearsson_seq, pearson_sp):
-    m = weight * (1-delta) * np.sgn(pearsson_seq) * np.sgn(pearson_sp)
-    m = m.sum()
-    return m
-# consider input shape, mean after calculate_score
-"""
-
 def _coexpression_per_cell_score(
     spt_adata: ad.AnnData, 
-    seq_adata: ad.AnnData, 
+    seq_adata: ad.AnnData,
+    layer: str = 'lognorm',
     obs_key: str = "celltype", 
     thresh: float = 0.1,
     key_added: str = "coexpression_per_cell_score",
@@ -593,6 +609,8 @@ def _coexpression_per_cell_score(
         Spatial data.
     adata_sc:
         Single cell data.
+    layer: str (default: 'lognorm')
+        Layer of ``AnnData`` to use to compute the metric.
     obs_key:
         adata.obs key for cell type annotations.
     thresh: 
@@ -627,48 +645,42 @@ def _coexpression_per_cell_score(
             a.layers[layer] = a.layers[layer].toarray()
 
     # sc data: calculate weight and r per celltype for each celltype and sp data: calculate r for spatial data per celltype 
-    sc_expression_per_celltype = {}
-    sc_weights_per_celltype = {}
-    sc_mask_per_celltype = {}
-
-    sp_expression_per_celltype = {}
-    sp_weights_per_celltype = {}
-    sp_mask_per_celltype = {}
-    sc_pearson = {}
-    sp_pearson = {}
-    cell_error = {}
-    cell_delta = {}
-    sign_sc = {}
-    sign_sp = {}
+    sum_cellscore = {}
 
     for c in common_celltypes:
-      sc_expression_per_celltype[c] = seq_adata[seq_adata.obs["cell_type"] == c, :].to_df()
-      sc_weights_per_celltype[c] = calculate_pearson_coeff(sc_expression_per_celltype[c], thresh)[2]
-      sc_mask_per_celltype[c] = calculate_pearson_coeff(sc_expression_per_celltype[c], thresh)[0]
-      sp_expression_per_celltype[c] = spt_adata[spt_adata.obs["cell_type"] == c, :].to_df()
-      sp_weights_per_celltype[c] = calculate_pearson_coeff(sp_expression_per_celltype[c], thresh)[2]
-      sp_mask_per_celltype[c] = calculate_pearson_coeff(sp_expression_per_celltype[c], thresh)[0]
-      sc_pearson[c] = calculate_pearson_coeff(sc_expression_per_celltype[c], thresh)[1]
-      sp_pearson[c] = calculate_pearson_coeff(sp_expression_per_celltype[c], thresh)[1]
-      cell_error[c] = calculate_linear_regression_error(sp_expression_per_celltype[c], sp_weights_per_celltype[c])
-      cell_delta[c] = 1 - cell_error[c]
-      sign_sc[c] = np.sign(sc_pearson[c])
-      sign_sp[c] = np.sign(sp_pearson[c])
+        sc_expression_per_celltype = seq_adata[seq_adata.obs["cell_type"] == c, :].to_df()
+        sc_weights_per_celltype = calculate_pearson_coeff(sc_expression_per_celltype, thresh)[2]
+        sc_mask_per_celltype = calculate_pearson_coeff(sc_expression_per_celltype, thresh)[0]
+        sp_expression_per_celltype = spt_adata[spt_adata.obs["cell_type"] == c, :].to_df()
+        sc_pearson = calculate_pearson_coeff(sc_expression_per_celltype, thresh)[1]
+        sp_pearson = calculate_pearson_coeff(sp_expression_per_celltype, thresh)[1]
+        cell_error = calculate_linear_regression_error(sp_expression_per_celltype, sc_mask_per_celltype)
+        cell_delta = 1 - cell_error
+        sign_sc = np.sign(sc_pearson)
+        sign_sp = np.sign(sp_pearson)
 
-    # calculate cellwise score and mean score per cell
-      
-   
-    
-       
+        # calculate sum score per cell and add to adata_sp
+        indices_with_offset = np.triu_indices_from( sc_weights_per_celltype[c], k=1)
+        sc_weights_per_celltype[c] = sc_weights_per_celltype[c][indices_with_offset]
+
+        indices_with_offset_sc = np.triu_indices_from(sign_sc[c], k=1)
+        indices_with_offset_sp = np.triu_indices_from(sign_sp[c], k=1)
+
+        sign_sc[c] = sign_sc[c][indices_with_offset_sc]
+        sign_sp[c] = sign_sp[c][indices_with_offset_sp]
+
+        sum_cellscore[c] = {}
+
+        for cellnumber in len(cell_delta[c]):
+            sum_score = []
+            for index in len(sc_weights_per_celltype[c]):
+                x = sc_weights_per_celltype[c][index] * cell_delta[c][cellnumber] * sign_sc[c][index] * sign_sp[c][index]
+                sum_score.append(x)
+            sum_cellscore[c][f"cell_{cellnumber}"] = sum(sum_score)
+    print(sum_cellscore)
     
 
-    
-    
-    
-    # add mean cell score to adata_sp
-    spt_adata.obs[key_added] = 
-      
-    
+
 
 def _coexpression_similarity_grid(
     spt_adata: ad.AnnData,
