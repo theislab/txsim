@@ -13,13 +13,16 @@ from ._util import get_eligible_celltypes
 
 
 def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData, 
-                              key:str='celltype', layer:str='lognorm', smooth_distributions:str='no',
+                              key:str='celltype', layer:str='lognorm', 
+                              smooth_distributions:str='no',
                               min_number_cells:int=10,
-                              pipeline_output: bool=True):
+                              pipeline_output: bool=True,
+                              window_size: int=3,
+                              sigma: int=1):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
     is an asymmetric metric that measures the relative entropy or difference 
-    in information represented by two distributions.
+    in information represented by two distributions.ß
     ----------
     adata_sp: AnnData
         annotated ``AnnData`` object containing the spatial single-cell data
@@ -53,12 +56,15 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
     per_celltype_metric: float
         per celltype Jensen-Shannon divergence between the two distributions
     """
-    celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, adata_sp, key=key, 
+    celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, 
+                                                           adata_sp, 
+                                                           key=key, 
                                                            layer=layer, 
                                                            min_number_cells=min_number_cells)
     n_celltypes = len(celltypes)
     n_genes = len(adata_sc.var_names)
     overall_metric = 0
+    jsd_total_sum = 0
 
     # if there are no eligible celltypes, return NaN
     if n_celltypes == 0:
@@ -67,48 +73,61 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
         else:
             return np.nan, np.nan, np.nan
 
-    ################
     # PER-CELLTYPE METRIC
-    ################
     per_celltype_metric = pd.DataFrame(columns=['celltype', 'JSD'])
     for celltype in celltypes:
         sum = 0
         for gene in adata_sc.var_names:
-            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype, smooth_distributions)
+            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, 
+                                                                adata_sc, 
+                                                                gene, 
+                                                                celltype,
+                                                                smooth_distributions,
+                                                                window_size,
+                                                                sigma)
         jsd = sum / n_genes
         new_entry = pd.DataFrame([[celltype, jsd]],
                      columns=['celltype', 'JSD'])
         per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
-        overall_metric += sum
-    
-    ################
+        # if the jsd value for this celltype is not NaN, 
+        # add it to the overall metric pool to calculte overall in the next step
+        if not math.isnan(jsd):
+            jsd_total_sum += sum
+    per_celltype_metric.set_index('celltype', inplace=True)
+
     # OVERALL METRIC
-    ################
-    overall_metric = overall_metric / (n_celltypes * n_genes)
+    overall_metric = jsd_total_sum / (n_celltypes * n_genes)
     if pipeline_output: # the execution stops here if pipeline_output=True
          return overall_metric
 
-    ################
     # PER-GENE METRIC
-    ################
     per_gene_metric = pd.DataFrame(columns=['Gene', 'JSD']) 
     for gene in adata_sc.var_names:
         sum = 0
         for celltype in celltypes:
-            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, adata_sc, gene, celltype, smooth_distributions)
+            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, 
+                                                                 adata_sc, 
+                                                                 gene, 
+                                                                 celltype, 
+                                                                 smooth_distributions,
+                                                                 window_size,
+                                                                 sigma)
         jsd = sum / n_celltypes
         new_entry = pd.DataFrame([[gene, jsd]],
                    columns=['Gene', 'JSD'])
         per_gene_metric = pd.concat([per_gene_metric, new_entry])
-
+    per_gene_metric.set_index('Gene', inplace=True)
+    
     return overall_metric, per_gene_metric, per_celltype_metric
 
 def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
-                                               x_min:int, x_max:int, y_min:int, y_max:int,
-                                               image: np.ndarray, bins: int = 10,
-                                               key:str='celltype', layer:str='lognorm',
-                                               min_number_cells:int=10 # the minimal number of cells per celltype to be considered
-                                               ):
+                                x_min:int, x_max:int, y_min:int, y_max:int,
+                                image: np.ndarray, bins: int = 10,
+                                key:str='celltype', layer:str='lognorm',
+                                min_number_cells:int=10, # the minimal number of cells per celltype to be considered
+                                smooth_distributions:str='no',
+                                window_size:int=3,
+                                sigma:int=1):
     """Calculate the Jensen-Shannon divergence between the spatial and dissociated single-cell data distributions
     for each gene, but using only the cells in a given local area for the spatial data.
 
@@ -180,15 +199,26 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
                 i += 1
             else:
                 # pipeline output=True, so we only get the overall metric, maybe expand this to per gene and per celltype
-                jsd = jensen_shannon_distance(adata_sp_local, adata_sc, key=key, 
-                                          layer=layer, min_number_cells=min_number_cells, pipeline_output=True)
+                jsd = jensen_shannon_distance(adata_sp_local, 
+                                        adata_sc, 
+                                        key=key, 
+                                        layer=layer, 
+                                        min_number_cells=min_number_cells,
+                                        smooth_distributions=smooth_distributions,
+                                        window_size=window_size,
+                                        sigma=sigma, 
+                                        pipeline_output=True)
                 gridfield_metric[i,j]  = jsd
             i += 1
         j += 1
             
     return gridfield_metric
 
-def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:AnnData, gene:str, celltype:str, smooth_distributions):
+def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:AnnData, 
+                                                  gene:str, celltype:str, 
+                                                  smooth_distributions: str,
+                                                  window_size=15,
+                                                  sigma=1):
     """Calculate the Jensen-Shannon distance between two distributions:
     1. expression values for a given gene in a given celltype from spatial data
     2. expression values for a given gene in a given celltype from single-cell data
@@ -212,11 +242,12 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     sc = adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X.ravel()
 
     # 2. get the probability distributions for the two vectors
-    P, Q = get_probability_distributions(sp, sc, smooth_distributions)
+    P, Q = get_probability_distributions(sp, sc, smooth_distributions, window_size, sigma)
     return distance.jensenshannon(P, Q, base=2)
 
 
-def get_probability_distributions(v_sp:np.array, v_sc:np.array, smooth_distributions):
+def get_probability_distributions(v_sp:np.array, v_sc:np.array, smooth_distributions: str,
+                                  window_size=15, sigma=1):
     """Calculate the probability distribution vectors from one celltype and one gene
     from spatial and single-cell data
     ---------- 
@@ -232,47 +263,66 @@ def get_probability_distributions(v_sp:np.array, v_sc:np.array, smooth_distribut
     probability_distribution_sc: np.array
         probability distribution from dissociated sc data for one celltype and one gene, 1-dim vector
     """
-    # 0. find the maximum and minimus value in the two given vectors
-    max_value = max(max(v_sp), max(v_sc))
-    min_value = min(min(v_sp), min(v_sc))
+    bins1 = freedman_diaconis(v_sc)
+    bins2 = freedman_diaconis(v_sp)
+    common_bins = np.linspace(start=min(np.min(v_sc), np.min(v_sp)), 
+                            stop=max(np.max(v_sc), np.max(v_sp)),
+                              num=max(max(bins1, bins2) + 1, 40))
+    # original data without smoothing
+    hist_sc, _ = np.histogram(v_sc, bins=common_bins, density=True)
+    hist_sp, _ = np.histogram(v_sp, bins=common_bins, density=True)
 
-    # 1. Calculate the histograms for the two vectors
-    # 1.1 spatial
-    hist_sp, bin_edges = np.histogram(v_sp, bins=min(100, int(max_value - min_value + 1)), density=True)
+    if smooth_distributions == 'no':
+        return hist_sp, hist_sc
+    else:
+        # find out which vector is smaller
+        if len(v_sp) <= len(v_sc):
+            hist_bigger = hist_sc
+            hist_to_smooth = hist_sp
+        else:   
+            hist_bigger = hist_sp
+            hist_to_smooth = hist_sc
+        # separate the zeros
+        zeros_bin = hist_to_smooth[0].copy()
+        hist_to_smooth_nonzeros = hist_to_smooth.copy()
+        hist_to_smooth_nonzeros[0] = 0
+        match smooth_distributions:
+            case 'convolution':
+                hist_smoothed_nonzeros = convolution_smooth(hist_to_smooth_nonzeros, window_size)
+            case 'gaussian':
+                hist_smoothed_nonzeros = gaussian_smooth(hist_to_smooth_nonzeros, sigma)
+            case _:
+                raise ValueError(f"Unknown smoothing method: {smooth_distributions}")
+        # add the zeros back
+        hist_smoothed = hist_smoothed_nonzeros.copy()
+        hist_smoothed[0] = zeros_bin
+    return hist_bigger, hist_smoothed
 
-    # 1.2 dissociated sc
-    hist_sc, bin_edges = np.histogram(v_sc, bins=min(100, int(max_value - min_value + 1)), density=True)
+# Calculate bin edges for datasets with different sizes
+def freedman_diaconis(data, default_bins=10):
+    if len(data) < 10:
+        return default_bins
+    iqr = np.subtract(*np.percentile(data, [75, 25]))
+    n = len(data)
+    # Handling the case where IQR is 0, which could happen if all values are the same
+    if iqr == 0:
+        return default_bins
+    bin_width = 2 * iqr * n ** (-1/3)
+    data_range = np.max(data) - np.min(data)
+    # Prevent division by zero or negative bin width
+    if bin_width <= 0:
+        return default_bins
+    bin_count = data_range / bin_width
+    # Ensure bin_count is at least 1 and rounded to the nearest whole number
+    bin_count = max(1, np.round(bin_count))
+    return int(bin_count)
 
-    # 2. Smooth the distributions if the method is specified
-    match smooth_distributions:
-        case 'no':
-            pass
-        case 'moving_average':
-            hist_sp = moving_average_smooth(hist_sp)
-            hist_sc = moving_average_smooth(hist_sc)
-        case 'rolling_median':
-            hist_sp = rolling_median(hist_sp)
-            hist_sc = rolling_median(hist_sc)
-        case 'gaussian':
-            hist_sp = gaussian_smooth(hist_sp)
-            hist_sc = gaussian_smooth(hist_sc)
-        case _:
-            raise ValueError(f"Unknown smoothing method: {smooth_distributions}")
-    return hist_sp, hist_sc
+def convolution_smooth(data, window_size):
+    smoothed_data = np.convolve(data, np.ones(window_size) / window_size, mode='same')
+    return smoothed_data
 
-def moving_average_smooth(histogram, window_size=3):
-    # Applying moving average
-    # TODO: make window_size changeable
-    weights = np.repeat(1.0, window_size) / window_size
-    smoothed_values = np.convolve(histogram, weights, 'valid')
-    return np.concatenate((smoothed_values, np.zeros(window_size-1)))
-
-def rolling_median(data, window_size=3):
-    # TODO: make window_size changeable
-    return np.convolve(data, np.ones(window_size)/window_size, mode='same')
-
-def gaussian_smooth(data, sigma=1):
-    # TODO: make sigma changeable
+def gaussian_smooth(data, sigma):
+    # sigma is the standard deviation for the Gaussian kernel
     smoothed_values = gaussian_filter1d(data, sigma=sigma)
     return smoothed_values
 
