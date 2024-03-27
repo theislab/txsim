@@ -9,7 +9,7 @@ from ._spots_based import _get_spot_density_grid
 from ._metrics import _get_knn_mixing_grid, _get_celltype_proportions_grid
 from ._metrics import _get_relative_expression_similarity_across_genes_grid
 from ._metrics import _get_relative_expression_similarity_across_celltypes_grid
-from ._metrics import _get_coexpression_similarity_grid, _coexpression_per_cell_score, calculate_linear_regression_error, calculate_pearson_coeff
+from ._metrics import _get_coexpression_similarity_grid
 from ._self_consistency_metrics import _get_ARI_between_cell_assignments_grid
 from ._self_consistency_metrics import _get_spots_based_annotation_similarity_grid
 
