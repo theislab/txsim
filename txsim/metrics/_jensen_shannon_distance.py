@@ -19,8 +19,8 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
                               smooth_distributions:str='no',
                               min_number_cells:int=10,
                               pipeline_output: bool=True,
-                              window_size: int=3,
-                              sigma: int=1,
+                              window_size: int=7,
+                              sigma: int=2,
                               correct_for_cell_number_dependent_decay: bool=False):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
@@ -45,9 +45,9 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
     pipeline_output: bool (default: True)
         whether to return only the overall metric (pipeline style)
         (if False, will return the overall metric, per-gene metric and per-celltype metric)
-    window_size: int (default: 3)
+    window_size: int (default: 7)
         window size for the convolution filter
-    sigma: int (default: 1)
+    sigma: int (default: 2)
         standard deviation for the gaussian filter
     correct_for_cell_number_dependent_decay: bool (default: True)
         whether to correct the metric for cell number dependent decay, cannot be used simultaneously with smoothing
@@ -134,8 +134,8 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
                                 key:str='celltype', layer:str='lognorm',
                                 min_number_cells:int=10, # the minimal number of cells per celltype to be considered
                                 smooth_distributions:str='no',
-                                window_size:int=3,
-                                sigma:int=1,
+                                window_size:int=7,
+                                sigma:int=2,
                                 correct_for_cell_number_dependent_decay:bool=False):
     """Calculate the Jensen-Shannon divergence between the spatial and dissociated single-cell data distributions
     for each gene, but using only the cells in a given local area for the spatial data.
@@ -174,9 +174,9 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
         'no' - no smoothing
         'convolution' - convolution filter, moving average
         'gaussian' - gaussian filter
-    window_size: int (default: 3)
+    window_size: int (default: 7)
         window size for the convolution filter
-    sigma: int (default: 1)
+    sigma: int (default: 2)
         standard deviation for the gaussian filter
     correct_for_cell_number_dependent_decay: bool (default: True)
         whether to correct the metric for cell number dependent decay, cannot be used simultaneously with smoothing
@@ -238,8 +238,8 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
 def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:AnnData, 
                                                   gene:str, celltype:str, 
                                                   smooth_distributions: str,
-                                                  window_size=15,
-                                                  sigma=1,
+                                                  window_size=7,
+                                                  sigma=2,
                                                   correct_for_cell_number_dependent_decay=False):
     """Calculate the Jensen-Shannon distance between two distributions:
     1. expression values for a given gene in a given celltype from spatial data
@@ -260,9 +260,9 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
         'gaussian' - gaussian filter
     correct_for_cell_number_dependent_decay: bool (default: True)
         whether to correct the metric for cell number dependent decay, cannot be used simultaneously with smoothing
-    window_size: int (default: 3)
+    window_size: int (default: 7)
         window size for the convolution filter
-    sigma: int (default: 1)
+    sigma: int (default: 2)
         standard deviation for the gaussian filter
         
     Returns
@@ -295,7 +295,7 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     return jsd
 
 def get_probability_distributions(v_sp:np.array, v_sc:np.array, smooth_distributions: str,
-                                  window_size=15, sigma=1):
+                                  window_size=7, sigma=2):
     """Calculate the probability distribution vectors from one celltype and one gene
     from spatial and single-cell data
     ---------- 
