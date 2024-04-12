@@ -390,7 +390,7 @@ def power_law_func(x, a, k, y0):
     return a*x**k + y0
 
 def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl=[1.5, -0.5, -0.5]):
-    number_of_cells_to_sample = list(range(5, 1000, 10))
+    number_of_cells_to_sample = list(range(5, 1000, 20))
     number_of_samplings = 3
 
     mean_jsd = pd.DataFrame(columns=['cell_number', 'mean_jsd'])
