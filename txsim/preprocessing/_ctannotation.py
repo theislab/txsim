@@ -25,19 +25,27 @@ def run_majority_voting(
         Anndata object with cell type annotation in ``adata_st.obs['ct_majority']`` and certainty as ``adata_st.obs['ct_majority_cert']`` 
     """
 
+    
+    assert ('celltype' in spots.columns); 'No celltypes available in spots object'
+    
+    #Sort spots table by cell id and get table intervals for each cell
+    spots = spots.sort_values("cell",ascending=True)
+    cells_sorted = spots["cell"].values
+    start_indices = np.flatnonzero(np.concatenate(([True], cells_sorted[1:] != cells_sorted[:-1])))
+    cell_to_start_idx = pd.Series(start_indices, index=cells_sorted[start_indices])
+    cell_to_end_idx = pd.Series(cell_to_start_idx.iloc[1:].tolist()+[len(spots)], index=cell_to_start_idx.index)
+    
     for cell_id in adata_st.obs['cell_id']:
-        cts = spots[spots['cell'] == cell_id ]['Gene'].value_counts()
+        start_idx = cell_to_start_idx.loc[cell_id]
+        end_idx = cell_to_end_idx.loc[cell_id]
+        spots_of_cell = spots.iloc[start_idx:end_idx]
         
-        if 'celltype' in spots.columns:
-            mode = spots[spots['cell'] == cell_id ]['celltype'].mode()
-            adata_st.obs.loc[adata_st.obs['cell_id'] == cell_id, 'ct_majority'] = mode.values[0]
-            adata_st.obs.loc[adata_st.obs['cell_id'] == cell_id, 'ct_majority_cert'] = (spots[spots['cell'] == cell_id ]['celltype'].value_counts()[mode].values[0] / sum(cts))
-            
-        else:
-            print('No celltypes available in spots object')
+        cts = spots_of_cell['Gene'].value_counts()
+        mode = spots_of_cell['celltype'].mode()
+        adata_st.obs.loc[str(cell_id), 'ct_majority'] = mode.values[0]
+        adata_st.obs.loc[str(cell_id), 'ct_majority_cert'] = (spots_of_cell['celltype'].value_counts()[mode].values[0] / sum(cts))
 
     return adata_st
-
 
         
 def run_ssam(
@@ -117,3 +125,49 @@ def run_ssam(
         (spots[spots['cell'] == cell_id ]['celltype'].value_counts()[mode].values[0] / sum(cts))
     
     return adata_st
+
+def annotate_celltypes(
+    adata: AnnData,
+    adata_sc: AnnData,
+    ct_method: str = 'majority',
+    ct_threshold: float = 0.7,
+    prior_celltypes : pd.DataFrame = None,
+    hyperparams: dict = {}
+) -> AnnData:
+    #all_ct_methods = False
+    #TODO potentially fix how threshold is measured
+    #Add celltype according to ct_method and check if all methods should be implemented
+    if hyperparams.get('threshold') is not None: ct_threshold = hyperparams.get('threshold')
+    ran_ct_method = False
+    if (ct_method is None): ct_method = 'majority'
+    if (ct_method == 'majority'):
+        adata = run_majority_voting(adata, adata.uns['spots'])
+        ran_ct_method = True
+    elif (ct_method == 'ssam'):
+        adata = run_ssam(adata, adata.uns['spots'], adata_sc = adata_sc)
+        ran_ct_method = True
+    elif (ct_method == 'pciSeqCT'):
+        #TODO check if this actually works
+        ct_method = 'pciSeq'
+        adata.obs['ct_pciSeq'] = pd.Categorical(prior_celltypes['type'][adata.obs['cell_id']])
+        adata.obs['ct_pciSeq_cert'] = prior_celltypes['prob'][adata.obs['cell_id']]
+        ran_ct_method = True
+    else:
+        raise Exception(f'{ct_method} is not a valid cell type method')
+    # ToDo (second prio)
+    # elif ct_method == 'manual_markers':
+    #     adata = run_manual_markers(adata, spots)
+    # elif ct_method == 'scrna_markers':
+    #     adata = run_scrna_markers(adata, spots, rna_adata)
+    if not ran_ct_method: print('No valid cell type annotation method')
+    
+    # Take over primary ct annotation method to adata.obs['celltype'] and apply certainty threshold
+    # Add methods, if they provide certainty measure
+    if ct_method in ['majority', 'ssam']: 
+        ct_list = adata.obs['ct_'+str(ct_method)].copy()
+        ct_list[adata.obs['ct_'+str(ct_method)+'_cert'] < ct_threshold] = "Unknown" #TODO different hyperparams probably
+        adata.obs['celltype'] = ct_list
+    else:
+        adata.obs['celltype'] = adata.obs['ct_'+str(ct_method)]
+
+    return adata

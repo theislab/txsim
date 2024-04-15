@@ -10,6 +10,7 @@ def gene_set_coexpression(
     seq_data: AnnData,
     overlap_threshold: int = 5,
     min_cells: int = 20,
+    correlation_measure: str = "pearson",
     pipeline_output: bool = True,
     **kwargs
 ) -> float:
@@ -27,6 +28,8 @@ def gene_set_coexpression(
     min_cells : int, optional (Default: 20)
         The number of cells a gene must be expressed in at minimum to contribute to
         coexpression similarity score.
+    correlation_measure: str, optional (Default: pearson)
+        The metric used for assess the correlation of gene expression, pearson, spearman or mutual
     pipeline_output : bool, optional (Default: True)
         flag whether to output a single value (True) or results broken down into
         gene sets
@@ -46,6 +49,7 @@ def gene_set_coexpression(
     print('Computing gene set coexpression...')
 
     # Get gene sets to test
+    # MSigDB is a resource of tens of thousands of annotated gene sets
     anns = op.requests.Annotations.get(resources='MSigDB')
     geneset_dict = _get_msigdb_collection(anns)
 
@@ -56,6 +60,7 @@ def gene_set_coexpression(
     vars_in_x_cells_sc = sc.pp.filter_genes(seq_data, min_cells = min_cells, inplace=False)[0]
     seq_features = seq_data.var_names[vars_in_x_cells_sc].tolist()
 
+    # Common features in both modalities
     common_features = list(set(spatial_features).intersection(seq_features))
 
     sets_to_remove = list()
@@ -75,7 +80,8 @@ def gene_set_coexpression(
         spatial_data,
         seq_data,
         min_cells = min_cells,
-        pipeline_output = False,
+        correlation_measure=correlation_measure,
+        pipeline_output = False
     )
     
     
@@ -146,11 +152,18 @@ def _get_msigdb_collection(anns, collection='hallmark', verbose=False):
     
     """
     from collections import defaultdict
-    
+
+    """
+       The 33196 gene sets in the Human Molecular Signatures Database (MSigDB) 
+       are divided into 9 major collections, and several sub-collections, e.g. 
+       Hallmark gene sets summarize and represent specific well-defined biological 
+       states or processes and display coherent expression. 
+    """
+    # load `record_ids`, which is unique within the records of each database
     ids = anns[(anns.entity_type.isin(['protein'])) &
                (anns.label.isin(['collection'])) &
                (anns.value.isin([collection]))].record_id
-
+    # load gene sets based on record ids
     collection_anns = anns[(anns.entity_type.isin(['protein'])) & 
                            (anns.label.isin(['geneset'])) &
                            (anns.record_id.isin(ids))]
@@ -160,7 +173,7 @@ def _get_msigdb_collection(anns, collection='hallmark', verbose=False):
         print(f'Number of annotations: {len(collection_anns.genesymbol)}')
         print(f'Number of gene sets: {collection_anns}')
 
-        
+    # convert the dataframe of annotation to a dictionary of gene sets
     geneset_dict = defaultdict(list)
 
     [geneset_dict[collection_anns['value'][i]].append(collection_anns['genesymbol'][i])

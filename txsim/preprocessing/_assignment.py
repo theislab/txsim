@@ -67,20 +67,28 @@ def run_pciSeq(
     """
 
     import pciSeq
-    from scipy.sparse import coo_matrix
+    from scipy.sparse import coo_matrix, issparse
     import scanpy as sc
 
-    
     #Read and format molecules, single cell data, and labels
     spots = molecules.copy()
     spots.rename(columns = {spots.columns[0]:'Gene',
                      spots.columns[1]:'x',
                      spots.columns[2]:'y'
                      } , inplace = True)
+    spots_gxy = spots[["Gene","x","y"]]
 
     adata = sc_data.copy()
-    scdata = adata.X
+    if 'raw' in adata.layers:
+        adata.X = adata.layers['raw']
+        del adata.layers
+    scdata = adata.X if not issparse(adata.X) else adata.X.toarray()
     scdata  = pd.DataFrame(scdata.transpose())
+    print(scdata.columns, flush=True)
+    print(adata.obs[cell_type_key], flush=True)
+    print(type(adata.X), flush=True)
+    print(type(scdata), flush=True)
+    print(scdata, flush=True)
     scdata.columns = adata.obs[cell_type_key]
     scdata.index = adata.var_names
 
@@ -103,17 +111,19 @@ def run_pciSeq(
     #Run through pciSeq
     pciSeq.attach_to_log()
     if(opts is not None):
-        cellData, geneData = pciSeq.fit(spots, coo, scdata, opts)
+        cellData, geneData = pciSeq.fit(spots=spots_gxy, coo=coo, scRNAseq=scdata, opts=opts) #(spots=iss_spots, coo=coo, scRNAseq=scRNAseq)
     else:
-        cellData, geneData = pciSeq.fit(spots, coo, scdata)   
+        cellData, geneData = pciSeq.fit(spots=spots_gxy, coo=coo, scRNAseq=scdata)   
 
     #Save in correct format
     assignments = geneData["neighbour"]
 
     #Save cell types
     type_vec = []
+    prob_vec = []
     for i in cellData['Cell_Num']:
         type_vec.append(cellData['ClassName'][i][np.argmax(cellData['Prob'][i])])
+        prob_vec.append(np.max(cellData['Prob'][i]))
 
     #Change the cell names to match the segmentation
 
@@ -125,7 +135,7 @@ def run_pciSeq(
         spots['cell'] = 0
         spots.loc[~spots['Gene'].isin(opts['exclude_genes']), 'cell'] = assignments
     
-    cell_types = pd.DataFrame(data=type_vec, index = cell_id[cell_id != 0])
-    cell_types[cell_types == 'Zero'] = 'None'
+    cell_types = pd.DataFrame(data={'type':type_vec, 'prob':prob_vec}, index = cell_id[cell_id != 0])
+    cell_types = cell_types.replace({'Zero':'None'})
     
     return spots, cell_types
