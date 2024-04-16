@@ -40,7 +40,7 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
         'no' - no smoothing
         'convolution' - convolution filter, moving average 
         'gaussian' - gaussian filter
-    min_number_cells: int (default: 20)
+    min_number_cells: int (default: 10)
         minimum number of cells belonging to a cluster to consider it in the analysis
     pipeline_output: bool (default: True)
         whether to return only the overall metric (pipeline style)
@@ -79,12 +79,12 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
         else:
             return np.nan, np.nan, np.nan
 
-    # PER-CELLTYPE METRIC
-    per_celltype_metric = pd.DataFrame(columns=['celltype', 'JSD'])
+    #first, make an array to store the jsds per gene and celltype
+    jsd_array = np.zeros((n_genes, n_celltypes))
+    # now, loop over the genes and celltypes to fill the array
     for celltype in celltypes:
-        sum = 0
         for gene in adata_sc.var_names:
-            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, 
+            jsd = jensen_shannon_distance_per_gene_and_celltype(adata_sp, 
                                                                 adata_sc, 
                                                                 gene, 
                                                                 celltype,
@@ -92,40 +92,28 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
                                                                 window_size,
                                                                 sigma,
                                                                 correct_for_cell_number_dependent_decay)
-        jsd = sum / n_genes
-        new_entry = pd.DataFrame([[celltype, jsd]],
-                     columns=['celltype', 'JSD'])
-        per_celltype_metric = pd.concat([per_celltype_metric, new_entry])
-        # if the jsd value for this celltype is not NaN, 
-        # add it to the overall metric pool to calculte overall in the next step
-        if not math.isnan(jsd):
-            jsd_total_sum += sum
-    per_celltype_metric.set_index('celltype', inplace=True)
+            jsd_array[adata_sc.var_names.get_indexer([gene]).astype(int)[0], 
+                        celltypes.index(celltype)] = jsd
 
     # OVERALL METRIC
+    jsd_total_sum = np.sum(jsd_array)
     overall_metric = jsd_total_sum / (n_celltypes * n_genes)
     if pipeline_output: # the execution stops here if pipeline_output=True
-         return overall_metric
+            return overall_metric
+    # PER-CELLTYPE METRIC
+    # sum over all genes for each celltype, make a dataframe with the results
+    sums_per_celltype = np.sum(jsd_array, axis=0)
+    per_celltype_metric = pd.DataFrame(sums_per_celltype / n_genes, columns=['JSD'])
+    per_celltype_metric['celltype'] = celltypes
+    per_celltype_metric.set_index('celltype', inplace=True)
 
     # PER-GENE METRIC
-    per_gene_metric = pd.DataFrame(columns=['Gene', 'JSD']) 
-    for gene in adata_sc.var_names:
-        sum = 0
-        for celltype in celltypes:
-            sum += jensen_shannon_distance_per_gene_and_celltype(adata_sp, 
-                                                                 adata_sc, 
-                                                                 gene, 
-                                                                 celltype, 
-                                                                 smooth_distributions,
-                                                                 window_size,
-                                                                 sigma,
-                                                                 correct_for_cell_number_dependent_decay)
-        jsd = sum / n_celltypes
-        new_entry = pd.DataFrame([[gene, jsd]],
-                   columns=['Gene', 'JSD'])
-        per_gene_metric = pd.concat([per_gene_metric, new_entry])
+    # sum over all celltypes for each gene, make a dataframe with the results
+    sums_per_gene = np.sum(jsd_array, axis=1)
+    per_gene_metric = pd.DataFrame(sums_per_gene / n_celltypes, columns=['JSD'])
+    per_gene_metric['Gene'] = adata_sc.var_names
     per_gene_metric.set_index('Gene', inplace=True)
-    
+
     return overall_metric, per_gene_metric, per_celltype_metric
 
 def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
@@ -240,7 +228,8 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
                                                   smooth_distributions: str,
                                                   window_size=7,
                                                   sigma=2,
-                                                  correct_for_cell_number_dependent_decay=False):
+                                                  correct_for_cell_number_dependent_decay=False, 
+                                                  initial_guess_pl=[1.5, -0.5, -0.5]):
     """Calculate the Jensen-Shannon distance between two distributions:
     1. expression values for a given gene in a given celltype from spatial data
     2. expression values for a given gene in a given celltype from single-cell data
@@ -283,8 +272,6 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     P, Q = get_probability_distributions(sp, sc, smooth_distributions, window_size, sigma)
     jsd = distance.jensenshannon(P, Q, base=2)
 
-    initial_guess_pl = [0.3, -0.6, 0.1] # the initial guess for the power law function
-
     if correct_for_cell_number_dependent_decay:
         # calculate the decay by fitting a power law function to subsamples of the data
         popt_no_smoothing_pl = calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl)
@@ -315,16 +302,16 @@ def get_probability_distributions(v_sp:np.array, v_sc:np.array, smooth_distribut
     if np.max(v_sc) - np.min(v_sc) <= 1e-9 and np.max(v_sp) - np.min(v_sp) <= 1e-9:
         # Set a default range around 0 or the constant value in the data
         data_value = np.min(v_sc) if np.min(v_sc) != 0 else 1
-        common_bins = np.linspace(data_value - 1, data_value + 1, num=40)
+        common_bins = np.linspace(data_value - 1, data_value + 1, num=10)
     else:
         bins1 = freedman_diaconis(v_sc)
         bins2 = freedman_diaconis(v_sp)
-        num_bins = max(max(bins1, bins2) + 1, 40)
+        num_bins = max(max(bins1, bins2) + 1, 10)
         common_bins = np.linspace(start=min(np.min(v_sc), np.min(v_sp)), 
                                   stop=max(np.max(v_sc), np.max(v_sp)),
                                   num=num_bins)
     # ensure that common_bins have a reasonable number of bins
-    if np.any(np.diff(common_bins) <= 0) or len(common_bins) <= 10:
+    if np.any(np.diff(common_bins) <= 0) or len(common_bins) < 10:
         print(f"Common bins: {common_bins}")
         raise ValueError("Invalid bin configuration leading to zero or negative bin width.")
 
@@ -411,9 +398,21 @@ def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_
         cell_number_vs_jsd = pd.DataFrame(all_results)
         mean_entry = cell_number_vs_jsd.mean(axis=0)
         mean_jsd = pd.concat([mean_jsd, pd.DataFrame([mean_entry])], ignore_index=True)
-    popt_no_smoothing_pl, pcov_no_smoothing_pl = curve_fit(power_law_func, mean_jsd['cell_number'],
-                                                             mean_jsd['mean_jsd'], p0=initial_guess_pl, maxfev=2000)
-    return popt_no_smoothing_pl
+        # filter out values lower than 0.018
+        mean_jsd = mean_jsd[mean_jsd['mean_jsd'] > 0.018].copy()
+    popt_no_smoothing_pl = None
+    try:
+        popt_no_smoothing_pl, pcov_no_smoothing_pl = curve_fit(power_law_func, mean_jsd['cell_number'],
+                                                        mean_jsd['mean_jsd'], p0=initial_guess_pl, maxfev=2000)
+    except Exception as e:
+        print(f"Error fitting curve for {gene}, {celltype}: {e}")
+    
+    # Check if popt_no_smoothing_pl is still None
+    if popt_no_smoothing_pl is None:
+        # Handle the case where curve fitting failed, perhaps by returning default values or raising an error
+        return initial_guess_pl  # You can choose to return initial guess or another default value
+    else:
+        return popt_no_smoothing_pl
 
 # ONGOING
 # TODO: "FutureWarning: 
