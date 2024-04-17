@@ -275,9 +275,23 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     if correct_for_cell_number_dependent_decay:
         # calculate the decay by fitting a power law function to subsamples of the data
         popt_no_smoothing_pl = calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl)
-        baseline_jsd = power_law_func(len(sp), *popt_no_smoothing_pl)
+
+        if popt_no_smoothing_pl is None: # if the fitting failed (normally due to lack of variation in the data)
+            baseline_jsd = 0
+        else:
+            baseline_jsd = power_law_func(len(sp), *popt_no_smoothing_pl)
+            if baseline_jsd < 0:
+                baseline_jsd = 0
+            elif baseline_jsd > 1:
+                baseline_jsd = 1
+
         # correct the jsd
         jsd = jsd - baseline_jsd
+        # ensure that the jsd is between 0 and 1
+        if jsd < 0:
+            jsd = 0
+        elif jsd > 1:
+            jsd = 1
 
     return jsd
 
@@ -376,7 +390,7 @@ def gaussian_smooth(data, sigma):
 def power_law_func(x, a, k, y0):
     return a*x**k + y0
 
-def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl=[1.5, -0.5, -0.5]):
+def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl=[1.5, -0.5, 0.5]):
     number_of_cells_to_sample = list(range(5, 1000, 20))
     number_of_samplings = 3
 
@@ -398,21 +412,15 @@ def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_
         cell_number_vs_jsd = pd.DataFrame(all_results)
         mean_entry = cell_number_vs_jsd.mean(axis=0)
         mean_jsd = pd.concat([mean_jsd, pd.DataFrame([mean_entry])], ignore_index=True)
-        # filter out values lower than 0.018
-        mean_jsd = mean_jsd[mean_jsd['mean_jsd'] > 0.018].copy()
-    popt_no_smoothing_pl = None
+    
     try:
         popt_no_smoothing_pl, pcov_no_smoothing_pl = curve_fit(power_law_func, mean_jsd['cell_number'],
                                                         mean_jsd['mean_jsd'], p0=initial_guess_pl, maxfev=2000)
     except Exception as e:
         print(f"Error fitting curve for {gene}, {celltype}: {e}")
+        return None
     
-    # Check if popt_no_smoothing_pl is still None
-    if popt_no_smoothing_pl is None:
-        # Handle the case where curve fitting failed, perhaps by returning default values or raising an error
-        return initial_guess_pl  # You can choose to return initial guess or another default value
-    else:
-        return popt_no_smoothing_pl
+    return popt_no_smoothing_pl
 
 # ONGOING
 # TODO: "FutureWarning: 
