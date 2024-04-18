@@ -96,18 +96,6 @@ def get_eligible_celltypes(adata_sp: AnnData,
     celltypes, adata_sp, adata_sc
 
     """
-    # set the layer for adata_sc and adata_sp
-    # for most metrics, we use the lognorm layer
-    # for negative marker purity, we use the raw layer
-    adata_sp.X = adata_sp.layers[layer]
-    adata_sc.X = adata_sc.layers[layer]
-
-    # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
-    # sparse matrix support
-    for a in [adata_sc, adata_sp]:
-        if issparse(a.X):
-            a.X = a.X.toarray()
-
     # take the intersection of genes in adata_sp and adata_sc, as a list
     intersect_genes = list(set(adata_sp.var_names).intersection(set(adata_sc.var_names)))
 
