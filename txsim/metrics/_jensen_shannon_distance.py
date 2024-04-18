@@ -11,6 +11,8 @@ from ._util import get_bin_edges
 from ._util import get_eligible_celltypes
 from scipy.optimize import curve_fit
 import warnings
+import os
+
 # Ignore specific FutureWarning from pandas # TODO: remove this line after
 warnings.filterwarnings("ignore", message="The behavior of DataFrame concatenation with empty or all-NA entries is deprecated")
 
@@ -21,7 +23,9 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
                               pipeline_output: bool=True,
                               window_size: int=7,
                               sigma: int=2,
-                              correct_for_cell_number_dependent_decay: bool=False):
+                              correct_for_cell_number_dependent_decay: bool=False,
+                              decay_csv_path='output/jsd_decay_params.csv',
+                              initial_guess_pl=[1.5, -0.5, -0.5]):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
     is an asymmetric metric that measures the relative entropy or difference 
@@ -78,6 +82,14 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
             return np.nan
         else:
             return np.nan, np.nan, np.nan
+        
+    if correct_for_cell_number_dependent_decay:
+        if not os.path.exists(decay_csv_path):
+            decay_param_df = generate_jsd_decay_data(adata_sc=adata_sc,
+                                                    initial_guess_pl=initial_guess_pl,
+                                                    decay_csv_path=decay_csv_path)
+        else:
+            decay_param_df = pd.read_csv(decay_csv_path, index_col=0)
 
     #first, make an array to store the jsds per gene and celltype
     jsd_array = np.zeros((n_genes, n_celltypes))
@@ -91,7 +103,8 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
                                                                 smooth_distributions,
                                                                 window_size,
                                                                 sigma,
-                                                                correct_for_cell_number_dependent_decay)
+                                                                correct_for_cell_number_dependent_decay,
+                                                                decay_param_df)
             jsd_array[adata_sc.var_names.get_indexer([gene]).astype(int)[0], 
                         celltypes.index(celltype)] = jsd
 
@@ -223,13 +236,13 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
             
     return gridfield_metric
 
-def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:AnnData, 
+def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:AnnData,
+                                                  decay_param_df: pd.DataFrame, 
                                                   gene:str, celltype:str, 
                                                   smooth_distributions: str,
                                                   window_size=7,
                                                   sigma=2,
-                                                  correct_for_cell_number_dependent_decay=False, 
-                                                  initial_guess_pl=[1.5, -0.5, -0.5]):
+                                                  correct_for_cell_number_dependent_decay=False):
     """Calculate the Jensen-Shannon distance between two distributions:
     1. expression values for a given gene in a given celltype from spatial data
     2. expression values for a given gene in a given celltype from single-cell data
@@ -272,28 +285,16 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     P, Q = get_probability_distributions(sp, sc, smooth_distributions, window_size, sigma)
     jsd = distance.jensenshannon(P, Q, base=2)
 
+    # 4. Correct for cell number dependent decayn if requested
     if correct_for_cell_number_dependent_decay:
-        # calculate the decay by fitting a power law function to subsamples of the data
-        popt_no_smoothing_pl = calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl)
-
-        if popt_no_smoothing_pl is None: # if the fitting failed (normally due to lack of variation in the data)
-            baseline_jsd = 0
-        else:
-            baseline_jsd = power_law_func(len(sp), *popt_no_smoothing_pl)
-            if baseline_jsd < 0:
-                baseline_jsd = 0
-            elif baseline_jsd > 1:
-                baseline_jsd = 1
-
-        # correct the jsd
+        decay_params = decay_param_df.loc[gene, celltype]
+        baseline_jsd = power_law_func(len(sp), *decay_params)
         jsd = jsd - baseline_jsd
-        # ensure that the jsd is between 0 and 1
         if jsd < 0:
             jsd = 0
-        elif jsd > 1:
-            jsd = 1
 
     return jsd
+
 
 def get_probability_distributions(v_sp:np.array, v_sc:np.array, smooth_distributions: str,
                                   window_size=7, sigma=2):
@@ -404,6 +405,7 @@ def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_
             adata_sc_sample = adata_sc_sample[adata_sc_sample.obs.index.isin(sampled_indices)]
             jsd_original = jensen_shannon_distance_per_gene_and_celltype(adata_sc=adata_sc, 
                                                                          adata_sp=adata_sc_sample,
+                                                                         decay_param_df=None,
                                                                          gene=gene, 
                                                                          celltype=celltype, 
                                                                          smooth_distributions='no',
@@ -414,13 +416,23 @@ def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_
         mean_jsd = pd.concat([mean_jsd, pd.DataFrame([mean_entry])], ignore_index=True)
     
     try:
+        # try to find a fit for the power law function
         popt_no_smoothing_pl, pcov_no_smoothing_pl = curve_fit(power_law_func, mean_jsd['cell_number'],
                                                         mean_jsd['mean_jsd'], p0=initial_guess_pl, maxfev=2000)
     except Exception as e:
-        print(f"Error fitting curve for {gene}, {celltype}: {e}")
-        return None
+        # print(f"Error fitting curve for {gene}, {celltype}: {e}")
+        return [0,1,0] # return a baseline that will not affect the JSD
     
     return popt_no_smoothing_pl
+
+def generate_jsd_decay_data(adata_sc, initial_guess_pl, decay_csv_path):
+    decay_params = pd.DataFrame(index=adata_sc.var_names, columns=adata_sc.obs['celltype'].unique())
+    for gene in adata_sc.var_names:
+        for celltype in adata_sc.obs['celltype'].unique():
+            popt_no_smoothing_pl = calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl)
+            decay_params.loc[gene, celltype] = popt_no_smoothing_pl
+    decay_params.to_csv(decay_csv_path)
+    return decay_params
 
 # ONGOING
 # TODO: "FutureWarning: 
