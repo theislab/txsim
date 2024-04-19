@@ -16,16 +16,17 @@ import os
 # Ignore specific FutureWarning from pandas # TODO: remove this line after
 warnings.filterwarnings("ignore", message="The behavior of DataFrame concatenation with empty or all-NA entries is deprecated")
 
-def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData, 
-                              key:str='celltype', layer:str='lognorm', 
-                              smooth_distributions:str='no',
-                              min_number_cells:int=10,
-                              pipeline_output: bool=True,
-                              window_size: int=7,
-                              sigma: int=2,
-                              correct_for_cell_number_dependent_decay: bool=False,
-                              decay_csv_path='output/jsd_decay_params.csv',
-                              initial_guess_pl=[1.5, -0.5, -0.5]):
+def jensen_shannon_distance(adata_sc: AnnData, 
+                            adata_sp: AnnData, 
+                            key:str='celltype', layer:str='lognorm', 
+                            smooth_distributions:str='no',
+                            min_number_cells:int=10,
+                            pipeline_output: bool=True,
+                            window_size: int=7,
+                            sigma: int=2,
+                            correct_for_cell_number_dependent_decay: bool=False,
+                            decay_csv_path='output/jsd_decay_params.csv',
+                            initial_guess_pl=[1.5, -0.5, -0.5]):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
     is an asymmetric metric that measures the relative entropy or difference 
@@ -66,14 +67,14 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
     per_celltype_metric: float
         per celltype Jensen-Shannon divergence between the two distributions
     """
-    adata_sp.X = adata_sp.layers[layer]
     adata_sc.X = adata_sc.layers[layer]
+    adata_sp.X = adata_sp.layers[layer]
 
     # sparse matrix support
     for a in [adata_sc, adata_sp]:
         if issparse(a.X):
             a.X = a.X.toarray()
-            
+
     # jsd decay parameters
     decay_param_df = None
     if correct_for_cell_number_dependent_decay:
@@ -107,8 +108,8 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
     # now, loop over the genes and celltypes to fill the array
     for celltype in celltypes:
         for gene in adata_sc.var_names:
-            jsd = jensen_shannon_distance_per_gene_and_celltype(adata_sp=adata_sp,
-                                                                adata_sc=adata_sc,
+            jsd = jensen_shannon_distance_per_gene_and_celltype(adata_sc=adata_sc,
+                                                                adata_sp=adata_sp,
                                                                 correct_for_cell_number_dependent_decay=correct_for_cell_number_dependent_decay,
                                                                 decay_param_df=decay_param_df,
                                                                 gene=gene,
@@ -140,7 +141,8 @@ def jensen_shannon_distance(adata_sp: AnnData, adata_sc: AnnData,
 
     return overall_metric, per_gene_metric, per_celltype_metric
 
-def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
+def jensen_shannon_distance_local(adata_sc:AnnData,
+                                adata_sp:AnnData, 
                                 x_min:int, x_max:int, y_min:int, y_max:int,
                                 image: np.ndarray, bins: int = 10,
                                 key:str='celltype', layer:str='lognorm',
@@ -231,8 +233,8 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
                 i += 1
             else:
                 # pipeline output=True, so we only get the overall metric, maybe expand this to per gene and per celltype
-                jsd = jensen_shannon_distance(adata_sp_local, 
-                                        adata_sc, 
+                jsd = jensen_shannon_distance(adata_sc, 
+                                        adata_sp_local, 
                                         key=key, 
                                         layer=layer, 
                                         min_number_cells=min_number_cells,
@@ -247,7 +249,8 @@ def jensen_shannon_distance_local(adata_sp:AnnData, adata_sc:AnnData,
             
     return gridfield_metric
 
-def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:AnnData,
+def jensen_shannon_distance_per_gene_and_celltype(adata_sc:AnnData, 
+                                                  adata_sp:AnnData, 
                                                   correct_for_cell_number_dependent_decay: bool,
                                                   decay_param_df: pd.DataFrame, 
                                                   gene:str, celltype:str, 
@@ -284,8 +287,8 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
         Jensen-Shannon distance between the two distributions, single value
     """
     # 1. get the vectors for the two distributions
-    sp = adata_sp[adata_sp.obs['celltype']==celltype][:,gene].X.ravel()
     sc = adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X.ravel()
+    sp = adata_sp[adata_sp.obs['celltype']==celltype][:,gene].X.ravel()
 
     # 2. Check if smoothing was requested simultaneously with cell number dependent decay correction,
     # if so, raise an error
@@ -293,17 +296,15 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
         raise ValueError("Smoothing and cell number dependent decay correction cannot be applied simultaneously")
 
     # 3. get the probability distributions for the two vectors
-    P, Q = get_probability_distributions(sp, sc, smooth_distributions, window_size, sigma)
+    P, Q = get_probability_distributions(sc, sp, smooth_distributions, window_size, sigma)
     jsd = distance.jensenshannon(P, Q, base=2)
 
     # 4. Correct for cell number dependent decay if requested
     if correct_for_cell_number_dependent_decay:
-        decay_params = decay_param_df.loc[gene, celltype]
-        baseline_jsd = power_law_func(len(sp), *decay_params)
+        baseline_jsd = power_law_func(len(sp), *decay_param_df.loc[gene, celltype])
         if baseline_jsd < 0:
             baseline_jsd = 0
-        if baseline_jsd > 0.1:
-            print(f"Baseline JSD for {gene}, {celltype} is {baseline_jsd}")
+
         jsd = jsd - baseline_jsd
         if jsd < 0:
             jsd = 0
@@ -311,7 +312,7 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sp:AnnData, adata_sc:Ann
     return jsd
 
 
-def get_probability_distributions(v_sp:np.array, v_sc:np.array, smooth_distributions: str,
+def get_probability_distributions(v_sc:np.array, v_sp:np.array, smooth_distributions: str,
                                   window_size=7, sigma=2):
     """Calculate the probability distribution vectors from one celltype and one gene
     from spatial and single-cell data
@@ -407,7 +408,7 @@ def power_law_func(x, a, k, y0):
     return a*x**k + y0
 
 def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl=[1.5, -0.5, 0.5]):
-    number_of_cells_to_sample = list(range(5, 1000, 20))
+    number_of_cells_to_sample = list(range(5, 1000, 10))
     number_of_samplings = 3
 
     mean_jsd = pd.DataFrame(columns=['cell_number', 'mean_jsd'])
