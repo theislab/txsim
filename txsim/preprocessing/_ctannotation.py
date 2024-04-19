@@ -171,3 +171,91 @@ def annotate_celltypes(
         adata.obs['celltype'] = adata.obs['ct_'+str(ct_method)]
 
     return adata
+def run_tangram(
+        
+    adata_st: AnnData,
+    adata_sc: AnnData,
+    sc_ct_labels: str = 'celltype',
+    device: str = 'cpu',
+    mode: str = 'cells',
+    num_epochs: int = 1000,
+    
+) -> AnnData:
+    """Run the Tangram algorithm.
+
+    Parameters
+    ----------
+    adata_st : AnnData
+        AnnData object of the spatial transcriptomics data
+    adata_sc : str
+        Anndata object of the sc transcriptomics data
+    sc_ct_labels : str
+        Labels of the cell_type layer in the adata_sc
+    device : str or torch.device 
+        Optional. Default is 'cpu'.
+    mode : str
+        Optional. Tangram mapping mode. 'cells', 'clusters', 'constrained'. Default is 'cells'
+    num_epochs : int 
+        Optional. Number of epochs. Default is 1000
+        
+    Returns
+    -------
+    AnnData
+        Anndata object with cell type annotation in ``adata_st.obs['celltype']`` and ``adata_st.obs['score']``, whereby the latter is the noramlized scores, i.e. probability of each spatial cell to belong to a specific cell type assignment.
+    """
+    #import scanpy as sc
+    import tangram as tg
+
+    #TODO: check the layers in adata_sc
+    # use log1p noramlized values  
+    #adata_sc.X = adata_sc.layers['lognorm']
+    
+    adata_st_orig = adata_st.copy()
+
+    # use all the genes from adata_st as markers for tangram
+    markers = adata_st.var_names.tolist()
+    
+    # Removes genes that all entries are zero. Finds the intersection between adata_sc, adata_st and given marker gene list, save the intersected markers in two adatas
+    # Calculates density priors and save it with adata_st
+    tg.pp_adatas(
+        adata_sc=adata_sc, 
+        adata_sp=adata_st, 
+        genes=markers,
+        )
+    
+    # Map single cell data (`adata_sc`) on spatial data (`adata_st`).
+    # density_prior (str, ndarray or None): Spatial density of spots, when is a string, value can be 'rna_count_based' or 'uniform', when is a ndarray, shape = (number_spots,). 
+    # use 'uniform' if the spatial voxels are at single cell resolution (e.g. MERFISH). 'rna_count_based', assumes that cell density is proportional to the number of RNA molecules.
+
+    adata_map = tg.map_cells_to_space(
+        adata_sc=adata_sc,
+        adata_sp=adata_st,
+        device=device,
+        mode=mode,
+        num_epochs=num_epochs,
+        density_prior='uniform')
+    
+
+    # Spatial prediction dataframe is saved in `obsm` `tangram_ct_pred` of the spatial AnnData
+    tg.project_cell_annotations(
+        adata_map = adata_map,
+        adata_sp = adata_st, annotation=sc_ct_labels)
+    
+    # use original without extra layers generated from tangram
+    adata_st_orig.obsm['ct_tangram_scores'] = adata_st.obsm['tangram_ct_pred']
+    df = adata_st.obsm['tangram_ct_pred'].copy()
+    adata_st = adata_st_orig.copy()
+
+
+    adata_st.obs['celltype'] = df.idxmax(axis=1)
+
+
+    # Normalize by row before setting the score
+    normalized_df = df.div(df.sum(axis=1), axis=0)
+    max_values = normalized_df.max(axis=1)
+    adata_st.obs['score'] = max_values
+
+   
+
+    return adata_st
+
