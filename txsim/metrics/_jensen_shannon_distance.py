@@ -19,18 +19,19 @@ warnings.filterwarnings("ignore", message="The behavior of DataFrame concatenati
 def jensen_shannon_distance(adata_sc: AnnData, 
                             adata_sp: AnnData, 
                             key:str='celltype', layer:str='lognorm', 
-                            smooth_distributions:str='no',
                             min_number_cells:int=10,
                             pipeline_output: bool=True,
+                            smooth_distributions:str='no',
                             window_size: int=7,
                             sigma: int=2,
                             correct_for_cell_number_dependent_decay: bool=False,
+                            filter_out_double_zero_distributions: bool=True,
                             decay_csv_path='output/jsd_decay_params.csv',
                             initial_guess_pl=[1.5, -0.5, -0.5]):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
     is an asymmetric metric that measures the relative entropy or difference 
-    in information represented by two distributions.ß
+    in information represented by two distributions
     ----------
     adata_sp: AnnData
         annotated ``AnnData`` object containing the spatial single-cell data
@@ -93,51 +94,39 @@ def jensen_shannon_distance(adata_sc: AnnData,
                                                            key=key, 
                                                            layer=layer, 
                                                            min_number_cells=min_number_cells)
-    n_celltypes = len(celltypes)
-    n_genes = len(adata_sc.var_names)
 
     # if there are no eligible celltypes, return NaN
-    if n_celltypes == 0:
+    if len(celltypes) == 0:
         if pipeline_output:
             return np.nan
         else:
             return np.nan, np.nan, np.nan
 
-    #first, make an array to store the jsds per gene and celltype
-    jsd_array = np.zeros((n_genes, n_celltypes))
+    #first, make a df to store the jsds for each gene and celltype
+    jsd_df = pd.DataFrame(index=adata_sc.var_names, columns=celltypes)
     # now, loop over the genes and celltypes to fill the array
     for celltype in celltypes:
         for gene in adata_sc.var_names:
             jsd = jensen_shannon_distance_per_gene_and_celltype(adata_sc=adata_sc,
                                                                 adata_sp=adata_sp,
-                                                                correct_for_cell_number_dependent_decay=correct_for_cell_number_dependent_decay,
-                                                                decay_param_df=decay_param_df,
                                                                 gene=gene,
                                                                 celltype=celltype,
                                                                 smooth_distributions=smooth_distributions,
                                                                 window_size=window_size,
-                                                                sigma=sigma)
-            jsd_array[adata_sc.var_names.get_indexer([gene]).astype(int)[0], 
-                        celltypes.index(celltype)] = jsd
+                                                                sigma=sigma,
+                                                                correct_for_cell_number_dependent_decay=correct_for_cell_number_dependent_decay,
+                                                                filter_out_double_zero_distributions=filter_out_double_zero_distributions,
+                                                                decay_param_df=decay_param_df)
+            jsd_df.loc[gene, celltype] = jsd
 
     # OVERALL METRIC
-    jsd_total_sum = np.sum(jsd_array)
-    overall_metric = jsd_total_sum / (n_celltypes * n_genes)
+    overall_metric = jsd_df.mean().mean()
     if pipeline_output: # the execution stops here if pipeline_output=True
-            return overall_metric
+        return overall_metric
     # PER-CELLTYPE METRIC
-    # sum over all genes for each celltype, make a dataframe with the results
-    sums_per_celltype = np.sum(jsd_array, axis=0)
-    per_celltype_metric = pd.DataFrame(sums_per_celltype / n_genes, columns=['JSD'])
-    per_celltype_metric['celltype'] = celltypes
-    per_celltype_metric.set_index('celltype', inplace=True)
-
+    per_celltype_metric = jsd_df.mean(axis=0).to_frame(name="JSD")
     # PER-GENE METRIC
-    # sum over all celltypes for each gene, make a dataframe with the results
-    sums_per_gene = np.sum(jsd_array, axis=1)
-    per_gene_metric = pd.DataFrame(sums_per_gene / n_celltypes, columns=['JSD'])
-    per_gene_metric['Gene'] = adata_sc.var_names
-    per_gene_metric.set_index('Gene', inplace=True)
+    per_gene_metric = jsd_df.mean(axis=1).to_frame(name="JSD")
 
     return overall_metric, per_gene_metric, per_celltype_metric
 
@@ -251,12 +240,14 @@ def jensen_shannon_distance_local(adata_sc:AnnData,
 
 def jensen_shannon_distance_per_gene_and_celltype(adata_sc:AnnData, 
                                                   adata_sp:AnnData, 
-                                                  correct_for_cell_number_dependent_decay: bool,
-                                                  decay_param_df: pd.DataFrame, 
-                                                  gene:str, celltype:str, 
+                                                  gene:str, 
+                                                  celltype:str,
                                                   smooth_distributions: str,
-                                                  window_size=7,
-                                                  sigma=2):
+                                                  window_size: int,
+                                                  sigma: int,
+                                                  correct_for_cell_number_dependent_decay: bool,
+                                                  filter_out_double_zero_distributions: bool,
+                                                  decay_param_df: pd.DataFrame):
     """Calculate the Jensen-Shannon distance between two distributions:
     1. expression values for a given gene in a given celltype from spatial data
     2. expression values for a given gene in a given celltype from single-cell data
@@ -297,9 +288,19 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sc:AnnData,
 
     # 3. get the probability distributions for the two vectors
     P, Q = get_probability_distributions(sc, sp, smooth_distributions, window_size, sigma)
-    jsd = distance.jensenshannon(P, Q, base=2)
 
-    # 4. Correct for cell number dependent decay if requested
+    # 4. check if the distributions are None, handle accordingly
+    if P is None and Q is None:
+        if filter_out_double_zero_distributions:
+            return None
+        else:
+            return 0
+    elif (P is None and Q is not None) or (P is not None and Q is None):
+        return 1
+    else:
+        jsd = distance.jensenshannon(P, Q)
+
+    # 5. Correct for cell number dependent decay if requested
     if correct_for_cell_number_dependent_decay:
         baseline_jsd = power_law_func(len(sp), *decay_param_df.loc[gene, celltype])
         if baseline_jsd < 0:
@@ -313,7 +314,7 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sc:AnnData,
 
 
 def get_probability_distributions(v_sc:np.array, v_sp:np.array, smooth_distributions: str,
-                                  window_size=7, sigma=2):
+                                  window_size:int, sigma:int):
     """Calculate the probability distribution vectors from one celltype and one gene
     from spatial and single-cell data
     ---------- 
@@ -330,10 +331,13 @@ def get_probability_distributions(v_sc:np.array, v_sp:np.array, smooth_distribut
         probability distribution from dissociated sc data for one celltype and one gene, 1-dim vector
     """
     # Check if data has no variation
-    if np.max(v_sc) - np.min(v_sc) <= 1e-9 and np.max(v_sp) - np.min(v_sp) <= 1e-9:
-        # Set a default range around 0 or the constant value in the data
-        data_value = np.min(v_sc) if np.min(v_sc) != 0 else 1
-        common_bins = np.linspace(data_value - 1, data_value + 1, num=10)
+    if np.max(v_sc) - np.min(v_sc) <= 1e-9 and np.max(v_sp) - np.min(v_sp) > 1e-9:
+        return None, np.zeros_like(v_sp)
+    elif np.max(v_sc) - np.min(v_sc) > 1e-9 and np.max(v_sp) - np.min(v_sp) <= 1e-9:
+        return np.zeros_like(v_sc), None
+    elif np.max(v_sc) - np.min(v_sc) <= 1e-9 and np.max(v_sp) - np.min(v_sp) <= 1e-9:
+        return None, None
+    # only if both vectors have variation, calculate common bins
     else:
         bins1 = freedman_diaconis(v_sc)
         bins2 = freedman_diaconis(v_sp)
@@ -343,7 +347,6 @@ def get_probability_distributions(v_sc:np.array, v_sp:np.array, smooth_distribut
                                   num=num_bins)
     # ensure that common_bins have a reasonable number of bins
     if np.any(np.diff(common_bins) <= 0) or len(common_bins) < 10:
-        print(f"Common bins: {common_bins}")
         raise ValueError("Invalid bin configuration leading to zero or negative bin width.")
 
     # original data without smoothing
@@ -433,10 +436,9 @@ def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_
     
     try:
         # try to find a fit for the power law function
-        popt_no_smoothing_pl, pcov_no_smoothing_pl = curve_fit(power_law_func, mean_jsd['cell_number'],
+        popt_no_smoothing_pl, _ = curve_fit(power_law_func, mean_jsd['cell_number'],
                                                         mean_jsd['mean_jsd'], p0=initial_guess_pl, maxfev=2000)
-    except Exception as e:
-        # print(f"Error fitting curve for {gene}, {celltype}: {e}")
+    except Exception:
         return np.array([0, 1, 0]) # return a baseline that will not affect the JSD
     
     return popt_no_smoothing_pl
