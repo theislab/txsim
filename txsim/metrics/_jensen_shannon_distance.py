@@ -26,7 +26,7 @@ def jensen_shannon_distance(adata_sc: AnnData,
                             sigma: int=2,
                             correct_for_cell_number_dependent_decay: bool=False,
                             filter_out_double_zero_distributions: bool=True,
-                            decay_csv_path='output/jsd_decay_params.csv',
+                            decay_csv_enclosing_folder='output',
                             initial_guess_pl=[1.5, -0.5, -0.5]):
     """Calculate the Jensen-Shannon divergence between the two distributions:
     the spatial and dissociated single-cell data distributions. Jensen-Shannon
@@ -68,17 +68,26 @@ def jensen_shannon_distance(adata_sc: AnnData,
     per_celltype_metric: float
         per celltype Jensen-Shannon divergence between the two distributions
     """
+    # 1. Preparation
     adata_sc.X = adata_sc.layers[layer]
     adata_sp.X = adata_sp.layers[layer]
-
-    # sparse matrix support
     for a in [adata_sc, adata_sp]:
         if issparse(a.X):
             a.X = a.X.toarray()
+    
+    if smooth_distributions == 'gaussian':
+        window_size = None
+    elif smooth_distributions == 'convolution':
+        sigma = None
+    else:
+        window_size = None
+        sigma = None
 
-    # jsd decay parameters
+    # 2. calculate and save jsd decay parameters if correct_for_cell_number_dependent_decay is True
     decay_param_df = None
     if correct_for_cell_number_dependent_decay:
+        decay_csv_path = os.path.join(decay_csv_enclosing_folder, 
+        f"{smooth_distributions}{sigma if sigma is not None else ''}{window_size if window_size is not None else ''}_jsd_decay_params.csv")
         if not os.path.exists(decay_csv_path):
             decay_param_df = generate_jsd_decay_data(adata_sc=adata_sc,
                                                     initial_guess_pl=initial_guess_pl,
@@ -136,7 +145,7 @@ def jensen_shannon_distance_local(adata_sc:AnnData,
                                 image: np.ndarray, bins: int = 10,
                                 key:str='celltype', layer:str='lognorm',
                                 min_number_cells:int=10, # the minimal number of cells per celltype to be considered
-                                smooth_distributions:str='no',
+                                smooth_distributions:str='no_smoothing',
                                 window_size:int=7,
                                 sigma:int=2,
                                 correct_for_cell_number_dependent_decay:bool=False):
@@ -281,15 +290,10 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sc:AnnData,
     sc = adata_sc[adata_sc.obs['celltype']==celltype][:,gene].X.ravel()
     sp = adata_sp[adata_sp.obs['celltype']==celltype][:,gene].X.ravel()
 
-    # 2. Check if smoothing was requested simultaneously with cell number dependent decay correction,
-    # if so, raise an error
-    if smooth_distributions != 'no' and correct_for_cell_number_dependent_decay:
-        raise ValueError("Smoothing and cell number dependent decay correction cannot be applied simultaneously")
-
-    # 3. get the probability distributions for the two vectors
+    # 2. get the probability distributions for the two vectors
     P, Q = get_probability_distributions(sc, sp, smooth_distributions, window_size, sigma)
 
-    # 4. check if the distributions are None, handle accordingly
+    # 3. check if the distributions are None, handle accordingly
     if P is None and Q is None:
         if filter_out_double_zero_distributions:
             return None
@@ -300,7 +304,7 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sc:AnnData,
     else:
         jsd = distance.jensenshannon(P, Q)
 
-    # 5. Correct for cell number dependent decay if requested
+    # 4. Correct for cell number dependent decay if requested
     if correct_for_cell_number_dependent_decay:
         baseline_jsd = power_law_func(len(sp), *decay_param_df.loc[gene, celltype])
         if baseline_jsd < 0:
@@ -353,7 +357,7 @@ def get_probability_distributions(v_sc:np.array, v_sp:np.array, smooth_distribut
     hist_sc, _ = np.histogram(v_sc, bins=common_bins, density=True)
     hist_sp, _ = np.histogram(v_sp, bins=common_bins, density=True)
 
-    if smooth_distributions == 'no':
+    if smooth_distributions == 'no_smoothing':
         return hist_sp, hist_sc
     else:
         # find out which vector is smaller
@@ -410,8 +414,8 @@ def gaussian_smooth(data, sigma):
 def power_law_func(x, a, k, y0):
     return a*x**k + y0
 
-def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl=[1.5, -0.5, 0.5]):
-    number_of_cells_to_sample = list(range(5, 1000, 10))
+def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl):
+    number_of_cells_to_sample = list(range(5, 1000, 20))
     number_of_samplings = 3
 
     mean_jsd = pd.DataFrame(columns=['cell_number', 'mean_jsd'])
@@ -459,13 +463,5 @@ def parse_array(array_str):
 
 
 # ONGOING
-# TODO: "FutureWarning: 
-# The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. 
-# In a future version, this will no longer exclude empty or all-NA columns when 
-# determining the result dtypes. To retain the old behavior, exclude the relevant 
-# entries before the concat operation.
-# per_celltype_metric = pd.concat([per_celltype_metric, new_entry])"
-# TODO: change the functions structure so that it is not calculating per gene and per celltype metrics twice
-# TODO: allow setting the window size or sigma for smoothing
 # TODO: maybe implement Wasserstein or maybe even the Cramer distance in addition to Jensen-Shannon
 ####
