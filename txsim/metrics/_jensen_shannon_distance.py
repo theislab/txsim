@@ -69,12 +69,13 @@ def jensen_shannon_distance(adata_sc: AnnData,
         per celltype Jensen-Shannon divergence between the two distributions
     """
     # 1. Preparation
+    # 1.1 correct layer, sparse support
     adata_sc.X = adata_sc.layers[layer]
     adata_sp.X = adata_sp.layers[layer]
     for a in [adata_sc, adata_sp]:
         if issparse(a.X):
             a.X = a.X.toarray()
-    
+    # 1.2 disable the unnecessary smoothing parameter(s)
     if smooth_distributions == 'gaussian':
         window_size = None
     elif smooth_distributions == 'convolution':
@@ -82,6 +83,19 @@ def jensen_shannon_distance(adata_sc: AnnData,
     else:
         window_size = None
         sigma = None
+
+    # 1.3 get the eligible celltypes (at leaset min_number_cells cells per celltype, in both adata_sp and adata_sc)
+    celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, 
+                                                           adata_sp, 
+                                                           key=key, 
+                                                           layer=layer, 
+                                                           min_number_cells=min_number_cells)
+    # if there are no eligible celltypes, return NaN
+    if len(celltypes) == 0:
+        if pipeline_output:
+            return np.nan
+        else:
+            return np.nan, np.nan, np.nan
 
     # 2. calculate and save jsd decay parameters if correct_for_cell_number_dependent_decay is True
     decay_param_df = None
@@ -96,24 +110,9 @@ def jensen_shannon_distance(adata_sc: AnnData,
             decay_param_df = pd.read_csv(decay_csv_path, index_col=0)
             for col in decay_param_df.columns:
                 decay_param_df[col] = decay_param_df[col].apply(parse_array)
-    
-    # get the eligible celltypes (at leaset min_number_cells cells per celltype, in both adata_sp and adata_sc)
-    celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, 
-                                                           adata_sp, 
-                                                           key=key, 
-                                                           layer=layer, 
-                                                           min_number_cells=min_number_cells)
 
-    # if there are no eligible celltypes, return NaN
-    if len(celltypes) == 0:
-        if pipeline_output:
-            return np.nan
-        else:
-            return np.nan, np.nan, np.nan
-
-    #first, make a df to store the jsds for each gene and celltype
+    # 3. JSD calculation
     jsd_df = pd.DataFrame(index=adata_sc.var_names, columns=celltypes)
-    # now, loop over the genes and celltypes to fill the array
     for celltype in celltypes:
         for gene in adata_sc.var_names:
             jsd = jensen_shannon_distance_per_gene_and_celltype(adata_sc=adata_sc,
@@ -462,6 +461,6 @@ def parse_array(array_str):
     return np.array(numbers)
 
 
-# ONGOING
+# ONGOING/IDEAS:
 # TODO: maybe implement Wasserstein or maybe even the Cramer distance in addition to Jensen-Shannon
 ####
