@@ -49,12 +49,10 @@ def run_majority_voting(
 
         
 def run_ssam(
-    
     adata_st: AnnData,
     spots: pd.DataFrame,
     adata_sc: pd.DataFrame,
     um_p_px: float = 0.325,
-    
 ) -> AnnData:
     """Add cell type annotation by ssam.
 
@@ -126,51 +124,7 @@ def run_ssam(
     
     return adata_st
 
-def annotate_celltypes(
-    adata: AnnData,
-    adata_sc: AnnData,
-    ct_method: str = 'majority',
-    ct_threshold: float = 0.7,
-    prior_celltypes : pd.DataFrame = None,
-    hyperparams: dict = {}
-) -> AnnData:
-    #all_ct_methods = False
-    #TODO potentially fix how threshold is measured
-    #Add celltype according to ct_method and check if all methods should be implemented
-    if hyperparams.get('threshold') is not None: ct_threshold = hyperparams.get('threshold')
-    ran_ct_method = False
-    if (ct_method is None): ct_method = 'majority'
-    if (ct_method == 'majority'):
-        adata = run_majority_voting(adata, adata.uns['spots'])
-        ran_ct_method = True
-    elif (ct_method == 'ssam'):
-        adata = run_ssam(adata, adata.uns['spots'], adata_sc = adata_sc)
-        ran_ct_method = True
-    elif (ct_method == 'pciSeqCT'):
-        #TODO check if this actually works
-        ct_method = 'pciSeq'
-        adata.obs['ct_pciSeq'] = pd.Categorical(prior_celltypes['type'][adata.obs['cell_id']])
-        adata.obs['ct_pciSeq_cert'] = prior_celltypes['prob'][adata.obs['cell_id']]
-        ran_ct_method = True
-    else:
-        raise Exception(f'{ct_method} is not a valid cell type method')
-    # ToDo (second prio)
-    # elif ct_method == 'manual_markers':
-    #     adata = run_manual_markers(adata, spots)
-    # elif ct_method == 'scrna_markers':
-    #     adata = run_scrna_markers(adata, spots, rna_adata)
-    if not ran_ct_method: print('No valid cell type annotation method')
-    
-    # Take over primary ct annotation method to adata.obs['celltype'] and apply certainty threshold
-    # Add methods, if they provide certainty measure
-    if ct_method in ['majority', 'ssam']: 
-        ct_list = adata.obs['ct_'+str(ct_method)].copy()
-        ct_list[adata.obs['ct_'+str(ct_method)+'_cert'] < ct_threshold] = "Unknown" #TODO different hyperparams probably
-        adata.obs['celltype'] = ct_list
-    else:
-        adata.obs['celltype'] = adata.obs['ct_'+str(ct_method)]
 
-    return adata
 def run_tangram(
         
     adata_st: AnnData,
@@ -235,7 +189,6 @@ def run_tangram(
         num_epochs=num_epochs,
         density_prior='uniform')
     
-
     # Spatial prediction dataframe is saved in `obsm` `tangram_ct_pred` of the spatial AnnData
     tg.project_cell_annotations(
         adata_map = adata_map,
@@ -246,16 +199,12 @@ def run_tangram(
     df = adata_st.obsm['tangram_ct_pred'].copy()
     adata_st = adata_st_orig.copy()
 
-
     adata_st.obs['celltype'] = df.idxmax(axis=1)
-
 
     # Normalize by row before setting the score
     normalized_df = df.div(df.sum(axis=1), axis=0)
     max_values = normalized_df.max(axis=1)
     adata_st.obs['score'] = max_values
-
-   
 
     return adata_st
 
