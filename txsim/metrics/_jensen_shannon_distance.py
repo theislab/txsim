@@ -18,10 +18,11 @@ warnings.filterwarnings("ignore", message="The behavior of DataFrame concatenati
 
 def jensen_shannon_distance(adata_sc: AnnData, 
                             adata_sp: AnnData, 
-                            key:str='celltype', layer:str='lognorm', 
+                            key:str='celltype', 
+                            layer:str='lognorm', 
                             min_number_cells:int=10,
                             pipeline_output: bool=True,
-                            smooth_distributions:str='no',
+                            smooth_distributions:str='no_smoothing',
                             window_size: int=7,
                             sigma: int=2,
                             correct_for_cell_number_dependent_decay: bool=False,
@@ -41,24 +42,29 @@ def jensen_shannon_distance(adata_sc: AnnData,
         .obs column of ``AnnData`` that contains celltype information
     layer: str (default: 'lognorm')
         layer of ```AnnData`` to use to compute the metric
-    smooth_distributions: str (default: 'no')
-        whether to smooth the distributions before calculating the metric per gene and per celltype
-        'no' - no smoothing
-        'convolution' - convolution filter, moving average 
-        'gaussian' - gaussian filter
     min_number_cells: int (default: 10)
         minimum number of cells belonging to a cluster to consider it in the analysis
     pipeline_output: bool (default: True)
         whether to return only the overall metric (pipeline style)
         (if False, will return the overall metric, per-gene metric and per-celltype metric)
+    smooth_distributions: str (default: 'no_smoothing')
+        whether to smooth the distributions before calculating the metric per gene and per celltype
+        'no_smoothing' - no smoothing
+        'convolution' - convolution filter, moving average 
+        'gaussian' - gaussian filter
     window_size: int (default: 7)
         window size for the convolution filter
     sigma: int (default: 2)
         standard deviation for the gaussian filter
     correct_for_cell_number_dependent_decay: bool (default: True)
         whether to correct the metric for cell number dependent decay, cannot be used simultaneously with smoothing
+    filter_out_double_zero_distributions: bool (default: True)
+        whether to filter out the cases for one gene and celltype where both distributions contain only zeros
+    decay_csv_enclosing_folder: str (default: 'output')
+        folder where the decay parameters are saved as a csv file
+    initial_guess_pl: list (default: [1.5, -0.5, -0.5])
+        initial guess for the power law function parameters, used to correct for cell number dependent decay
     
-
     Returns
     -------
     overall_metric: float
@@ -88,7 +94,6 @@ def jensen_shannon_distance(adata_sc: AnnData,
     celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, 
                                                            adata_sp, 
                                                            key=key, 
-                                                           layer=layer, 
                                                            min_number_cells=min_number_cells)
     # if there are no eligible celltypes, return NaN
     if len(celltypes) == 0:
@@ -273,12 +278,16 @@ def jensen_shannon_distance_per_gene_and_celltype(adata_sc:AnnData,
         'no' - no smoothing
         'convolution' - convolution filter, moving average
         'gaussian' - gaussian filter
-    correct_for_cell_number_dependent_decay: bool (default: True)
-        whether to correct the metric for cell number dependent decay, cannot be used simultaneously with smoothing
     window_size: int (default: 7)
         window size for the convolution filter
     sigma: int (default: 2)
         standard deviation for the gaussian filter
+    correct_for_cell_number_dependent_decay: bool (default: True)
+        whether to correct the metric for cell number dependent decay, cannot be used simultaneously with smoothing
+    filter_out_double_zero_distributions: bool (default: True)
+        whether to filter out the cases for one gene and celltype where both distributions contain only zeros
+    decay_param_df: pd.DataFrame
+        dataframe with the decay parameters for the power law function, used to correct for cell number dependent decay
         
     Returns
     -------
