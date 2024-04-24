@@ -152,7 +152,9 @@ def jensen_shannon_distance_local(adata_sc:AnnData,
                                 smooth_distributions:str='no_smoothing',
                                 window_size:int=7,
                                 sigma:int=2,
-                                correct_for_cell_number_dependent_decay:bool=False):
+                                correct_for_cell_number_dependent_decay:bool=False,
+                                filter_out_double_zero_distributions:bool=True,
+                                decay_csv_enclosing_folder='output'):
     """Calculate the Jensen-Shannon divergence between the spatial and dissociated single-cell data distributions
     for each gene, but using only the cells in a given local area for the spatial data.
 
@@ -183,11 +185,11 @@ def jensen_shannon_distance_local(adata_sc:AnnData,
         .obs column of ``AnnData`` that contains celltype information
     layer: str (default: 'lognorm')
         layer of ```AnnData`` to use to compute the metric
-    min_number_cells: int (default: 20)
-        minimum number of cells belonging to a cluster to consider it in the analysis
-    smooth_distributions: str (default: 'no')
+    min_number_cells: int (default: 10)
+        minimum number of cells in one celltype in one grid segment to consider it in the analysis
+    smooth_distributions: str (default: 'no_smoothing')
         whether to smooth the distributions before calculating the metric per gene and per celltype
-        'no' - no smoothing
+        'no_smoothing' - no smoothing
         'convolution' - convolution filter, moving average
         'gaussian' - gaussian filter
     window_size: int (default: 7)
@@ -195,7 +197,11 @@ def jensen_shannon_distance_local(adata_sc:AnnData,
     sigma: int (default: 2)
         standard deviation for the gaussian filter
     correct_for_cell_number_dependent_decay: bool (default: True)
-        whether to correct the metric for cell number dependent decay, cannot be used simultaneously with smoothing
+        whether to correct the metric for cell number dependent decay
+    filter_out_double_zero_distributions: bool (default: True)
+        whether to filter out the cases for one gene and celltype where both distributions contain only zeros
+    decay_csv_enclosing_folder: str (default: 'output')
+        folder where the decay parameters are saved as a csv file
 
     Returns
     -------
@@ -224,7 +230,6 @@ def jensen_shannon_distance_local(adata_sc:AnnData,
         i = 0
         for y_start, y_end in zip(bins_y[:-1], bins_y[1:]):    
             # instead of dataframe, take the cropped adata_sp for one bin here
-
             adata_sp_local = adata_sp[(adata_sp.obs['centroid_x'] >= x_start) & 
                                         (adata_sp.obs['centroid_x'] < x_end) &
                                         (adata_sp.obs['centroid_y'] >= y_start) &
@@ -244,7 +249,9 @@ def jensen_shannon_distance_local(adata_sc:AnnData,
                                         window_size=window_size,
                                         sigma=sigma, 
                                         pipeline_output=True,
-                                        correct_for_cell_number_dependent_decay=correct_for_cell_number_dependent_decay)
+                                        correct_for_cell_number_dependent_decay=correct_for_cell_number_dependent_decay,
+                                        filter_out_double_zero_distributions=filter_out_double_zero_distributions,
+                                        decay_csv_enclosing_folder=decay_csv_enclosing_folder)
                 gridfield_metric[i,j]  = jsd
             i += 1
         j += 1
