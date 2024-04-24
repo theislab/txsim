@@ -8,4 +8,4 @@ from ._negative_marker_purity import negative_marker_purity_cells, negative_mark
 from ._cell_statistics import ratio_median_readsXcells,ratio_mean_readsXcells,ratio_number_of_cells,ratio_mean_genesXcells,ratio_median_genesXcells
 from ._coembedding import knn_mixing
 from ._gene_set_coexpression import gene_set_coexpression
-from ._jensen_shannon_distance import jensen_shannon_distance, jensen_shannon_distance_local
+from ._jensen_shannon_distance import *
