@@ -80,7 +80,6 @@ def get_bin_edges(A: list[list[int]], bins):
 def get_eligible_celltypes(adata_sp: AnnData, 
                            adata_sc: AnnData, 
                            key: str='celltype', 
-                           layer: str='lognorm',
                            min_number_cells: int=10):
     """ Get shared celltypes of adata_sp and adata_sc, that have at least min_number_cells members.
 
