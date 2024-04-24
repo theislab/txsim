@@ -6,8 +6,8 @@ from anndata import AnnData
 from scipy.sparse import issparse
 from scipy.spatial import distance
 from scipy.ndimage import gaussian_filter1d
-from ._util import check_crop_exists
-from ._util import get_bin_edges
+from ._util import check_crop_exists # #TODO this needs to go later
+from ._util import get_bin_edges # #TODO this needs to go later
 from ._util import get_eligible_celltypes
 from scipy.optimize import curve_fit
 import warnings
