@@ -217,9 +217,11 @@ def jensen_shannon_distance_local(adata_sc:AnnData,
     n_bins_x = len(bins_x) - 1
     n_bins_y = len(bins_y) - 1
 
-    celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, adata_sp, key=key, 
-                                                           layer=layer, 
-                                                           min_number_cells=min_number_cells)
+
+    # TODO: check if I really do not need this, but I think not, because jsd is doing it for each grid
+    # celltypes, adata_sc, adata_sp = get_eligible_celltypes(adata_sc, adata_sp, key=key, 
+    #                                                        layer=layer, 
+    #                                                        min_number_cells=min_number_cells)
 
 
     #initialize the np.array that will hold the metric for each segment of the gridfield
