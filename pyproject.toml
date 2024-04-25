@@ -10,6 +10,7 @@ requires = [
     "shapely",
     "scikit-image",
     "planktonspace",
-    "geopandas"
+    "geopandas",
+    "rasterio"
 ]
 build-backend = "setuptools.build_meta"
