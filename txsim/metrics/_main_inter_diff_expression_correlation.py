@@ -229,7 +229,6 @@ def local_MIDEC(adata_sp_source : ad.AnnData,
     for x_start, x_end in zip(bins_x[:-1], bins_x[1:]):
         i = 0
         for y_start, y_end in zip(bins_y[:-1], bins_y[1:]):
-            print(f"crop: {x_start}:{x_end}, {y_start}:{y_end}")
             
             # crop the spots_df
             spots_crop = spots_df[(spots_df[spots_x_col].astype(int) >= x_start) &
