@@ -3,6 +3,7 @@ import anndata as ad
 from anndata import AnnData
 import pandas as pd
 import scanpy as sc
+from scipy.sparse import issparse
 
 
 def run_majority_voting(
@@ -83,6 +84,8 @@ def run_ssam(
                             spots.x*um_p_px,
                             spots.y*um_p_px )
     adata_sc=adata_sc[:,adata_st.var_names]
+    if issparse(adata_sc.X):
+        adata_sc.X = adata_sc.X.toarray()
     exp=pd.DataFrame(adata_sc.X,columns=adata_sc.var_names)
     exp['celltype']=list(adata_sc.obs['celltype'])
     signatures=exp.groupby('celltype').mean().transpose()
