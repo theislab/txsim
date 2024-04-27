@@ -85,6 +85,7 @@ def run_ssam(
                             spots.y*um_p_px )
     adata_sc=adata_sc[:,adata_st.var_names]
     if issparse(adata_sc.X):
+        adata_sc = adata_sc.copy()
         adata_sc.X = adata_sc.X.toarray()
     exp=pd.DataFrame(adata_sc.X,columns=adata_sc.var_names)
     exp['celltype']=list(adata_sc.obs['celltype'])
