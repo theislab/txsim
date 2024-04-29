@@ -3,6 +3,7 @@ import pandas as pd
 import anndata as ad
 import math
 from scipy.stats import spearmanr
+from scipy.stats import pearsonr
 from ._util import check_crop_exists
 from ._util import get_bin_edges
 
@@ -24,8 +25,8 @@ and other metrics (MSE, absolute error).
 
 # Main functions
 
-def global_MIDEC(adata_sp_source : ad.AnnData,
-                                adata_sp_target : ad.AnnData,
+def global_MIDEC(adata_sp_1 : ad.AnnData,
+                                adata_sp_2 : ad.AnnData,
                                 min_number_of_spots_per_cell : int = 10,
                                 min_number_of_cells : int = 10,
                                 upper_threshold : float = 0.75,
@@ -96,31 +97,34 @@ def global_MIDEC(adata_sp_source : ad.AnnData,
     # assert that one of the metrics is chosen
     assert which_metric in ['pearson', 'spearman', 'MAE', 'MSE'], 'Invalid metric'
 
-    # get the spots from both AnnData objects
-    source_spots = adata_sp_source.uns['spots'].copy()
-    target_spots = adata_sp_target.uns['spots'].copy()
+    # calculate the metric once when 1 is the source and 2 is the target, and once the other way around
+    result = []
+    for source, target in [(adata_sp_1, adata_sp_2), (adata_sp_2, adata_sp_1)]:
+        # get the spots from both AnnData objects
+        source_spots = source.uns['spots'].copy()
+        target_spots = target.uns['spots'].copy()
 
-    # rename the cell column to source_segmentation_name and make it integer type
-    spots_df = source_spots.rename(columns={cell_col_name: source_segmentation_name}).copy()
-    # add the cell column from target segmentation to the spots_df
-    spots_df[target_segmentation_name] = target_spots[cell_col_name].copy()
-    # fill the NaN values with 0 and make the column integer type
-    spots_df[source_segmentation_name] = spots_df[source_segmentation_name].fillna(0).astype(int)
-    spots_df[target_segmentation_name] = spots_df[target_segmentation_name].fillna(0).astype(int)
+        # rename the cell column to source_segmentation_name and make it integer type
+        spots_df = source_spots.rename(columns={cell_col_name: source_segmentation_name}).copy()
+        # add the cell column from target segmentation to the spots_df
+        spots_df[target_segmentation_name] = target_spots[cell_col_name].copy()
+        # fill the NaN values with 0 and make the column integer type
+        spots_df[source_segmentation_name] = spots_df[source_segmentation_name].fillna(0).astype(int)
+        spots_df[target_segmentation_name] = spots_df[target_segmentation_name].fillna(0).astype(int)
 
-    metric = main_inter_diff_expression_correlation(spots_df=spots_df,
-                                min_number_of_spots_per_cell=min_number_of_spots_per_cell,
-                                min_number_of_cells=min_number_of_cells,
-                                upper_threshold=upper_threshold,
-                                lower_threshold=lower_threshold,
-                                source_segmentation_name=source_segmentation_name,
-                                target_segmentation_name=target_segmentation_name,
-                                spots_x_col=spots_x_col,
-                                spots_y_col=spots_y_col,
-                                gene_col_name=gene_col_name,
-                                which_metric=which_metric)
-
-    return metric
+        metric, cell_number = main_inter_diff_expression_correlation(spots_df=spots_df,
+                                    min_number_of_spots_per_cell=min_number_of_spots_per_cell,
+                                    min_number_of_cells=min_number_of_cells,
+                                    upper_threshold=upper_threshold,
+                                    lower_threshold=lower_threshold,
+                                    source_segmentation_name=source_segmentation_name,
+                                    target_segmentation_name=target_segmentation_name,
+                                    spots_x_col=spots_x_col,
+                                    spots_y_col=spots_y_col,
+                                    gene_col_name=gene_col_name,
+                                    which_metric=which_metric)
+        result.append((metric, cell_number))
+    return result
 
 def local_MIDEC(adata_sp_source : ad.AnnData,
                 adata_sp_target : ad.AnnData,
@@ -341,24 +345,20 @@ def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
             continue
         if which_metric == 'pearson':
             # calculate the pearson correlation coefficient between intersection and difference
-            pearson_correlation = np.corrcoef(main_overlap, rest)[0, 1]
-            # add the pearson correlation coefficient to the list
-            values.append(pearson_correlation)
+            value = pearsonr(main_overlap, rest)[0]
         elif which_metric == 'spearman':
-            spearman_correlation = spearmanr(main_overlap, rest)[0]
-            values.append(spearman_correlation)
+            value = spearmanr(main_overlap, rest)[0]
         elif which_metric == 'MAE':
             main_overlap_normalized = main_overlap/np.linalg.norm(main_overlap)
             rest_normalized = rest/np.linalg.norm(rest)
-            abs_error = np.abs(np.subtract(main_overlap_normalized, rest_normalized)).mean()
-            values.append(abs_error)
+            value = np.abs(np.subtract(main_overlap_normalized, rest_normalized)).mean()
         elif which_metric == 'MSE':
             main_overlap_normalized = main_overlap/np.linalg.norm(main_overlap)
             rest_normalized = rest/np.linalg.norm(rest)
-            mse = np.square(np.subtract(main_overlap_normalized, rest_normalized)).mean()
-            values.append(mse)
-        else:
-            raise ValueError('Invalid metric')
+            value = np.square(np.subtract(main_overlap_normalized, rest_normalized)).mean()
+        # ensure that the value is not None, because for example pearsonr can return None
+        if value is not None:
+            values.append(value)
 
     # calculate the mean for the overall value
     if len(values) < min_number_of_cells:
@@ -366,7 +366,7 @@ def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
     else:
         metric = np.mean(values)
 
-    return metric
+    return metric, len(values) # return the metric and the number of cells that were considered
 
 def allocate_spots_to_pixels(spots_df, spots_x_col, spots_y_col):
     """
