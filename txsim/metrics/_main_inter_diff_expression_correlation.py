@@ -356,8 +356,8 @@ def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
             main_overlap_normalized = main_overlap/np.linalg.norm(main_overlap)
             rest_normalized = rest/np.linalg.norm(rest)
             value = np.square(np.subtract(main_overlap_normalized, rest_normalized)).mean()
-        # ensure that the value is not None, because for example pearsonr can return None
-        if value is not None:
+        # ensure that the value is not NaN, because for example pearsonr can return None
+        if value is not math.nan:
             values.append(value)
 
     # calculate the mean for the overall value
