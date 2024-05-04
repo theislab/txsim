@@ -5,6 +5,10 @@ import math
 from scipy.stats import spearmanr
 from scipy.stats import pearsonr
 
+# suppress pandas FutureWarning TODO: remove this when pandas is updated
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 
 """
 Main Intersection over Difference Expression Correlation (MIDEC)
@@ -128,12 +132,72 @@ def MIDEC(adata_sp_1 : ad.AnnData,
                                     spots_y_col=spots_y_col,
                                     gene_col_name=gene_col_name,
                                     which_metric=which_metric)
+        if cell_number < min_number_of_cells:
+            metric = None
         # round the metric to 2 decimal places
         if metric is not None:
             metric = round(metric, 2)
         result.append((metric, cell_number))
     # convert result (list) to a 2-dim numpy array
     return np.array(result)
+
+def MIDEC_per_celltype(adata_sp_1 : ad.AnnData,
+                        adata_sp_2 : ad.AnnData,
+                        min_number_of_spots_per_cell : int = 10,
+                        min_number_of_cells : int = 10,
+                        upper_threshold : float = 0.75,
+                        lower_threshold : float = 0.25,
+                        source_segmentation_name : str = 'source',
+                        target_segmentation_name : str = 'target',
+                        spots_x_col: str = 'x',
+                        spots_y_col: str = 'y',
+                        cell_col_name_uns: str = 'cell',
+                        cell_col_name_obs: str = 'cell_id',
+                        gene_col_name: str = 'Gene',
+                        which_metric = 'MAE'):
+    
+    # per celltype metric only makes sense with MAE
+    assert which_metric == 'MAE', 'Per celltype metric only makes sense with the absolute error metric (MAE).'
+
+    # sort out celltypes with less than min_number_of_cells
+    celltype_counts_1 = adata_sp_1.obs['celltype'].value_counts()
+    selected_celltypes_1 = celltype_counts_1[celltype_counts_1 >= min_number_of_cells].index
+    adata_sp_1 = adata_sp_1[adata_sp_1.obs['celltype'].isin(selected_celltypes_1)].copy()
+
+    celltype_counts_2 = adata_sp_2.obs['celltype'].value_counts()
+    selected_celltypes_2 = celltype_counts_2[celltype_counts_2 >= min_number_of_cells].index
+    adata_sp_2 = adata_sp_2[adata_sp_2.obs['celltype'].isin(selected_celltypes_2)].copy()
+
+    # find celltypes which are in both datasets and filter the adatas for them
+    celltypes = list(set(adata_sp_1.obs['celltype'].unique()).intersection(set(adata_sp_2.obs['celltype'].unique())))
+    adata_sp_1 = adata_sp_1[adata_sp_1.obs['celltype'].isin(celltypes)].copy()
+
+    per_celltype_df = pd.DataFrame(columns=['celltype', f'{which_metric}_1', 'cell_number_1', f'{which_metric}_2', 'cell_number_2'])
+
+    for celltype in celltypes:
+        adata_sp_1_celltype = adata_sp_1[adata_sp_1.obs['celltype'] == celltype].copy()
+        adata_sp_2_celltype = adata_sp_2[adata_sp_2.obs['celltype'] == celltype].copy()
+        metric = MIDEC(adata_sp_1_celltype, 
+                    adata_sp_2_celltype, 
+                    min_number_of_spots_per_cell=min_number_of_spots_per_cell,
+                    min_number_of_cells=min_number_of_cells, 
+                    upper_threshold=upper_threshold, 
+                    lower_threshold=lower_threshold,
+                    source_segmentation_name=source_segmentation_name,
+                    target_segmentation_name=target_segmentation_name,
+                    spots_x_col=spots_x_col, spots_y_col=spots_y_col, 
+                    cell_col_name_uns=cell_col_name_uns,
+                    cell_col_name_obs=cell_col_name_obs, 
+                    gene_col_name=gene_col_name, 
+                    which_metric=which_metric)
+        if metric[0][1] >= min_number_of_cells and metric[1][1] >= min_number_of_cells:
+            new_entry = pd.DataFrame([[celltype, metric[0][0], metric[0][1], metric[1][0], metric[1][1]]], 
+                            columns=['celltype', f'{which_metric}_1', 'cell_number_1', f'{which_metric}_2', 'cell_number_2'])
+            per_celltype_df = pd.concat([per_celltype_df, new_entry], ignore_index=True)
+            # type of the cell number column is int
+            per_celltype_df['cell_number_1'] = per_celltype_df['cell_number_1'].astype(int)
+            per_celltype_df['cell_number_2'] = per_celltype_df['cell_number_2'].astype(int)
+    return per_celltype_df
 
 
 # Helper functions
@@ -189,6 +253,10 @@ def main_inter_diff_expression_correlation(spots_df : pd.DataFrame,
         Pearson correlation coefficient between the intersection gene expression
         vector and the difference gene expression vector.
     """
+    # if spots_df is empty, return None
+    if spots_df.shape[0] == 0:
+        return None, 0
+    
     spots_df = allocate_spots_to_pixels(spots_df, spots_x_col=spots_x_col, spots_y_col=spots_y_col)
 
     # get the ids from the source segmentation
@@ -256,8 +324,12 @@ def allocate_spots_to_pixels(spots_df, spots_x_col, spots_y_col):
     spots_df_copy : pandas.DataFrame
         DataFrame with columns 'pixel_x' and 'pixel_y', spots_x_col and spots_y_col
     """
-    spots_df['pixel_x'] = spots_df[spots_x_col].astype(int)
-    spots_df['pixel_y'] = spots_df[spots_y_col].astype(int)
+    try: 
+        spots_df['pixel_x'] = spots_df[spots_x_col].astype(int)
+        spots_df['pixel_y'] = spots_df[spots_y_col].astype(int)
+    except:
+        print(spots_df)
+        raise ValueError('Error in allocating spots to pixels.')
     return spots_df
 
 def add_segmentation_to_spots_df(spots_df : pd.DataFrame, 
