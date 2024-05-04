@@ -4,8 +4,6 @@ import anndata as ad
 import math
 from scipy.stats import spearmanr
 from scipy.stats import pearsonr
-from ._util import check_crop_exists
-from ._util import get_bin_edges
 
 
 """
@@ -25,7 +23,7 @@ and other metrics (MSE, absolute error).
 
 # Main functions
 
-def global_MIDEC(adata_sp_1 : ad.AnnData,
+def MIDEC(adata_sp_1 : ad.AnnData,
                                 adata_sp_2 : ad.AnnData,
                                 min_number_of_spots_per_cell : int = 10,
                                 min_number_of_cells : int = 10,
@@ -35,7 +33,8 @@ def global_MIDEC(adata_sp_1 : ad.AnnData,
                                 target_segmentation_name : str = 'target',
                                 spots_x_col: str = 'x',
                                 spots_y_col: str = 'y',
-                                cell_col_name: str = 'cell',
+                                cell_col_name_uns: str = 'cell',
+                                cell_col_name_obs: str = 'cell_id',
                                 gene_col_name: str = 'Gene',
                                 which_metric = 'pearson'):
     """
@@ -97,17 +96,23 @@ def global_MIDEC(adata_sp_1 : ad.AnnData,
     # assert that one of the metrics is chosen
     assert which_metric in ['pearson', 'spearman', 'MAE', 'MSE'], 'Invalid metric'
 
-    # calculate the metric once when 1 is the source and 2 is the target, and once the other way around
+    # prepare the result variable (list), which will contain data in the tuple form (float, int)
     result = []
     for source, target in [(adata_sp_1, adata_sp_2), (adata_sp_2, adata_sp_1)]:
         # get the spots from both AnnData objects
         source_spots = source.uns['spots'].copy()
         target_spots = target.uns['spots'].copy()
 
+        # adjust the spots Dataframe to only include spots from the cells which are actually in adata.obs
+        source_available_cells = source.obs[cell_col_name_obs].to_frame().copy()
+        target_available_cells = target.obs[cell_col_name_obs].to_frame().copy()
+        # natural join the spots with the available cells
+        source_spots = pd.merge(source_available_cells, source_spots, left_on=cell_col_name_obs, right_on=cell_col_name_uns).copy()
+        target_spots = pd.merge(target_available_cells, target_spots, left_on=cell_col_name_obs, right_on=cell_col_name_uns).copy()
         # rename the cell column to source_segmentation_name and make it integer type
-        spots_df = source_spots.rename(columns={cell_col_name: source_segmentation_name}).copy()
+        spots_df = source_spots.rename(columns={cell_col_name_uns: source_segmentation_name}).copy()
         # add the cell column from target segmentation to the spots_df
-        spots_df[target_segmentation_name] = target_spots[cell_col_name].copy()
+        spots_df[target_segmentation_name] = target_spots[cell_col_name_uns].copy()
         # fill the NaN values with 0 and make the column integer type
         spots_df[source_segmentation_name] = spots_df[source_segmentation_name].fillna(0).astype(int)
         spots_df[target_segmentation_name] = spots_df[target_segmentation_name].fillna(0).astype(int)
@@ -123,143 +128,12 @@ def global_MIDEC(adata_sp_1 : ad.AnnData,
                                     spots_y_col=spots_y_col,
                                     gene_col_name=gene_col_name,
                                     which_metric=which_metric)
+        # round the metric to 2 decimal places
+        if metric is not None:
+            metric = round(metric, 2)
         result.append((metric, cell_number))
-    return result
-
-def local_MIDEC(adata_sp_source : ad.AnnData,
-                adata_sp_target : ad.AnnData,
-                image : np.ndarray,
-                x_min : int,
-                x_max : int,
-                y_min : int,
-                y_max : int,
-                min_number_of_spots_per_cell = 10,
-                min_number_of_cells = 10,
-                upper_threshold = 0.75,
-                lower_threshold = 0.25,
-                source_segmentation_name='source',
-                target_segmentation_name = 'target',
-                spots_x_col='x',
-                spots_y_col='y',
-                cell_col_name='cell',
-                gene_col_name='Gene',
-                bins = 10,
-                which_metric = 'pearson'):
-    """
-    Local Main Intersection over Difference Expression Correlation (MIDEC).
-
-    For a given segmentation, calculate MIDEC for each bin in a local crop.
-
-    Calculate pearson correlation between the gene expression vectors 1 and 2:
-
-    1. gene expression vector of the main overlap (intersection between one source 
-    segmentation cell and one target segmentation cell). The intersection with the most
-    spots is considered as the main overlap (intersection).
-    2. gene expression vector from the rest of the source segmentation cell which is not 
-    containing the intersection (or in other words, the difference)
-
-    is computed for each cell.
-
-    Input
-    ----------
-    adata_sp_source : anndata.AnnData 
-        AnnData object containing the spots with the source segmentation in adata.uns['spots']
-    adata_sp_target : anndata.AnnData
-        AnnData object containing the spots with the target segmentation in adata.uns['spots']
-    source_segmentation : numpy.ndarray
-        Segmentation array of the source segmentation.
-    x_min : int
-        Minimum x coordinate of the segment of interest.
-    x_max : int
-        Maximum x coordinate of the segment of interest.
-    y_min : int
-        Minimum y coordinate of the segment of interest.
-    y_max : int
-        Maximum y coordinate of the segment of interest.
-    min_number_of_spots_per_cell : int
-        Minimum number of spots per cell. Default is 10.
-    min_number_of_cells : int
-        Minimum number of cells for the metric to be calculated. Default is 10.
-    upper_threshold : float
-        Upper threshold for share of spots in the intersection (<1.0). Default is 0.75.
-    lower_threshold : float
-        Lower threshold for share of spots in the intersection. Default is 0.25.
-    source_segmentation_name : str
-        Name of the column with the source segmentation. Default is 'source'.
-    target_segmentation_name : str
-        Name of the column with the target segmentation. Default is 'target'.
-    bins : int
-        Number of bins for the crop for one axes. Default is 10.
-    
-    Output
-    -------
-    gridfield_metric : numpy.ndarray
-        Local correlation for each segment of the gridfield in a given crop.
-    """
-    # if the thresholds make no sense - throw an error
-    if upper_threshold >= 1:
-        raise ValueError('upper_threshold must be < 1')
-    elif upper_threshold <= lower_threshold:
-        raise ValueError('upper_threshold must be > lower_threshold')
-    elif lower_threshold <= 0:
-        raise ValueError('lower_threshold must be > 0')
-
-    # 1. get one spot table with both segmentations
-    source_spots = adata_sp_source.uns['spots']
-    target_spots = adata_sp_target.uns['spots']
-    # rename the column 'cell' to source_segmentation_name and make it integer type
-    spots_df = source_spots.rename(columns={cell_col_name: source_segmentation_name}).copy()
-    # add the column 'cell' from target segmentation to the spots_df
-    spots_df[target_segmentation_name] = target_spots[cell_col_name].copy()
-    # fill the NaN values with 0 and make the column integer type
-    spots_df[source_segmentation_name] = spots_df[source_segmentation_name].fillna(0).astype(int)
-    spots_df[target_segmentation_name] = spots_df[target_segmentation_name].fillna(0).astype(int)
-
-    # 2. check crop, get bins
-    check_crop_exists(image, x_min, x_max, y_min, y_max)
-    bins_x, bins_y = get_bin_edges([[x_min, x_max], [y_min, y_max]], bins)
-    # make the values in bins_x and bins_y integers
-    bins_x = bins_x.astype(int)
-    bins_y = bins_y.astype(int)
-    # define the size of the gridfield_metric (np.array) 
-    n_bins_x = len(bins_x) - 1
-    n_bins_y = len(bins_y) - 1
-
-    # 3. initialize the np.array that will hold the metric for each segment of the gridfield
-    gridfield_metric = np.zeros((n_bins_x, n_bins_y))
-
-    # 4. generate the gridfield_metric
-    j = 0
-    for x_start, x_end in zip(bins_x[:-1], bins_x[1:]):
-        i = 0
-        for y_start, y_end in zip(bins_y[:-1], bins_y[1:]):
-            
-            # crop the spots_df
-            spots_crop = spots_df[(spots_df[spots_x_col].astype(int) >= x_start) &
-                                     (spots_df[spots_x_col].astype(int) < x_end) &
-                                     (spots_df[spots_y_col].astype(int) >= y_start) &
-                                     (spots_df[spots_y_col].astype(int) < y_end)].copy()
-            
-            # adjust the coordinates of the cropped dataframe
-            spots_crop[spots_x_col] = spots_crop[spots_x_col] - x_start
-            spots_crop[spots_y_col] = spots_crop[spots_y_col] - y_start
-            spots_crop = spots_crop.reset_index(drop=True)
-            
-            # calculate the metric for the crop
-            gridfield_metric[i, j] = main_inter_diff_expression_correlation(spots_df=spots_crop,
-                                                                            min_number_of_spots_per_cell=min_number_of_spots_per_cell,
-                                                                            min_number_of_cells=min_number_of_cells,
-                                                                            upper_threshold=upper_threshold,
-                                                                            lower_threshold=lower_threshold,
-                                                                            source_segmentation_name=source_segmentation_name,
-                                                                            target_segmentation_name=target_segmentation_name,
-                                                                            spots_x_col=spots_x_col,
-                                                                            spots_y_col=spots_y_col,
-                                                                            gene_col_name=gene_col_name,
-                                                                            which_metric=which_metric)
-            i += 1
-        j += 1 
-    return gridfield_metric
+    # convert result (list) to a 2-dim numpy array
+    return np.array(result)
 
 
 # Helper functions

@@ -8,6 +8,7 @@ from ..metrics import knn_mixing_per_cell_score
 from ..metrics import mean_proportion_deviation
 from ..metrics import relative_pairwise_gene_expression
 from ..metrics import relative_pairwise_celltype_expression
+from ..metrics import MIDEC
 from ._utils import _get_bin_ids
 
 #TODO: "negative_marker_purity_reads", "negative_marker_purity_cells", "coexpression_similarity", 
@@ -522,5 +523,123 @@ def _get_relative_expression_similarity_across_celltypes_grid(
                 metric_contribution_matrix[y_bin, x_bin] = 1 - (diff_explained_by_grid_field * diff_to_explain)
 
         return metric_contribution_matrix
+
+    return overall_metric_matrix
+
+
+def _get_MIDEC_grid(
+                adata_sp_1 : ad.AnnData,
+                adata_sp_2 : ad.AnnData,
+                region_range: Tuple[Tuple[float, float], Tuple[float, float]],
+                bins: Tuple[int, int],
+                min_number_of_spots_per_cell = 10,
+                min_number_of_cells = 10,
+                upper_threshold = 0.75,
+                lower_threshold = 0.25,
+                source_segmentation_name='source',
+                target_segmentation_name = 'target',
+                cells_x_col='centroid_x',
+                cells_y_col='centroid_y',
+                spots_x_col='x',
+                spots_y_col='y',
+                cell_col_name_obs='cell_id',
+                cell_col_name_uns='cell',
+                gene_col_name='Gene',
+                which_metric = 'pearson'):
+    """
+    Local Main Intersection over Difference Expression Correlation (MIDEC).
+
+    For a given segmentation, calculate MIDEC for each bin in a local crop.
+
+    Calculate pearson correlation between the gene expression vectors 1 and 2:
+
+    1. gene expression vector of the main overlap (intersection between one source 
+    segmentation cell and one target segmentation cell). The intersection with the most
+    spots is considered as the main overlap (intersection).
+    2. gene expression vector from the rest of the source segmentation cell which is not 
+    containing the intersection (or in other words, the difference)
+
+    is computed for each cell.
+
+    Input
+    ----------
+    adata_sp_source : anndata.AnnData 
+        AnnData object containing the spots with the source segmentation in adata.uns['spots']
+    adata_sp_target : anndata.AnnData
+        AnnData object containing the spots with the target segmentation in adata.uns['spots']
+    source_segmentation : numpy.ndarray
+        Segmentation array of the source segmentation.
+    x_min : int
+        Minimum x coordinate of the segment of interest.
+    x_max : int
+        Maximum x coordinate of the segment of interest.
+    y_min : int
+        Minimum y coordinate of the segment of interest.
+    y_max : int
+        Maximum y coordinate of the segment of interest.
+    min_number_of_spots_per_cell : int
+        Minimum number of spots per cell. Default is 10.
+    min_number_of_cells : int
+        Minimum number of cells for the metric to be calculated. Default is 10.
+    upper_threshold : float
+        Upper threshold for share of spots in the intersection (<1.0). Default is 0.75.
+    lower_threshold : float
+        Lower threshold for share of spots in the intersection. Default is 0.25.
+    source_segmentation_name : str
+        Name of the column with the source segmentation. Default is 'source'.
+    target_segmentation_name : str
+        Name of the column with the target segmentation. Default is 'target'.
+    bins : int
+        Number of bins for the crop for one axes. Default is 10.
+    
+    Output
+    -------
+    gridfield_metric : numpy.ndarray
+        Local correlation for each segment of the gridfield in a given crop.
+    """
+    # if the thresholds make no sense - throw an error
+    if upper_threshold >= 1:
+        raise ValueError('upper_threshold must be < 1')
+    elif upper_threshold <= lower_threshold:
+        raise ValueError('upper_threshold must be > lower_threshold')
+    elif lower_threshold <= 0:
+        raise ValueError('lower_threshold must be > 0')
+    
+    # assert that one of the metrics is chosen
+    assert which_metric in ['pearson', 'spearman', 'MAE', 'MSE'], 'Invalid metric'
+    
+    ### SET UP
+    # get bin ids
+    adata_sp_1.obs = _get_bin_ids(adata_sp_1.obs, region_range, bins, cells_x_col, cells_y_col)
+    adata_sp_2.obs = _get_bin_ids(adata_sp_2.obs, region_range, bins, cells_x_col, cells_y_col)
+
+    # create an empty matrix to store the computed metric for each grid field, set common data type to accept tuple of tuples
+    overall_metric_matrix = np.zeros((bins[0], bins[1]), dtype=object)
+
+    # only consider cells within the specified region
+    adata_sp_1_region_range = adata_sp_1[(adata_sp_1.obs["y_bin"] != -1) & (adata_sp_1.obs["x_bin"] != -1)]
+    adata_sp_2_region_range = adata_sp_2[(adata_sp_2.obs["y_bin"] != -1) & (adata_sp_2.obs["x_bin"] != -1)]
+
+    for y_bin in adata_sp_1_region_range.obs["y_bin"].unique():
+        for x_bin in adata_sp_1_region_range.obs["x_bin"].unique():
+            # subset the spatial data to only include cells in the current grid field
+            adata_sp_1_local = adata_sp_1_region_range[(adata_sp_1_region_range.obs["y_bin"] == y_bin) & (adata_sp_1_region_range.obs["x_bin"] == x_bin)]
+            adata_sp_2_local = adata_sp_2_region_range[(adata_sp_2_region_range.obs["y_bin"] == y_bin) & (adata_sp_2_region_range.obs["x_bin"] == x_bin)]
+
+            # calculate the metric for the crop
+            overall_metric_matrix[y_bin, x_bin] = MIDEC(adata_sp_1 = adata_sp_1_local,
+                                                        adata_sp_2 = adata_sp_2_local,
+                                                        min_number_of_spots_per_cell = min_number_of_spots_per_cell,
+                                                        min_number_of_cells = min_number_of_cells,
+                                                        upper_threshold = upper_threshold,
+                                                        lower_threshold = lower_threshold,
+                                                        source_segmentation_name=source_segmentation_name,
+                                                        target_segmentation_name = target_segmentation_name,
+                                                        spots_x_col=spots_x_col,
+                                                        spots_y_col=spots_y_col,
+                                                        cell_col_name_obs=cell_col_name_obs,
+                                                        cell_col_name_uns=cell_col_name_uns,
+                                                        gene_col_name=gene_col_name,
+                                                        which_metric = which_metric)
 
     return overall_metric_matrix
