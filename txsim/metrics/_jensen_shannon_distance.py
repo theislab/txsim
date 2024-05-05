@@ -109,7 +109,10 @@ def jensen_shannon_distance(adata_sp: AnnData,
         if not os.path.exists(decay_csv_path):
             decay_param_df = generate_jsd_decay_data(adata_sc=adata_sc,
                                                     initial_guess_pl=initial_guess_pl,
-                                                    decay_csv_path=decay_csv_path)
+                                                    decay_csv_path=decay_csv_path,
+                                                    smooth_distributions=smooth_distributions,
+                                                    window_size=window_size,
+                                                    sigma=sigma)
         else:
             decay_param_df = pd.read_csv(decay_csv_path, index_col=0)
             for col in decay_param_df.columns:
@@ -329,7 +332,7 @@ def gaussian_smooth(data, sigma):
 def power_law_func(x, a, k, y0):
     return a*x**k + y0
 
-def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl):
+def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl, smooth_distributions, window_size, sigma):
     """Calculate decay parameters for the power law function that describes the theoretical
     decay of the Jensen-Shannon distance depending on the number of cells sampled. The fit
     is calculated by sampling small subsets of cells from the dissociated single-cell data 
@@ -368,7 +371,10 @@ def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_
                                                                          decay_param_df=None,
                                                                          gene=gene, 
                                                                          celltype=celltype, 
-                                                                         smooth_distributions='no',
+                                                                         smooth_distributions=smooth_distributions,
+                                                                         window_size=window_size,
+                                                                         sigma=sigma,
+                                                                         filter_out_double_zero_distributions=False,
                                                                          correct_for_cell_number_dependent_decay=False)
             all_results.append({'cell_number': cell_number, 'mean_jsd': jsd_original})
         cell_number_vs_jsd = pd.DataFrame(all_results)
@@ -384,11 +390,11 @@ def calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_
     
     return popt_pl
 
-def generate_jsd_decay_data(adata_sc, initial_guess_pl, decay_csv_path):
+def generate_jsd_decay_data(adata_sc, initial_guess_pl, decay_csv_path, smooth_distributions, window_size, sigma):
     decay_params = pd.DataFrame(index=adata_sc.var_names, columns=adata_sc.obs['celltype'].unique())
     for gene in adata_sc.var_names:
         for celltype in adata_sc.obs['celltype'].unique():
-            popt_pl = calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl)
+            popt_pl = calculate_cell_number_dependent_jsd_decay(adata_sc, gene, celltype, initial_guess_pl, smooth_distributions, window_size, sigma)
             decay_params.loc[gene, celltype] = popt_pl
     decay_params.to_csv(decay_csv_path)
     return decay_params
