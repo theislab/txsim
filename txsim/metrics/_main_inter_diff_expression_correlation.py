@@ -136,7 +136,12 @@ def MIDEC(adata_sp_1 : ad.AnnData,
             metric = None
         # round the metric to 2 decimal places
         if metric is not None:
-            metric = round(metric, 2)
+            # round to 2 decimal places for pearson and spearman
+            if which_metric in ['pearson', 'spearman']:
+                metric = round(metric, 2)
+            elif which_metric in ['MAE', 'MSE']:        
+                metric = round(metric, 4)
+                
         result.append((metric, cell_number))
     # convert result (list) to a 2-dim numpy array
     return np.array(result)
