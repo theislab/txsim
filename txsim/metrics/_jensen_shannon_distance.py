@@ -238,11 +238,11 @@ def get_probability_distributions(v_sc:np.array, v_sp:np.array, smooth_distribut
         probability distribution from dissociated sc data for one celltype and one gene, 1-dim vector
     """
     # Check if data has no variation
-    if np.max(v_sc) - np.min(v_sc) <= 1e-9 and np.max(v_sp) - np.min(v_sp) > 1e-9:
+    if (np.max(v_sc) - np.min(v_sc)) == 0 and (np.max(v_sp) - np.min(v_sp)) > 0:
         return None, np.zeros_like(v_sp)
-    elif np.max(v_sc) - np.min(v_sc) > 1e-9 and np.max(v_sp) - np.min(v_sp) <= 1e-9:
+    elif (np.max(v_sc) - np.min(v_sc)) > 0 and (np.max(v_sp) - np.min(v_sp)) == 0:
         return np.zeros_like(v_sc), None
-    elif np.max(v_sc) - np.min(v_sc) <= 1e-9 and np.max(v_sp) - np.min(v_sp) <= 1e-9:
+    elif (np.max(v_sc) - np.min(v_sc)) == 0 and (np.max(v_sp) - np.min(v_sp)) == 0:
         return None, None
     # only if both vectors have variation, calculate common bins
     else:
