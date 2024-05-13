@@ -5,7 +5,6 @@ import warnings
 import geopandas as gpd
 import shapely
 from shapely.geometry import Polygon
-import rasterio
 from rasterio import features
 from rasterio import Affine
 
@@ -201,10 +200,10 @@ def convert_polygons_to_label_image_xenium(
             continue
         
         # Rasterize polygon on little crop of the image
-        cell_image_crop = rasterio.features.rasterize(
+        cell_image_crop = features.rasterize(
             [(polygon, label_id)],
             out_shape=(maxy-miny, maxx-minx),
-            transform = rasterio.Affine.translation(minx, miny),
+            transform = Affine.translation(minx, miny),
             fill=0,
             dtype=dtype
         )
