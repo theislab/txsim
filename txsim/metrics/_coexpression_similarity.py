@@ -4,6 +4,9 @@ import pandas as pd
 import scanpy as sc
 import scipy
 from scipy import stats
+from typing import Tuple, Dict
+from scipy.sparse import issparse
+from local._utils import _get_bin_ids
 
 
 # TODO Change how normalization happens and consider using log1p

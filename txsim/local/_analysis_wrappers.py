@@ -9,6 +9,7 @@ from ._spots_based import _get_spot_density_grid
 from ._metrics import _get_knn_mixing_grid, _get_celltype_proportions_grid
 from ._metrics import _get_relative_expression_similarity_across_genes_grid
 from ._metrics import _get_relative_expression_similarity_across_celltypes_grid
+from ._metrics import _get_coexpression_similarity_grid
 from ._self_consistency_metrics import _get_ARI_between_cell_assignments_grid
 from ._self_consistency_metrics import _get_spots_based_annotation_similarity_grid
 
@@ -376,6 +377,8 @@ def metrics(
     layer: str = 'lognorm',
     normalization: str = "global",
     contribution: bool = True,
+    thresh: float = 0.1,
+    key_added: str = "coexpression_per_cell_score"
 ) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
     """Compute similarity metrics between spatial and dissociated data over a spatial grid.
 
@@ -421,6 +424,13 @@ def metrics(
     contribution: bool (default: True)
         Applicable only for the relative_expression_similarity metrics.
         Set to True to calculate the contribution of each grid field to the overall metric, or False to calculate the metric itself.
+    thresh: float (default: 0.1)
+        Applicable to calculate per cell score for coexpression similarity.
+        Threshold for weight on what gene pairs to indlude in the calculation
+    key_added: str (default: "coexpression_per_cell_score")
+        Applicable to calculate per cell score for coexpression similarity.
+        Column name for storing the calculated cell scores
+
 
     Returns
     -------
@@ -459,8 +469,8 @@ def metrics(
         out_dict["knn_mixing"] = _get_knn_mixing_grid(
             adata_sp.copy(), adata_sc.copy(), region_range, bins, obs_key, cells_x_col, cells_y_col)
     if "coexpression_similarity" in metrics:
-        raise NotImplementedError("coexpression_similarity is not yet implemented.")
-        #out_dict["coexpression_similarity"] = _get_coexpression_similarity_grid(adata_sp, adata_sc, ct_key, region_range, bins, cells_x_col, cells_y_col)
+        #raise NotImplementedError("coexpression_similarity is not yet implemented.")
+        out_dict["coexpression_similarity"] = _get_coexpression_similarity_grid(adata_sp.copy(), adata_sc.copy(), region_range, bins, obs_key, cells_x_col, cells_y_col, layer, thresh, key_added)
     if "relative_expression_similarity_across_genes" in metrics:
         out_dict["relative_expression_similarity_across_genes"] = _get_relative_expression_similarity_across_genes_grid(
             adata_sp, adata_sc, region_range, bins, obs_key, layer, cells_x_col, cells_y_col, normalization,

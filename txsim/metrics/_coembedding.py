@@ -157,5 +157,6 @@ def knn_mixing_per_cell_score(
             
             a.obs[key_added] = f(ct_df)
             adata_sp.obs.loc[adata_sp.obs[obs_key] == ct, key_added] = a.obs.loc[a.obs["modality"]=="spatial", key_added]
+            
 
     adata_sp.obs_names = sp_obs_names

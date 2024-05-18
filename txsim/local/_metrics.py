@@ -3,6 +3,10 @@ import anndata as ad
 from typing import Tuple
 import pandas as pd
 from scipy.sparse import issparse
+import scipy
+from scipy.stats import linregress
+from sklearn.linear_model import LinearRegression
+from math import nan
 
 from ..metrics import knn_mixing_per_cell_score
 from ..metrics import mean_proportion_deviation
@@ -502,8 +506,6 @@ def _get_relative_expression_similarity_across_celltypes_grid(
             overall_metric = 1 - (overall_score / (2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=None)))
             overall_metric_matrix[y_bin, x_bin] = overall_metric
 
-
-
     # calculate the contribution of each grid field to the overall metric, if contribution is set to True
     if contribution:
         # calculate global metric for the entire spatial dataset (not just in the region range)
@@ -524,3 +526,224 @@ def _get_relative_expression_similarity_across_celltypes_grid(
         return metric_contribution_matrix
 
     return overall_metric_matrix
+
+
+def _calculate_pearson_coeff(
+    mat: pd.DataFrame,
+    thresh: float
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Calculates the weight for each gene pair, based on pearson correlation coefficient
+    Arguments
+    ----------
+    mat:
+        log gene expression dataframe.
+    thresh:
+    threshold by which to filter abs(correlation coefficient) by.
+   
+    Returns
+    -------
+    Tupel with 3 ndarrays: mask where (abs(correlation coefficient) > thresh) == True, correlation coefficients, filtered weights
+    """
+    if scipy.sparse.issparse(mat):
+        with np.errstate(divide="ignore", invalid="ignore"): 
+            pearson_r = np.corrcoef(mat.toarray(), rowvar=False)
+    else:
+        with np.errstate(divide="ignore", invalid="ignore"): 
+            pearson_r = np.corrcoef(mat.astype(float), rowvar=False)
+    
+    coeff_mask = np.abs(pearson_r)
+    coeff_mask = pearson_r > thresh
+    filtered_weights = np.where(coeff_mask > thresh, pearson_r, 0)
+
+    return coeff_mask, pearson_r, filtered_weights
+
+
+def _calculate_linear_regression_error(
+    expression_data: pd.DataFrame, 
+    mask: np.ndarray,
+    njobs: int = -1,
+) -> np.ndarray[float]:
+    """Computes mean residuals per cell for all gene pairs
+    Arguments
+    ----------
+    expression_data:
+        log gene expression dataframe.
+    mask:
+        nparray with boolean mask for weights > threshold.
+    njobs:
+        int defining how many processors to use. default value = -1
+
+    Returns
+    -------
+    ndarray of mean residuals per cell
+    """
+    colnames = expression_data.columns
+    mask = pd.DataFrame(mask, columns= colnames)
+    mask.index = colnames
+    gene_pairs_checked = set()
+    predictions = {}
+    errors = {}
+    for col in expression_data:
+        for cols in expression_data:
+            if col != cols and mask.loc[col, cols]:
+                if (col, cols) not in gene_pairs_checked and (cols, col) not in gene_pairs_checked:
+                    model = LinearRegression(n_jobs= njobs)
+                    model.fit(np.array(expression_data[col]).reshape((-1, 1)), expression_data[cols])
+                    predictions[(col, cols)] = model.predict(np.array(expression_data[col]).reshape(-1, 1))
+                    errors[(col, cols)] = np.square(np.abs(np.asarray(expression_data[col]) - np.asarray(predictions[(col, cols)])))
+                    gene_pairs_checked.add((col, cols))
+    error = pd.DataFrame(errors)
+    mean_error = np.mean(error, axis=1)
+    return mean_error
+
+
+def _coexpression_per_cell_score(
+    spt_adata: ad.AnnData, 
+    seq_adata: ad.AnnData,
+    layer: str = 'lognorm',
+    obs_key: str = "celltype", 
+    thresh: float = 0.1,
+    key_added: str = "coexpression_per_cell_score",
+) -> ad.AnnData:
+    """Computes coexpression scores per cell
+    Arguments
+    ----------
+    adata_sp:
+        Spatial data.
+    adata_sc:
+        Single cell data.
+    layer: str (default: 'lognorm')
+        Layer of ``AnnData`` to use to compute the metric.
+    obs_key:
+        adata.obs key for cell type annotations.
+    thresh: 
+        threshold to filter weights by
+    key_added:
+        adata.obs key where coexpression scores are saved.
+
+    Returns
+    -------
+    The spatial AnnData object with added scores to `adata.obs[key_added]`
+    """
+    # Set counts to log norm data
+    spt_adata.X = spt_adata.layers[layer]
+    seq_adata.X = seq_adata.layers[layer]
+
+    # only keep genes that are in both data sets
+    common_genes = np.intersect1d(seq_adata.var_names,spt_adata.var_names)
+    seq_adata = seq_adata[:, common_genes]
+    spt_adata = spt_adata[:, common_genes]
+    spt_adata.obs[key_added] = np.zeros(spt_adata.n_obs) 
+
+     # only keep celltypes that are in both data sets
+    common_celltypes = np.asarray(np.intersect1d(seq_adata.obs[obs_key], spt_adata.obs[obs_key]))
+    seq_adata = seq_adata[seq_adata.obs[obs_key].isin(common_celltypes)]
+    spt_adata = spt_adata[spt_adata.obs[obs_key].isin(common_celltypes)]
+
+    # sparse matrix support
+    for a in [seq_adata, spt_adata]:
+        if issparse(a.X):
+            a.layers[layer] = a.layers[layer].toarray()
+
+    # sc data: calculate weight and r per celltype for each celltype and sp data: calculate r for spatial data per celltype 
+    sum_cellscore = {}
+  
+    for c in common_celltypes:
+        sc_expression_per_celltype = seq_adata[seq_adata.obs[obs_key] == c, :].to_df()
+        sc_weights_per_celltype = _calculate_pearson_coeff(sc_expression_per_celltype, thresh)[2]
+        sc_mask_per_celltype = _calculate_pearson_coeff(sc_expression_per_celltype, thresh)[0]
+        sp_expression_per_celltype = spt_adata[spt_adata.obs[obs_key] == c, :].to_df()
+        sc_pearson = _calculate_pearson_coeff(sc_expression_per_celltype, thresh)[1]
+        sp_pearson = _calculate_pearson_coeff(sp_expression_per_celltype, thresh)[1]
+        cell_error = _calculate_linear_regression_error(sp_expression_per_celltype, sc_mask_per_celltype)
+        cell_delta = 1 - cell_error
+
+        # calculate sum score per cell and add to adata_sp
+        mask_tri = np.triu(sc_mask_per_celltype)
+        ind = np.triu_indices(len(sc_mask_per_celltype), 1)
+        mask_tri_sub = mask_tri[ind]
+
+        weight_sc = np.triu(sc_weights_per_celltype)
+        indices = np.triu_indices(len(sc_weights_per_celltype), 1)
+        weight_sc_sub = weight_sc[indices]
+     
+        tri_sc = np.triu(sc_pearson)
+        indices_with_offset_sc = np.triu_indices(len(tri_sc),1)
+        tri_sc_sub = tri_sc[indices_with_offset_sc]
+        sign_sc = np.sign(tri_sc_sub)
+
+        tri_sp = np.triu(sp_pearson)
+        indices_with_offset_sp = np.triu_indices(len(tri_sp),1)
+        tri_sp_sub = tri_sp[indices_with_offset_sp]
+        sign_sp = np.sign(tri_sp_sub)
+
+        sum_cellscore[c] = {}
+        for cellnumber in range(len(cell_delta)):
+            sum_score = []
+            for index in range(len(weight_sc_sub)):
+                if mask_tri_sub[index]: 
+                    x = weight_sc_sub[index] * cell_delta[cellnumber] * sign_sc[index] * sign_sp[index]
+                    sum_score.append(x)
+                else:
+                    x = 0
+                    sum_score.append(x)
+            sum_cellscore[c][f"cell_{cellnumber}"] = np.nansum(sum_score)
+
+        # add cell scores to sp_adata
+        sum_cellscore[c] = pd.DataFrame.from_dict(sum_cellscore[c], orient="index", columns=["per_cellscore_sum"])
+        spt_adata.obs.loc[spt_adata.obs[obs_key] == c, key_added] = sum_cellscore[c]["per_cellscore_sum"].values
+
+    return spt_adata
+
+def _get_coexpression_similarity_grid(
+    spt_adata: ad.AnnData,
+    seq_adata: ad.AnnData,
+    region_range: Tuple[Tuple[float, float], Tuple[float, float]],
+    bins: Tuple[int, int],
+    obs_key: str = "celltype",
+    cells_x_col: str = "x",
+    cells_y_col: str = "y",
+    layer: str = "lognorm",
+    thresh: float = 0.1,
+    key_added: str = "coexpression_per_cell_score"
+) -> np.ndarray:
+    """Calculates the coexpression similarity score for each grid bin.
+
+    Parameters
+    ----------
+    spt_adata : AnnData
+        Annotated AnnData object containing spatial transcriptomics data.
+    seq_adata : AnnData
+        Annotated AnnData object containing dissociated single cell transcriptomics data.
+    region_range : Tuple[Tuple[float, float], Tuple[float, float]]
+        The range of the grid specified as ((y_min, y_max), (x_min, x_max)).
+    bins : Tuple[int, int]
+        The number of bins along the y and x axes, formatted as (ny, nx).
+    obs_key : str, default "celltype"
+        The column name in adata_sp.obs and adata_sc.obs for the cell type annotations.
+    cells_x_col : str, default "x"
+        The column name in adata_sp.obs for the x-coordinates of cells.
+    cells_y_col : str, default "y"
+        The column name in adata_sp.obs for the y-coordinates of cells.
+    layer: str (default: 'lognorm')
+        Layer of ``AnnData`` to use to compute the metric.
+    thresh: float (default: 0.1)
+        threshold for filtering weights 
+    Returns
+    -------
+    ndarray: 
+        A 2D numpy array representing coexpression similarity scores in each grid bin.
+    """
+    df = _coexpression_per_cell_score(spt_adata, seq_adata, obs_key, thresh, key_added)
+
+    df_cells = df.obs[[cells_y_col, cells_x_col, key_added]]
+    
+    H = np.histogram2d(
+        df_cells[cells_y_col], df_cells[cells_x_col], bins=bins, 
+        range=region_range, weights=df_cells[key_added]
+    )[0]
+    
+    # Normalize by the number of cells in each bin
+    #H = H / np.histogram2d(df_cells[cells_y_col], df_cells[cells_x_col], bins=bins, range=region_range)[0]
+    
+    return H
