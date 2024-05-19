@@ -11,6 +11,7 @@ def cell_density(
     adata_sp: AnnData,
     scaling_factor: float = 1.0,
     img_shape: Optional[tuple] = None,
+    ct_key: str = "celltype",
     pipeline_output: bool = True
 ) -> float:
     """Calculates the area of the region imaged using convex hull and divide total number of cells/area.
@@ -23,6 +24,8 @@ def cell_density(
         XY position should be in µm. If not, a multiplicative scaling factor can be provided.
     img_shape: tuple
         Provide an image shape for area calculation instead of convex hull
+    ct_key: str
+        Key in adata.obs that contains cell type information. Only needed if pipeline_output is False.
     pipeline_output : float, optional
         Generic argument for txsim metrics. Boolean for whether to return only the summary statistic or additional
         metric specific outputs. (Here: no additional outputs)
@@ -30,7 +33,7 @@ def cell_density(
     Returns
     -------
     density : float
-       Cell density (cells/um)
+       Cell density (cells per area unit)
     """   
     if scaling_factor == 1.0:
         pos = adata_sp.uns['spots'].loc[:,['x','y']].values
@@ -45,7 +48,12 @@ def cell_density(
         
     density= adata_sp.n_obs/area #*10e6 #TODO: Check if there can be numerical issues due to large area!!!
     
-    return density
+    if pipeline_output:
+        return density
+    
+    density_per_celltype = adata_sp.obs[ct_key].value_counts()/area
+    
+    return density, density_per_celltype
 
 def proportion_of_assigned_reads(adata_sp: AnnData,pipeline_output=True):
     """Proportion of assigned reads
