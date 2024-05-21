@@ -199,16 +199,20 @@ def run_tangram(
         adata_sp = adata_st, annotation=sc_ct_labels)
     
     # use original without extra layers generated from tangram
-    adata_st_orig.obsm['ct_tangram_scores'] = adata_st.obsm['tangram_ct_pred']
+    
     df = adata_st.obsm['tangram_ct_pred'].copy()
     adata_st = adata_st_orig.copy()
 
+
     adata_st.obs['celltype'] = df.idxmax(axis=1)
+
 
     # Normalize by row before setting the score
     normalized_df = df.div(df.sum(axis=1), axis=0)
     max_values = normalized_df.max(axis=1)
     adata_st.obs['score'] = max_values
+    adata_st.obsm['ct_tangram_scores'] = normalized_df
+
+   
 
     return adata_st
-
