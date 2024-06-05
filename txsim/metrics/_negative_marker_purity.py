@@ -8,7 +8,12 @@ from scipy.sparse import issparse
 # TODO: Write test
 # TODO: Investigate the importance of setting max_ratio_cells, minimum_exp, and min_number_cells
 
-def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype', pipeline_output: bool=True):
+def negative_marker_purity_cells(
+    adata_sp: AnnData, 
+    adata_sc: AnnData, 
+    key: str='celltype', 
+    pipeline_output: bool=True
+) -> float | tuple[float, pd.Series, pd.Series]:
     """ Negative marker purity aims to measure read leakeage between cells in spatial datasets. 
     
     For this, we calculate the increase in positive cells assigned in spatial datasets to pairs of genes-celltyes with 
@@ -35,7 +40,7 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
     max_ratio_cells=0.005 # maximum ratio of cells expressing a marker to call it a negative marker gene-ct pair
     
     # Subset adata_sc to genes of spatial data
-    adata_sc = adata_sc[:,adata_sp.var_names] #TODO: probably here we create a view! --> Then the sparse adata.X doesn't convert to dense --> CHECK and then also adjust in the other metrics!!!
+    adata_sc = adata_sc[:,adata_sp.var_names].copy()
     
     # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
     for a in [adata_sc, adata_sp]:
@@ -54,11 +59,13 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
     # Return nan if too few cell types were found
     if len(celltypes) < 2:
         print("Not enough cell types (>1) eligible to calculate negative marker purity")
-        negative_marker_purity = 'nan'
+        negative_marker_purity = np.nan
         if pipeline_output==True:
             return negative_marker_purity
         else:
-            return negative_marker_purity, None, None
+            purity_per_gene = pd.Series(index=adata_sp.var_names, data=np.nan)
+            purity_per_celltype = pd.Series(index=celltypes, data=np.nan)
+            return negative_marker_purity, purity_per_gene, purity_per_celltype
     
     # Filter cells to eligible cell types
     adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
@@ -81,11 +88,13 @@ def negative_marker_purity_cells(adata_sp: AnnData, adata_sc: AnnData, key: str=
     # Return nan if no negative markers were found
     if np.sum(neg_marker_mask) < 1:
         print("No negative markers were found in the sc data reference.")
-        negative_marker_purity = 'nan'
+        negative_marker_purity = np.nan
         if pipeline_output==True:
             return negative_marker_purity
         else:
-            return negative_marker_purity, None, None
+            purity_per_gene = pd.Series(index=adata_sp.var_names, data=np.nan)
+            purity_per_celltype = pd.Series(index=celltypes, data=np.nan)
+            return negative_marker_purity, purity_per_gene, purity_per_celltype
     
     # Get pos cell ratios in negative marker-cell type pairs
     lowvals_sc = np.full_like(neg_marker_mask, np.nan, dtype=np.float32)
@@ -140,7 +149,7 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
     minimum_exp=0.005 #maximum relative expression allowed in a gene in a cluster to consider the gene-celltype pair the analysis 
     
     # Subset adata_sc to genes of spatial data
-    adata_sc = adata_sc[:,adata_sp.var_names]
+    adata_sc = adata_sc[:,adata_sp.var_names].copy()
     
     # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
     for a in [adata_sc, adata_sp]:
@@ -159,11 +168,13 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
     # Return nan if too few cell types were found
     if len(celltypes) < 2:
         print("Not enough cell types (>1) eligible to calculate negative marker purity")
-        negative_marker_purity = 'nan'
+        negative_marker_purity = np.nan
         if pipeline_output==True:
             return negative_marker_purity
         else:
-            return negative_marker_purity, None, None
+            purity_per_gene = pd.Series(index=adata_sp.var_names, data=np.nan)
+            purity_per_celltype = pd.Series(index=celltypes, data=np.nan)
+            return negative_marker_purity, purity_per_gene, purity_per_celltype
     
     # Filter cells to eligible cell types
     adata_sc = adata_sc[adata_sc.obs[key].isin(celltypes)]
@@ -205,11 +216,13 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
     # Return nan if no negative markers were found
     if np.sum(neg_marker_mask) < 1:
         print("No negative markers were found in the sc data reference.")
-        negative_marker_purity = 'nan'
+        negative_marker_purity = np.nan
         if pipeline_output==True:
             return negative_marker_purity
         else:
-            return negative_marker_purity, None, None
+            purity_per_gene = pd.Series(index=adata_sp.var_names, data=np.nan)
+            purity_per_celltype = pd.Series(index=celltypes, data=np.nan)
+            return negative_marker_purity, purity_per_gene, purity_per_celltype
     
     # Get marker expressions in negative marker-cell type pairs
     lowvals_sc = np.full_like(neg_marker_mask, np.nan, dtype=np.float32)
