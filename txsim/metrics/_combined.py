@@ -35,10 +35,12 @@ def all_metrics(
     ##metrics['relative_sim_across_gene_overall_metric'] = relative_pairwise_gene_expression(adata_sp, adata_sc, 'celltype', 'lognorm')
     ###metrics['mean_sim_across_clust'] = mean_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
     ###metrics['prc95_sim_across_clust'] = percentile95_similarity_gene_expression_across_clusters(adata_sp,adata_sc)
+    metrics['rel_pairwise_ct_expr_sim'] = relative_pairwise_celltype_expression(adata_sp.copy(), adata_sc.copy())
+    metrics['rel_pairwise_gene_expr_sim'] = relative_pairwise_gene_expression(adata_sp.copy(), adata_sc.copy())
     #
     ### Coexpression similarity
-    #metrics['coexpression_similarity'] = coexpression_similarity(adata_sp, adata_sc)
-    #metrics['coexpression_similarity_celltype'] = coexpression_similarity(adata_sp, adata_sc, by_celltype = True)
+    metrics['coexpr_similarity'] = coexpression_similarity(adata_sp.copy(), adata_sc.copy())
+    metrics['coexpr_similarity_celltype'] = coexpression_similarity(adata_sp.copy(), adata_sc.copy(), by_celltype = True)
     ##metrics['gene_set_coexpression'] = gene_set_coexpression(adata_sp, adata_sc)
         
     # Negative marker purity
@@ -46,7 +48,7 @@ def all_metrics(
     metrics['neg_marker_purity_reads'] = negative_marker_purity_reads(adata_sp.copy(),adata_sc.copy())
     
     #### KNN mixing
-    #metrics['knn_mixing'] = knn_mixing(adata_sp.copy(),adata_sc.copy())
+    metrics['knn_mixing'] = knn_mixing(adata_sp.copy(),adata_sc.copy())
     
     # Cell statistics
     #metrics['ratio_median_readsxcell'] = ratio_median_readsXcells(adata_sp,adata_sc)
