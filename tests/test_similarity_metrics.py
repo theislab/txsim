@@ -143,3 +143,53 @@ def test_knn_mixing_score(adata_spatial, adata_sc, k, ct_filter_factor, request)
     assert (knn_mixing_score_per_celltype.loc[~knn_mixing_score_per_celltype.isnull()] >= 0).all()
     assert (knn_mixing_score_per_celltype.loc[~knn_mixing_score_per_celltype.isnull()] <= 1).all()
     
+    
+@pytest.mark.parametrize("adata_spatial, adata_sc", [
+    ("adata_sp", "adata_sc_high_sim"),
+    ("adata_sp_not_sparse", "adata_sc_high_sim_not_sparse"),
+])
+def test_relative_pairwise_celltype_expression(adata_spatial, adata_sc, request):
+    adata_spatial = request.getfixturevalue(adata_spatial)
+    adata_sc = request.getfixturevalue(adata_sc)
+    
+    rel_ct_expr, rel_ct_expr_per_gene, rel_ct_expr_per_celltype = tx.metrics.relative_pairwise_celltype_expression(
+        adata_spatial, adata_sc, pipeline_output=False
+    )
+    
+    assert isinstance(rel_ct_expr, (float,np.float32))
+    assert isinstance(rel_ct_expr_per_gene, pd.Series)
+    assert isinstance(rel_ct_expr_per_celltype, pd.Series)
+    assert rel_ct_expr_per_gene.dtype in [float, np.float32]
+    assert rel_ct_expr_per_celltype.dtype in [float, np.float32]
+    # >= 0, <= 1 for all that are not np.nan #NOTE: theoretically could be negative, but not with the given dataset
+    assert np.isnan(rel_ct_expr) or ((rel_ct_expr >= 0) and (rel_ct_expr <= 1))
+    assert (rel_ct_expr_per_gene.loc[~rel_ct_expr_per_gene.isnull()] >= 0).all()
+    assert (rel_ct_expr_per_gene.loc[~rel_ct_expr_per_gene.isnull()] <= 1).all()
+    assert (rel_ct_expr_per_celltype.loc[~rel_ct_expr_per_celltype.isnull()] >= 0).all()
+    assert (rel_ct_expr_per_celltype.loc[~rel_ct_expr_per_celltype.isnull()] <= 1).all()
+    
+
+@pytest.mark.parametrize("adata_spatial, adata_sc", [
+    ("adata_sp", "adata_sc_high_sim"),
+    ("adata_sp_not_sparse", "adata_sc_high_sim_not_sparse"),
+])
+def test_relative_pairwise_gene_expression(adata_spatial, adata_sc, request):
+    adata_spatial = request.getfixturevalue(adata_spatial)
+    adata_sc = request.getfixturevalue(adata_sc)
+    
+    rel_gene_expr, rel_gene_expr_per_gene, rel_gene_expr_per_celltype = tx.metrics.relative_pairwise_gene_expression(
+        adata_spatial, adata_sc, pipeline_output=False
+    )
+    
+    assert isinstance(rel_gene_expr, (float,np.float32))
+    assert isinstance(rel_gene_expr_per_gene, pd.Series)
+    assert isinstance(rel_gene_expr_per_celltype, pd.Series)
+    assert rel_gene_expr_per_gene.dtype in [float, np.float32]
+    assert rel_gene_expr_per_celltype.dtype in [float, np.float32]
+    # >= 0, <= 1 for all that are not np.nan
+    assert np.isnan(rel_gene_expr) or ((rel_gene_expr >= 0) and (rel_gene_expr <= 1))
+    assert (rel_gene_expr_per_gene.loc[~rel_gene_expr_per_gene.isnull()] >= 0).all()
+    assert (rel_gene_expr_per_gene.loc[~rel_gene_expr_per_gene.isnull()] <= 1).all()
+    assert (rel_gene_expr_per_celltype.loc[~rel_gene_expr_per_celltype.isnull()] >= 0).all()
+    assert (rel_gene_expr_per_celltype.loc[~rel_gene_expr_per_celltype.isnull()] <= 1).all()
+    
