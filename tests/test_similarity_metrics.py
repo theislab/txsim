@@ -120,3 +120,26 @@ def test_coexpression_similarity(adata_spatial, adata_sc, correlation_measure, b
     assert (coexp_sim_per_gene.loc[~coexp_sim_per_gene.isnull()] <= 1).all()
     assert (coexp_sim_per_celltype.loc[~coexp_sim_per_celltype.isnull()] >= 0).all()
     assert (coexp_sim_per_celltype.loc[~coexp_sim_per_celltype.isnull()] <= 1).all()
+
+
+@pytest.mark.parametrize("adata_spatial, adata_sc, k, ct_filter_factor", [
+    ("adata_sp", "adata_sc_high_sim", 5, 1),
+    ("adata_sp_not_sparse", "adata_sc_high_sim_not_sparse", 5, 1),
+    ("adata_sp", "adata_sc_high_sim", 45, 5),
+])
+def test_knn_mixing_score(adata_spatial, adata_sc, k, ct_filter_factor, request):
+    adata_spatial = request.getfixturevalue(adata_spatial)
+    adata_sc = request.getfixturevalue(adata_sc)
+    
+    knn_mixing_score, knn_mixing_score_per_celltype = tx.metrics.knn_mixing(
+        adata_spatial, adata_sc, k=k, ct_filter_factor=ct_filter_factor, pipeline_output=False
+    )
+    
+    assert isinstance(knn_mixing_score, (float,np.float32))
+    assert isinstance(knn_mixing_score_per_celltype, pd.Series)
+    assert knn_mixing_score_per_celltype.dtype in [float, np.float32]
+    # >= 0, <= 1 for all that are not np.nan
+    assert np.isnan(knn_mixing_score) or ((knn_mixing_score >= 0) and (knn_mixing_score <= 1))
+    assert (knn_mixing_score_per_celltype.loc[~knn_mixing_score_per_celltype.isnull()] >= 0).all()
+    assert (knn_mixing_score_per_celltype.loc[~knn_mixing_score_per_celltype.isnull()] <= 1).all()
+    

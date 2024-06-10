@@ -1,7 +1,9 @@
 import numpy as np
+import pandas as pd
 import networkx as nx
 import anndata as ad
 import scanpy as sc
+import scipy
 from typing import Union, Tuple
 
 def knn_mixing(
@@ -11,7 +13,7 @@ def knn_mixing(
     obs_key: str = "celltype",
     k: int = 45,
     ct_filter_factor: float = 5,
-) -> Union[float, Tuple[str, dict]]: 
+) -> Union[float, Tuple[str, pd.Series]]: 
     """Compute score for knn mixing of modalities
     
     Procedure: Concatenate sc and st data. Compute PCA on dataset union. Compute assortativity of each knn graph on 
@@ -59,8 +61,6 @@ def knn_mixing(
     st_cts = set(adata_sp.obs[obs_key].cat.categories)
     all_cts = list(sc_cts.union(st_cts))
     shared_cts = list(sc_cts.intersection(st_cts))
-    #st_only_cts = list(st_cts - sc_cts)
-    #sc_only_cts = list(sc_cts - st_cts)
     
     # Get adata per shared cell type
     scores = {ct:np.nan for ct in all_cts}
@@ -73,12 +73,16 @@ def knn_mixing(
             nx.set_node_attributes(G, {i:a.obs["modality"].values[i] for i in range(G.number_of_nodes())}, "modality")
             scores[ct] = np.clip(-nx.attribute_assortativity_coefficient(G, "modality") + 1, 0, 1)
             
-    mean_score = np.mean([v for _,v in scores.items() if v is not np.nan])
+    score_per_ct = pd.Series(scores, dtype=float)
+    if score_per_ct.isnull().all():
+        mean_score = np.nan
+    else:
+        mean_score = np.nanmean(list(scores.values()))
     
     if pipeline_output:
         return mean_score
     else:
-        return mean_score, scores
+        return mean_score, score_per_ct
     
 #TODO: fix NumbaDeprecationWarning
 
