@@ -4,7 +4,13 @@ import pandas as pd
 from anndata import AnnData
 from scipy.sparse import issparse
 
-def relative_pairwise_gene_expression(adata_sp: AnnData, adata_sc: AnnData, key:str='celltype', layer:str='lognorm', pipeline_output: bool=True):
+def relative_pairwise_gene_expression(
+    adata_sp: AnnData, 
+    adata_sc: AnnData, 
+    key:str='celltype', 
+    layer:str='lognorm', 
+    pipeline_output: bool=True
+) -> float | tuple[float, pd.Series, pd.Series]:
     """Calculate the similarity of pairwise gene expression differences for all pairs of genes in the panel, between the two modalities 
     ----------
     adata_sp : AnnData
@@ -119,11 +125,13 @@ def relative_pairwise_gene_expression(adata_sp: AnnData, adata_sc: AnnData, key:
     # We can further compute the metric on a per-gene and per-celltype basis
     per_gene_score = np.sum(np.absolute(norm_pairwise_distances_sp - norm_pairwise_distances_sc), axis=(1,2))
     per_gene_metric = 1 - (per_gene_score/(2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(1,2))))
-    per_gene_metric = pd.DataFrame(per_gene_metric, index=mean_celltype_sc.columns, columns=['score']) #add back the gene labels 
+    #per_gene_metric = pd.DataFrame(per_gene_metric, index=mean_celltype_sc.columns, columns=['score']) #add back the gene labels 
+    per_gene_metric = pd.Series(per_gene_metric, index=mean_celltype_sc.columns)
     
     per_celltype_score = np.sum(np.absolute(norm_pairwise_distances_sp - norm_pairwise_distances_sc), axis=(0,1))
     per_celltype_metric = 1 - (per_celltype_score/(2 * np.sum(np.absolute(norm_pairwise_distances_sc), axis=(0,1))))
-    per_celltype_metric = pd.DataFrame(per_celltype_metric, index=mean_celltype_sc.index, columns=['score']) #add back the celltype labels 
+    #per_celltype_metric = pd.DataFrame(per_celltype_metric, index=mean_celltype_sc.index, columns=['score']) #add back the celltype labels 
+    per_celltype_metric = pd.Series(per_celltype_metric, index=mean_celltype_sc.index)
     
     if pipeline_output:
         return overall_metric
