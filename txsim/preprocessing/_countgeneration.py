@@ -8,13 +8,15 @@ from typing import Optional
 from scipy.sparse import csr_matrix
 
 
-def generate_adata(input_spots: DataFrame) -> AnnData:
+def generate_adata(input_spots: DataFrame, cell_id_col: str = "cell") -> AnnData:
     """Generate an AnnData object with counts from molecule data
 
     Parameters
     ----------
     input_spots : DataFrame
         DataFrame containing genes and cell assignments
+    cell_id_col : str, optional
+        Column name of the cell id column in the input_spots DataFrame.
 
     Returns
     -------
@@ -24,23 +26,23 @@ def generate_adata(input_spots: DataFrame) -> AnnData:
     
     #Read assignments, calculate percentage of non-assigned spots (pct_noise) and save raw version of spots
     spots = input_spots.copy()
-    pct_noise = sum(spots['cell'] <= 0)/len(spots['cell'])
+    pct_noise = sum(spots[cell_id_col] <= 0)/len(spots[cell_id_col])
     spots_raw = spots.copy() # save raw spots to add to adata.uns and set 0 to None
-    spots_raw.loc[spots_raw['cell']==0,'cell'] = None
-    spots = spots[spots['cell'] > 0] #What is happening here
+    spots_raw.loc[spots_raw[cell_id_col]==0,cell_id_col] = None
+    spots = spots[spots[cell_id_col] > 0] #What is happening here
 
     #Generate blank, labelled count matrix
-    X = np.zeros([ len(pd.unique(spots['cell'])), len(pd.unique(spots['Gene'])) ])
+    X = np.zeros([ len(pd.unique(spots[cell_id_col])), len(pd.unique(spots['Gene'])) ])
     adata = ad.AnnData(X, dtype = X.dtype)
-    adata.obs['cell_id'] = pd.unique(spots['cell'])
+    adata.obs['cell_id'] = pd.unique(spots[cell_id_col])
     adata.obs_names = [f"{i:d}" for i in adata.obs['cell_id']]
     adata.var_names = pd.unique(spots['Gene'])
     adata.obs['centroid_x'] = 0
     adata.obs['centroid_y'] = 0
     
     #Sort spots table by cell id and get table intervals for each cell
-    spots = spots.sort_values("cell",ascending=True)
-    cells_sorted = spots["cell"].values
+    spots = spots.sort_values(cell_id_col,ascending=True)
+    cells_sorted = spots[cell_id_col].values
     start_indices = np.flatnonzero(np.concatenate(([True], cells_sorted[1:] != cells_sorted[:-1])))
     cell_to_start_idx = pd.Series(start_indices, index=cells_sorted[start_indices])
     cell_to_end_idx = pd.Series(cell_to_start_idx.iloc[1:].tolist()+[len(spots)], index=cell_to_start_idx.index)
