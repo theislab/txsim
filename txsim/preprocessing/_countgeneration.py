@@ -8,7 +8,7 @@ from typing import Optional
 from scipy.sparse import csr_matrix
 
 
-def generate_adata(input_spots: DataFrame, cell_id_col: str = "cell") -> AnnData:
+def generate_adata(input_spots: DataFrame, cell_id_col: str = "cell", gene_col: str = "Gene") -> AnnData:
     """Generate an AnnData object with counts from molecule data
 
     Parameters
@@ -32,11 +32,11 @@ def generate_adata(input_spots: DataFrame, cell_id_col: str = "cell") -> AnnData
     spots = spots[spots[cell_id_col] > 0] #What is happening here
 
     #Generate blank, labelled count matrix
-    X = np.zeros([ len(pd.unique(spots[cell_id_col])), len(pd.unique(spots['Gene'])) ])
+    X = np.zeros([ len(pd.unique(spots[cell_id_col])), len(pd.unique(spots[gene_col])) ])
     adata = ad.AnnData(X, dtype = X.dtype)
     adata.obs['cell_id'] = pd.unique(spots[cell_id_col])
     adata.obs_names = [f"{i:d}" for i in adata.obs['cell_id']]
-    adata.var_names = pd.unique(spots['Gene'])
+    adata.var_names = pd.unique(spots[gene_col])
     adata.obs['centroid_x'] = 0
     adata.obs['centroid_y'] = 0
     
@@ -52,7 +52,7 @@ def generate_adata(input_spots: DataFrame, cell_id_col: str = "cell") -> AnnData
         start_idx = cell_to_start_idx.loc[cell_id]
         end_idx = cell_to_end_idx.loc[cell_id]
         spots_of_cell = spots.iloc[start_idx:end_idx]
-        cts = spots_of_cell['Gene'].value_counts()
+        cts = spots_of_cell[gene_col].value_counts()
         adata[str(cell_id), :] = cts.reindex(adata.var_names, fill_value = 0)
         adata.obs.loc[str(cell_id),'centroid_x'] = spots_of_cell['x'].mean()
         adata.obs.loc[str(cell_id),'centroid_y'] = spots_of_cell['y'].mean()
