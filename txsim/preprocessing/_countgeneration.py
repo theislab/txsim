@@ -76,7 +76,8 @@ def generate_adata(input_spots: DataFrame, cell_id_col: str = "cell", gene_col: 
 
 def calculate_alpha_area(
     adata: AnnData,
-    alpha: float = 0
+    alpha: float = 0,
+    cell_id_col: str = "cell"
 ) -> ndarray:
     """Calculate and store the alpha shape area of the cell given a set of points (genes). 
     Uses the Alpha Shape Toolboox: https://alphashape.readthedocs.io/en/latest/readme.html 
@@ -88,6 +89,8 @@ def calculate_alpha_area(
     alpha : float, optional
         The alpha parameter a, used to calculate the alpha shape, by default 0. If -1, optimal alpha 
         parameter will be calculated.
+    cell_id_col : str, optional
+        Column name of the cell id column in adata.uns['spots']
 
     Returns
     -------
@@ -101,8 +104,8 @@ def calculate_alpha_area(
     import json
     
     #Read assignments, sort spots table by cell id and get table intervals for each cell
-    spots = adata.uns['spots'].sort_values("cell",ascending=True)
-    cells_sorted = spots["cell"].values
+    spots = adata.uns['spots'].sort_values(cell_id_col,ascending=True)
+    cells_sorted = spots[cell_id_col].values
     start_indices = np.flatnonzero(np.concatenate(([True], cells_sorted[1:] != cells_sorted[:-1])))
     cell_to_start_idx = pd.Series(start_indices, index=cells_sorted[start_indices])
     cell_to_end_idx = pd.Series(cell_to_start_idx.iloc[1:].tolist()+[len(spots)], index=cell_to_start_idx.index)

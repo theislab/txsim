@@ -54,6 +54,9 @@ def run_ssam(
     spots: pd.DataFrame,
     adata_sc: pd.DataFrame,
     um_p_px: float = 0.325,
+    cell_id_col: str = 'cell',
+    gene_col: str = 'Gene',
+    sc_ct_key: str = 'celltype',
 ) -> AnnData:
     """Add cell type annotation by ssam.
 
@@ -67,6 +70,12 @@ def run_ssam(
         Path to the sc transcriptomics AnnData
     um_p_px : float
         Conversion factor micrometer per pixel. Adjust to data set
+    cell_id_col : str
+        Name of the cell id column in the spots DataFrame
+    gene_col : str
+        Name of the gene column in the spots DataFrame
+    sc_ct_key : str
+        Name of the cell type column in the sc AnnData
         
     Returns
     -------
@@ -77,10 +86,7 @@ def run_ssam(
     import plankton.plankton as pl
     from plankton.utils import ssam
     
-    x =  spots.x.values 
-    y =  spots.y.values 
-    g =  spots.Gene.values
-    sdata = pl.SpatialData( spots.Gene,
+    sdata = pl.SpatialData( spots[gene_col],
                             spots.x*um_p_px,
                             spots.y*um_p_px )
     adata_sc=adata_sc[:,adata_st.var_names]
@@ -88,7 +94,7 @@ def run_ssam(
         adata_sc = adata_sc.copy()
         adata_sc.X = adata_sc.X.toarray()
     exp=pd.DataFrame(adata_sc.X,columns=adata_sc.var_names)
-    exp['celltype']=list(adata_sc.obs['celltype'])
+    exp['celltype']=list(adata_sc.obs[sc_ct_key])
     signatures=exp.groupby('celltype').mean().transpose()
     # 'cheat-create' an anndata set:
     adata = AnnData(signatures.T)
@@ -96,7 +102,7 @@ def run_ssam(
     adata.obs['celltype'] = adata.obs.index
     # pl.ScanpyDataFrame(sdata,adata)
     sdata = pl.SpatialData(
-                            spots.Gene,
+                            spots[gene_col],
                             spots.x*um_p_px,
                             spots.y*um_p_px,
     #                         pixel_maps={'DAPI':bg_map},
@@ -120,11 +126,11 @@ def run_ssam(
     spots['celltype'] = sdata['celltype']
     
     for cell_id in adata_st.obs['cell_id']:
-        cts = spots[spots['cell'] == cell_id ]['Gene'].value_counts()
-        mode = spots[spots['cell'] == cell_id ]['celltype'].mode()
+        cts = spots[spots[cell_id_col] == cell_id ][gene_col].value_counts()
+        mode = spots[spots[cell_id_col] == cell_id ]['celltype'].mode()
         adata_st.obs.loc[adata_st.obs['cell_id'] == cell_id, 'ct_ssam'] = mode.values[0]
         adata_st.obs.loc[adata_st.obs['cell_id'] == cell_id, 'ct_ssam_cert'] = \
-        (spots[spots['cell'] == cell_id ]['celltype'].value_counts()[mode].values[0] / sum(cts))
+        (spots[spots[cell_id_col] == cell_id ]['celltype'].value_counts()[mode].values[0] / sum(cts))
     
     return adata_st
 
