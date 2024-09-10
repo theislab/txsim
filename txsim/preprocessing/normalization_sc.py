@@ -54,7 +54,10 @@ def normalize_sc(
         or updates `adata` with normalized version of the original
     `   adata.X` and `adata.layers`, depending on `inplace`
     """
-    adata.layers['raw'] = adata.X
+    if layer:
+        adata.layers['raw'] = adata.layers[layer]
+    else:
+        adata.layers['raw'] = adata.X
     adata.layers['norm'] = sc.pp.normalize_total(adata=adata, target_sum=target_sum, exclude_highly_expressed=exclude_highly_expressed, 
         max_fraction=max_fraction, key_added=key_added, layer=layer, copy=copy, inplace=False)['X']
     adata.layers['lognorm'] = adata.layers['norm'].copy()

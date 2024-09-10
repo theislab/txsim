@@ -57,6 +57,7 @@ def run_ssam(
     cell_id_col: str = 'cell',
     gene_col: str = 'Gene',
     sc_ct_key: str = 'celltype',
+    no_ct_assigned_value: str | None = 'None_sp',
 ) -> AnnData:
     """Add cell type annotation by ssam.
 
@@ -76,6 +77,8 @@ def run_ssam(
         Name of the gene column in the spots DataFrame
     sc_ct_key : str
         Name of the cell type column in the sc AnnData
+    no_ct_assigned_value : str
+        Value to assign to cells that are not assigned to any cell type
         
     Returns
     -------
@@ -85,6 +88,8 @@ def run_ssam(
     
     import plankton.plankton as pl
     from plankton.utils import ssam
+    
+    assert "other" not in adata_sc.obs[sc_ct_key].values, "cell type'other' not allowed in sc data"
     
     sdata = pl.SpatialData( spots[gene_col],
                             spots.x*um_p_px,
@@ -125,12 +130,16 @@ def run_ssam(
     # Assign based on majority vote
     spots['celltype'] = sdata['celltype']
     
+    adata_st.obs['ct_ssam'] = no_ct_assigned_value
+    
     for cell_id in adata_st.obs['cell_id']:
         cts = spots[spots[cell_id_col] == cell_id ][gene_col].value_counts()
         mode = spots[spots[cell_id_col] == cell_id ]['celltype'].mode()
         adata_st.obs.loc[adata_st.obs['cell_id'] == cell_id, 'ct_ssam'] = mode.values[0]
         adata_st.obs.loc[adata_st.obs['cell_id'] == cell_id, 'ct_ssam_cert'] = \
         (spots[spots[cell_id_col] == cell_id ]['celltype'].value_counts()[mode].values[0] / sum(cts))
+    
+    adata_st.obs.loc[adata_st.obs['ct_ssam'] == 'other', 'ct_ssam'] = no_ct_assigned_value
     
     return adata_st
 
