@@ -7,7 +7,7 @@ def mean_proportion_deviation(
         adata_sp: AnnData,
         adata_sc: AnnData,
         ct_set: str = "union",
-        obs_key: str = "celltype",
+        key: str = "celltype",
         pipeline_output: bool = True
 ) -> Union[float, Tuple[float, pd.DataFrame]]:
     """Calculate the mean difference in proportions between cell types from both datasets.
@@ -21,7 +21,7 @@ def mean_proportion_deviation(
     ct_set : str, default "union"
         Text string to determine which (sub)set of cell types to compare.
         Supported: ["union", "intersection", "sp_specific", "sc_specific"]
-    obs_key : str, default "celltype"
+    key : str, default "celltype"
         Key in adata_sp.obs for the cell type.
     pipeline_output : bool, default True
         Boolean that when set to ``False`` will return the DataFrame with cell type proportions for further analysis.
@@ -41,8 +41,8 @@ def mean_proportion_deviation(
     """
 
     # determine proportion of each cell type in each modality
-    ct_props_sp = adata_sp.obs[obs_key].value_counts(normalize=True).rename("proportion_sp")
-    ct_props_sc = adata_sc.obs[obs_key].value_counts(normalize=True).rename("proportion_sc")
+    ct_props_sp = adata_sp.obs[key].value_counts(normalize=True).rename("proportion_sp")
+    ct_props_sc = adata_sc.obs[key].value_counts(normalize=True).rename("proportion_sc")
 
     # merge cell type proportions from modalities together based on ct_how parameter
     merge_how = {"union": "outer", "intersection": "inner", "sp_specific": "left", "sc_specific": "right"}

@@ -13,7 +13,7 @@ def coexpression_similarity(
         min_cells: int = 20,
         thresh: float = 0,
         layer: str = 'lognorm',
-        ct_key: str = 'celltype',
+        key: str = 'celltype',
         by_celltype: bool = False,
         correlation_measure: str = "pearson",
         pipeline_output: bool = True,
@@ -37,7 +37,7 @@ def coexpression_similarity(
         name of layer used to calculate coexpression similarity. Should be the same
         in both AnnData objects
         default lognorm
-    ct_key : str
+    key : str
         name of the column containing the cell type information
     by_celltype: bool
         run analysis by cell type? If False, computation will be performed using the
@@ -104,7 +104,7 @@ def coexpression_similarity(
             return [coexp_sim, pd.Series(index=genes, data=np.nanmean(coexp_sim_mat, axis=1)), pd.Series(dtype=float)]
     else:        
         # Get shared cell types
-        shared_cts = list(set(adata_sc.obs[ct_key].unique()).intersection(set(adata_sp.obs[ct_key].unique())))
+        shared_cts = list(set(adata_sc.obs[key].unique()).intersection(set(adata_sp.obs[key].unique())))
         
         # Init coexpression similarity matrices
         coexp_sim_matrices = np.zeros((len(shared_cts), len(genes), len(genes)), dtype=float)
@@ -112,8 +112,8 @@ def coexpression_similarity(
 
         for ct_idx, ct in enumerate(shared_cts):
             # Adatas for the given cell type
-            adata_sc_ct = adata_sc[adata_sc.obs[ct_key] == ct, :]
-            adata_sp_ct = adata_sp[adata_sp.obs[ct_key] == ct, :]
+            adata_sc_ct = adata_sc[adata_sc.obs[key] == ct, :]
+            adata_sp_ct = adata_sp[adata_sp.obs[key] == ct, :]
 
             # Filter genes based on number of cells that express them
             genes_sp_ct = adata_sp_ct.var_names[sc.pp.filter_genes(adata_sp_ct, min_cells=min_cells, inplace=False)[0]]
