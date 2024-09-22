@@ -133,8 +133,15 @@ def run_ssam(
     adata_st.obs['ct_ssam'] = no_ct_assigned_value
     
     for cell_id in adata_st.obs['cell_id']:
-        cts = spots[spots[cell_id_col] == cell_id ][gene_col].value_counts()
-        mode = spots[spots[cell_id_col] == cell_id ]['celltype'].mode()
+        spots_of_cell = spots[spots[cell_id_col] == cell_id ]
+        if spots_of_cell["celltype"].isna().all():
+            # mode fails if all values are NaN. TODO: Potentially we want to convert NaNs to no_ct_assigned_value 
+            # before the loop: currently cells with mainly NaNs are still assigned to the cell type with the highest 
+            # number of spots
+            adata_st.obs.loc[adata_st.obs['cell_id'] == cell_id, 'ct_ssam'] = no_ct_assigned_value
+            continue
+        cts = spots_of_cell[gene_col].value_counts()
+        mode = spots_of_cell['celltype'].mode()
         adata_st.obs.loc[adata_st.obs['cell_id'] == cell_id, 'ct_ssam'] = mode.values[0]
         adata_st.obs.loc[adata_st.obs['cell_id'] == cell_id, 'ct_ssam_cert'] = \
         (spots[spots[cell_id_col] == cell_id ]['celltype'].value_counts()[mode].values[0] / sum(cts))
