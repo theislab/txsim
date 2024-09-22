@@ -11,7 +11,8 @@ from scipy.sparse import issparse
 def negative_marker_purity_cells(
     adata_sp: AnnData, 
     adata_sc: AnnData, 
-    key: str='celltype', 
+    key: str='celltype',
+    layer: str='raw',
     pipeline_output: bool=True
 ) -> float | tuple[float, pd.Series, pd.Series]:
     """ Negative marker purity aims to measure read leakeage between cells in spatial datasets. 
@@ -27,6 +28,8 @@ def negative_marker_purity_cells(
         Annotated ``AnnData`` object with counts scRNAseq data
     key : str
         Celltype key in adata_sp.obs and adata_sc.obs
+    layer : str
+        Layer of ``AnnData`` to use to compute the metric
     pipeline_output : float, optional
         Boolean for whether to use the function in the pipeline or not
     Returns
@@ -44,8 +47,8 @@ def negative_marker_purity_cells(
     
     # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
     for a in [adata_sc, adata_sp]:
-        if issparse(a.layers["raw"]):
-            a.layers["raw"] = a.layers["raw"].toarray()
+        if issparse(a.layers[layer]):
+            a.layers[layer] = a.layers[layer].toarray()
     
     # Get cell types that we find in both modalities
     shared_celltypes = adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
@@ -75,8 +78,8 @@ def negative_marker_purity_cells(
     
     
     # Get ratio of positive cells per cell type
-    pos_exp_sc = pd.DataFrame(adata_sc.layers['raw'] > 0,columns=adata_sp.var_names)
-    pos_exp_sp = pd.DataFrame(adata_sp.layers['raw'] > 0,columns=adata_sp.var_names)
+    pos_exp_sc = pd.DataFrame(adata_sc.layers[layer] > 0,columns=adata_sp.var_names)
+    pos_exp_sp = pd.DataFrame(adata_sp.layers[layer] > 0,columns=adata_sp.var_names)
     pos_exp_sc['celltype'] = list(adata_sc.obs[key])
     pos_exp_sp['celltype'] = list(adata_sp.obs[key])
     ratio_celltype_sc = pos_exp_sc.groupby('celltype').mean()
@@ -123,7 +126,13 @@ def negative_marker_purity_cells(
         return negative_marker_purity, purity_per_gene, purity_per_celltype
 
 
-def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str='celltype', pipeline_output: bool=True):
+def negative_marker_purity_reads(
+        adata_sp: AnnData, 
+        adata_sc: AnnData, 
+        key: str='celltype', 
+        layer: str='raw', 
+        pipeline_output: bool=True
+):
     """ Negative marker purity aims to measure read leakeage between cells in spatial datasets. 
     
     For this, we calculate the increase in reads assigned in spatial datasets to pairs of genes-celltyes with no/very low expression in scRNAseq
@@ -136,6 +145,8 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
         Annotated ``AnnData`` object with counts scRNAseq data
     key : str
         Celltype key in adata_sp.obs and adata_sc.obs
+    layer : str
+        Layer of ``AnnData`` to use to compute the metric
     pipeline_output : float, optional
         Boolean for whether to use the function in the pipeline or not
     Returns
@@ -153,8 +164,8 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
     
     # TMP fix for sparse matrices, ideally we don't convert, and instead have calculations for sparse/non-sparse
     for a in [adata_sc, adata_sp]:
-        if issparse(a.layers["raw"]):
-            a.layers["raw"] = a.layers["raw"].toarray()
+        if issparse(a.layers[layer]):
+            a.layers[layer] = a.layers[layer].toarray()
     
     # Get cell types that we find in both modalities
     shared_celltypes = adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
@@ -181,8 +192,8 @@ def negative_marker_purity_reads(adata_sp: AnnData, adata_sc: AnnData, key: str=
     adata_sp = adata_sp[adata_sp.obs[key].isin(celltypes)]
     
     # Get mean expression per cell type
-    exp_sc = pd.DataFrame(adata_sc.layers['raw'],columns=adata_sp.var_names)
-    exp_sp = pd.DataFrame(adata_sp.layers['raw'],columns=adata_sp.var_names)
+    exp_sc = pd.DataFrame(adata_sc.layers[layer],columns=adata_sp.var_names)
+    exp_sp = pd.DataFrame(adata_sp.layers[layer],columns=adata_sp.var_names)
     exp_sc['celltype'] = list(adata_sc.obs[key])
     exp_sp['celltype'] = list(adata_sp.obs[key])
     mean_celltype_sc = exp_sc.groupby('celltype').mean()

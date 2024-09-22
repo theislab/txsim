@@ -11,6 +11,7 @@ def knn_mixing(
     adata_sc: ad.AnnData, 
     pipeline_output: bool = True,
     key: str = "celltype",
+    layer: str = "lognorm",
     k: int = 45,
     ct_filter_factor: float = 5,
 ) -> Union[float, Tuple[str, pd.Series]]: 
@@ -31,6 +32,8 @@ def knn_mixing(
         Whether to return only a summary score or additionally also cell type level scores.
     key:
         adata.obs key for cell type annotations.
+    layer:
+        adata.layers key where the data is saved.
     k:
         Number of neighbors for knn graphs.
     ct_filter_factor:
@@ -52,7 +55,7 @@ def knn_mixing(
     adata = ad.concat([adata_sp, adata_sc], join='inner')
     
     # Set counts to log norm data
-    adata.X = adata.layers["lognorm"]
+    adata.X = adata.layers[layer]
     
     # Calculate PCA (Note: we could also think about pca per cell type...)
     assert (adata.obsm is None) or ('X_pca' not in adata.obsm), "PCA already exists."
@@ -93,6 +96,7 @@ def knn_mixing_per_cell_score(
     adata_sc: ad.AnnData, 
     key: str = "celltype", 
     key_added: str = "knn_mixing_score",
+    layer: str = "lognorm",
     k: int = 45,
     ct_filter_factor: float = 2
 ) -> None:
@@ -111,6 +115,8 @@ def knn_mixing_per_cell_score(
         adata.obs key for cell type annotations.
     key_added:
         adata.obs key where knn mixing scores are saved.
+    layer:
+        adata.layers key where the data is saved.
     k:
         Number of neighbors for knn graphs.
     ct_filter_factor:
@@ -132,7 +138,7 @@ def knn_mixing_per_cell_score(
     adata_sp.obs[key_added] = np.zeros(adata_sp.n_obs)  
 
     # Set counts to log norm data
-    adata.X = adata.layers["lognorm"]
+    adata.X = adata.layers[layer]
     
     # Calculate PCA (Note: we could also think about pca per cell type...)
     assert (adata.obsm is None) or ('X_pca' not in adata.obsm), "PCA already exists."
