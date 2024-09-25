@@ -1,17 +1,20 @@
 import numpy as np
+import pandas as pd
 import networkx as nx
 import anndata as ad
 import scanpy as sc
+import scipy
 from typing import Union, Tuple
 
 def knn_mixing(
     adata_sp: ad.AnnData, 
     adata_sc: ad.AnnData, 
     pipeline_output: bool = True,
-    obs_key: str = "celltype",
+    key: str = "celltype",
+    layer: str = "lognorm",
     k: int = 45,
     ct_filter_factor: float = 5,
-) -> Union[float, Tuple[str, dict]]: 
+) -> Union[float, Tuple[str, pd.Series]]: 
     """Compute score for knn mixing of modalities
     
     Procedure: Concatenate sc and st data. Compute PCA on dataset union. Compute assortativity of each knn graph on 
@@ -27,6 +30,10 @@ def knn_mixing(
         Single cell data.
     pipeline_output:
         Whether to return only a summary score or additionally also cell type level scores.
+    key:
+        adata.obs key for cell type annotations.
+    layer:
+        adata.layers key where the data is saved.
     k:
         Number of neighbors for knn graphs.
     ct_filter_factor:
@@ -48,45 +55,48 @@ def knn_mixing(
     adata = ad.concat([adata_sp, adata_sc], join='inner')
     
     # Set counts to log norm data
-    adata.X = adata.layers["lognorm"]
+    adata.X = adata.layers[layer]
     
     # Calculate PCA (Note: we could also think about pca per cell type...)
     assert (adata.obsm is None) or ('X_pca' not in adata.obsm), "PCA already exists."
     sc.tl.pca(adata)
     
     # get cell type groups
-    sc_cts = set(adata_sc.obs[obs_key].cat.categories)
-    st_cts = set(adata_sp.obs[obs_key].cat.categories)
+    sc_cts = set(adata_sc.obs[key].cat.categories)
+    st_cts = set(adata_sp.obs[key].cat.categories)
     all_cts = list(sc_cts.union(st_cts))
     shared_cts = list(sc_cts.intersection(st_cts))
-    #st_only_cts = list(st_cts - sc_cts)
-    #sc_only_cts = list(sc_cts - st_cts)
     
     # Get adata per shared cell type
     scores = {ct:np.nan for ct in all_cts}
     for ct in shared_cts:
-        enough_cells = (adata.obs.loc[adata.obs[obs_key]==ct,"modality"].value_counts() > (ct_filter_factor * k)).all()
+        enough_cells = (adata.obs.loc[adata.obs[key]==ct,"modality"].value_counts() > (ct_filter_factor * k)).all()
         if enough_cells:
-            a = adata[adata.obs[obs_key]==ct]
+            a = adata[adata.obs[key]==ct]
             sc.pp.neighbors(a,n_neighbors=k)
             G = nx.Graph(incoming_graph_data=a.obsp["connectivities"])
             nx.set_node_attributes(G, {i:a.obs["modality"].values[i] for i in range(G.number_of_nodes())}, "modality")
             scores[ct] = np.clip(-nx.attribute_assortativity_coefficient(G, "modality") + 1, 0, 1)
             
-    mean_score = np.mean([v for _,v in scores.items() if v is not np.nan])
+    score_per_ct = pd.Series(scores, dtype=float)
+    if score_per_ct.isnull().all():
+        mean_score = np.nan
+    else:
+        mean_score = np.nanmean(list(scores.values()))
     
     if pipeline_output:
         return mean_score
     else:
-        return mean_score, scores
+        return mean_score, score_per_ct
     
 #TODO: fix NumbaDeprecationWarning
 
 def knn_mixing_per_cell_score(
     adata_sp: ad.AnnData, 
     adata_sc: ad.AnnData, 
-    obs_key: str = "celltype", 
+    key: str = "celltype", 
     key_added: str = "knn_mixing_score",
+    layer: str = "lognorm",
     k: int = 45,
     ct_filter_factor: float = 2
 ) -> None:
@@ -101,10 +111,12 @@ def knn_mixing_per_cell_score(
         Spatial data.
     adata_sc:
         Single cell data.
-    obs_key:
+    key:
         adata.obs key for cell type annotations.
     key_added:
         adata.obs key where knn mixing scores are saved.
+    layer:
+        adata.layers key where the data is saved.
     k:
         Number of neighbors for knn graphs.
     ct_filter_factor:
@@ -126,22 +138,22 @@ def knn_mixing_per_cell_score(
     adata_sp.obs[key_added] = np.zeros(adata_sp.n_obs)  
 
     # Set counts to log norm data
-    adata.X = adata.layers["lognorm"]
+    adata.X = adata.layers[layer]
     
     # Calculate PCA (Note: we could also think about pca per cell type...)
     assert (adata.obsm is None) or ('X_pca' not in adata.obsm), "PCA already exists."
     sc.tl.pca(adata)
     
     # get cell type groups
-    sc_cts = set(adata_sc.obs[obs_key].cat.categories)
-    st_cts = set(adata_sp.obs[obs_key].cat.categories)
+    sc_cts = set(adata_sc.obs[key].cat.categories)
+    st_cts = set(adata_sp.obs[key].cat.categories)
     shared_cts = list(sc_cts.intersection(st_cts))         
 
     # Get ratio per shared cell type
     for ct in shared_cts:
-        enough_cells = (adata.obs.loc[adata.obs[obs_key]==ct,"modality"].value_counts() > (ct_filter_factor * k)).all()    
+        enough_cells = (adata.obs.loc[adata.obs[key]==ct,"modality"].value_counts() > (ct_filter_factor * k)).all()    
         if enough_cells:
-            a = adata[adata.obs[obs_key]==ct]
+            a = adata[adata.obs[key]==ct]
             exp_val = (a.obs.loc[a.obs["modality"]=="sc"].shape[0])/a.obs.shape[0]  
             sc.pp.neighbors(a,n_neighbors=k)
             G = nx.Graph(incoming_graph_data=a.obsp["connectivities"])
@@ -156,6 +168,6 @@ def knn_mixing_per_cell_score(
                 i += 1 
             
             a.obs[key_added] = f(ct_df)
-            adata_sp.obs.loc[adata_sp.obs[obs_key] == ct, key_added] = a.obs.loc[a.obs["modality"]=="spatial", key_added]
+            adata_sp.obs.loc[adata_sp.obs[key] == ct, key_added] = a.obs.loc[a.obs["modality"]=="spatial", key_added]
 
     adata_sp.obs_names = sp_obs_names

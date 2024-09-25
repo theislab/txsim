@@ -1,5 +1,18 @@
 [build-system]
-requires = [
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "txsim"
+version = "0.1.2"
+description = "Python package to measure the similarity between matched single cell and targeted spatial transcriptomics data"
+authors = [
+    { name = "Louis Kuemmerle", email = "your.email@example.com" },
+    { name = "Habib Rehman", email = "habib.email@example.com" }
+]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
     "setuptools",
     "wheel",
     "omnipath",
@@ -10,6 +23,36 @@ requires = [
     "shapely",
     "scikit-image",
     "planktonspace",
-    "geopandas"
+    "geopandas",
+    "rasterio",
+    "anndata",
+    "scanpy",
+    "numpy",
+    "pandas",
+    "scipy",
 ]
-build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "flake8",
+    "black",
+    "mypy",
+    "pre-commit",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["txsim"]
+
+[tool.hatch.version]
+path = "txsim/__init__.py"
+
+[tool.black]
+line-length = 120
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning:pkg_resources",
+    "ignore::DeprecationWarning:xarray_schema"
+]

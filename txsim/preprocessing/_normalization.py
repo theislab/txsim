@@ -166,7 +166,7 @@ def normalize_by_area(
 
 
 def gene_efficiency_correction(
-    adata_sp: AnnData,adata_sc: AnnData, layer_key:str='lognorm') -> AnnData:
+    adata_sp: AnnData,adata_sc: AnnData, layer_key:str='lognorm', ct_key:str='celltype') -> AnnData:
     """
     Calculate the efficiency of every gene in the panel and normalize for that in the spatial object
     Based on https://github.com/scverse/scanpy version 1.9.1
@@ -200,6 +200,8 @@ def gene_efficiency_correction(
         `adata.X` and `adata.layers`, by default True
     copy : bool, optional
         Whether to modify copied input object. Not compatible with ``inplace=False``, by default False
+    ct_key : str, optional
+        Name of the field in `adata.obs` where the cell types are stored, by default 'celltype'
 
     Returns
     -------
@@ -209,11 +211,15 @@ def gene_efficiency_correction(
     `   adata.X` and `adata.layers`, depending on `inplace`
     """
 
-
     transform=layer_key
-    key='celltype'
-    adata_sc=adata_sc[:,adata_sp.var_names]
-    unique_celltypes=adata_sc.obs.loc[adata_sc.obs[key].isin(adata_sp.obs[key]),key].unique()
+    adata_sc=adata_sc[:,adata_sp.var_names].copy()
+    
+    if issparse(adata_sc.layers[transform]):
+        adata_sc.layers[transform]=adata_sc.layers[transform].toarray().copy()
+    if issparse(adata_sp.layers[transform]):
+        adata_sp.layers[transform]=adata_sp.layers[transform].toarray().copy()
+        
+    unique_celltypes=adata_sc.obs.loc[adata_sc.obs[ct_key].isin(adata_sp.obs[ct_key]),ct_key].unique()
     genes=adata_sc.var.index[adata_sc.var.index.isin(adata_sp.var.index)]
     exp_sc=pd.DataFrame(adata_sc.layers[transform],columns=adata_sc.var.index)
     gene_means_sc=pd.DataFrame(np.mean(exp_sc,axis=0))
@@ -221,12 +227,12 @@ def gene_efficiency_correction(
     exp_sp=pd.DataFrame(adata_sp.layers[transform],columns=adata_sp.var.index)
     gene_means_sp=pd.DataFrame(np.mean(exp_sp,axis=0))
     gene_means_sp=gene_means_sp.loc[gene_means_sp.index.sort_values(),:]
-    exp_sc['celltype']=list(adata_sc.obs['celltype'])
-    exp_sp['celltype']=list(adata_sp.obs['celltype'])
-    exp_sc=exp_sc.loc[exp_sc['celltype'].isin(unique_celltypes),:]
-    exp_sp=exp_sp.loc[exp_sp['celltype'].isin(unique_celltypes),:]
-    mean_celltype_sp=exp_sp.groupby('celltype').mean()
-    mean_celltype_sc=exp_sc.groupby('celltype').mean()
+    exp_sc[ct_key]=list(adata_sc.obs[ct_key])
+    exp_sp[ct_key]=list(adata_sp.obs[ct_key])
+    exp_sc=exp_sc.loc[exp_sc[ct_key].isin(unique_celltypes),:]
+    exp_sp=exp_sp.loc[exp_sp[ct_key].isin(unique_celltypes),:]
+    mean_celltype_sp=exp_sp.groupby(ct_key).mean().astype(np.float64)
+    mean_celltype_sc=exp_sc.groupby(ct_key).mean().astype(np.float64)
     mean_celltype_sc=mean_celltype_sc.loc[:,mean_celltype_sc.columns.sort_values()]
     mean_celltype_sp=mean_celltype_sp.loc[:,mean_celltype_sp.columns.sort_values()]
     #If no read is prestent in a gene, we add 0.1 so that we can compute statistics
@@ -237,10 +243,10 @@ def gene_efficiency_correction(
     gene_ratios=pd.DataFrame(np.mean(mean_celltype_sp,axis=0)/np.mean(mean_celltype_sc,axis=0))
     gr=pd.DataFrame(gene_ratios)
     gr.columns=['efficiency_st_vs_sc']
-    efficiency_mean=np.mean(gene_ratios)
-    efficiency_std=np.std(gene_ratios)
+    efficiency_mean=np.mean(gene_ratios,axis=0)
+    efficiency_std=np.std(gene_ratios,axis=0)
     meanexp=pd.DataFrame(adata_sp.layers[transform],columns=adata_sp.var.index)
     for gene in meanexp.columns:
-        meanexp.loc[:,gene]=meanexp.loc[:,gene]/gene_ratios.loc[gene,'efficiency_st_vs_sc']
+        meanexp.loc[:,gene]=meanexp.loc[:,gene]/gr.loc[gene,'efficiency_st_vs_sc']
     adata_sp.layers[transform]=meanexp
     return adata_sp
