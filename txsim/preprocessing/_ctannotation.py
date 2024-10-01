@@ -128,7 +128,12 @@ def run_ssam(
     sdata['celltype'] = sdata.celltype.astype('category')
     
     # Assign based on majority vote
-    spots['celltype'] = sdata['celltype']
+    # TODO: Unsure why ssam can duplicate spots. And why some are missing. In general check if it's better
+    #       to use the ssam package instead of plankton, maybe there the issue is solved.
+    spots['celltype'] = no_ct_assigned_value
+    sdata = sdata[~sdata.index.duplicated(keep='first')] 
+    spots.loc[sdata.index,"celltype"] = sdata['celltype']
+    #spots['celltype'] = sdata['celltype']
     
     adata_st.obs['ct_ssam'] = no_ct_assigned_value
     
