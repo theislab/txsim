@@ -130,14 +130,26 @@ def run_ssam(
     # Assign based on majority vote
     # TODO: Unsure why ssam can duplicate spots. And why some are missing. In general check if it's better
     #       to use the ssam package instead of plankton, maybe there the issue is solved.
+    from datetime import datetime
+    t0 = datetime.now()
+    print(datetime.now() - t0, "Start new lines of ssam", flush=True)
     spots['celltype'] = no_ct_assigned_value
+    print(datetime.now() - t0, "Subset sdata", flush=True)
     sdata = sdata[~sdata.index.duplicated(keep='first')] 
+    print(datetime.now() - t0, "Set celltype col in spots", flush=True)
     spots.loc[sdata.index,"celltype"] = sdata['celltype']
     #spots['celltype'] = sdata['celltype']
     
     adata_st.obs['ct_ssam'] = no_ct_assigned_value
     
+    n_cell_ids = len(adata_st.obs['cell_id'])
+    incr = n_cell_ids // 20
+    count = 0
+    print(datetime.now() - t0, f"Start for loop for {n_cell_ids} cell ids", flush=True)
     for cell_id in adata_st.obs['cell_id']:
+        if (count % incr) == 0:
+            print(datetime.now() - t0, f"\t  {count}/{n_cell_ids} cell ids", flush=True)
+        count += 1 
         spots_of_cell = spots[spots[cell_id_col] == cell_id ]
         if spots_of_cell["celltype"].isna().all():
             # mode fails if all values are NaN. TODO: Potentially we want to convert NaNs to no_ct_assigned_value 
