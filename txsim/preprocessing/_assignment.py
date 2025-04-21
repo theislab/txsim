@@ -84,11 +84,11 @@ def run_pciSeq(
         del adata.layers
     scdata = adata.X if not issparse(adata.X) else adata.X.toarray()
     scdata  = pd.DataFrame(scdata.transpose())
-    print(scdata.columns, flush=True)
-    print(adata.obs[cell_type_key], flush=True)
-    print(type(adata.X), flush=True)
-    print(type(scdata), flush=True)
-    print(scdata, flush=True)
+    # print(scdata.columns, flush=True)
+    # print(adata.obs[cell_type_key], flush=True)
+    # print(type(adata.X), flush=True)
+    # print(type(scdata), flush=True)
+    # print(scdata, flush=True)
     scdata.columns = adata.obs[cell_type_key]
     scdata.index = adata.var_names
 
