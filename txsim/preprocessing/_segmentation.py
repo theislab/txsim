@@ -207,6 +207,8 @@ def segment_cellpose(
     else:
         model = models.CellposeModel()
         if hyperparams is not None:
+            if "model_type" in hyperparams:
+                del hyperparams["model_type"]
             res, _, _ = model.eval(img, **hyperparams)
         else:
             res, _, _ = model.eval(img)
