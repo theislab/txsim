@@ -174,7 +174,10 @@ def segment_cellpose(
     NDArray
         labelled image, where 0=no masks; 1,2,...=mask labels
     """
+    import cellpose
     from cellpose import models
+
+    CP_VERSION = int(cellpose.version.split('.')[0])
     
     # Set model type
     if (hyperparams is not None) and ("model_type" in hyperparams):
@@ -183,22 +186,33 @@ def segment_cellpose(
         model_type = 'nuclei'
     
     # Init model
-    model = models.Cellpose(model_type=model_type)
-    
-    # Predict
-    if hyperparams is not None:
-        if "model_type" in hyperparams:
-            del hyperparams["model_type"]
-        res, _, _, _ = model.eval(
-            img,
-            channels=[0, 0],
-            **hyperparams
-        )
+    if CP_VERSION < 4:
+        model = models.Cellpose(model_type=model_type)
+
+        # Predict
+        if hyperparams is not None:
+            if "model_type" in hyperparams:
+                del hyperparams["model_type"]
+            res, _, _, _ = model.eval(
+                img,
+                channels=[0, 0],
+                **hyperparams
+            )
+        else:
+            res, _, _, _ = model.eval(
+                img,
+                channels=[0, 0]
+            )
+
     else:
-        res, _, _, _ = model.eval(
-            img,
-            channels=[0, 0]
-        )
+        model = models.CellposeModel()
+        if hyperparams is not None:
+            res, _, _ = model.eval(img, **hyperparams)
+        else:
+            res, _, _ = model.eval(img)
+    
+    
+
         
     return res
 
