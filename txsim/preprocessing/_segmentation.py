@@ -205,7 +205,12 @@ def segment_cellpose(
             )
 
     else:
-        model = models.CellposeModel()
+        from cellpose import core
+        if core.use_gpu():
+            print("Using GPU", flush=True)
+        else:
+            print("Using CPU", flush=True)
+        model = models.CellposeModel(gpu=core.use_gpu())
         if hyperparams is not None:
             if "model_type" in hyperparams:
                 del hyperparams["model_type"]
